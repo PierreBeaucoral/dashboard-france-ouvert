@@ -32,6 +32,7 @@ suppressPackageStartupMessages({
 source(here::here("R", "theme.R"))
 source(here::here("R", "map_helpers.R"))
 source(here::here("R", "dvf_helpers.R"))
+source(here::here("R", "air_helpers.R"))
 
 # ---- Chargement des contours (Étape 1) ----
 geo_dep_path <- here::here("data", "processed", "geo", "departements.geojson")
@@ -149,6 +150,15 @@ if (dvf_ready) {
       n  = n_transactions
     ) |>
     dplyr::arrange(code, type, annee)
+}
+
+# ---- Air (Étape 4) ----
+atmo_path  <- here::here("data", "processed", "air", "atmo_snapshot.parquet")
+atmo_ready <- file.exists(atmo_path) && elec_ready
+
+if (atmo_ready) {
+  atmo       <- arrow::read_parquet(atmo_path)
+  atmo_date  <- unique(atmo$date_ech)[1]
 }
 ```
 
@@ -280,6 +290,76 @@ if (dvf_ready) {
       '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
       '    \'<div class="cp-section"><h4>Prix m² médian (€) par année</h4>\' +\n',
       '    trendBar("Appartement") + trendBar("Maison") + \'</div>\';\n',
+      '};\n',
+      '</script>\n',
+      sep = ""
+  )
+}
+```
+
+```{r}
+#| label: inject-air-data
+#| results: asis
+#| echo: false
+if (atmo_ready) {
+  atmo_for_js <- atmo |>
+    dplyr::transmute(
+      code = code_commune, qual = qual_indice,
+      no2 = no2_indice, o3 = o3_indice,
+      pm10 = pm10_indice, pm25 = pm25_indice,
+      label = qual_label, source = source_aasqa
+    )
+  atmo_json <- jsonlite::toJSON(atmo_for_js, auto_unbox = TRUE, na = "null")
+
+  atmo_colors_js <- jsonlite::toJSON(as.list(.atmo_colors), auto_unbox = TRUE)
+  atmo_labels_js <- jsonlite::toJSON(as.list(.atmo_labels), auto_unbox = TRUE)
+
+  cat('<script>\n',
+      'window.atmoRaw = ', as.character(atmo_json), ';\n',
+      'window.atmoColors = ', as.character(atmo_colors_js), ';\n',
+      'window.atmoLabels = ', as.character(atmo_labels_js), ';\n',
+      'window.atmoNAColor = "#E8E4DC";\n',
+      'window.atmoData = {};\n',
+      'window.atmoRaw.forEach(function(r) { window.atmoData[r.code] = r; });\n',
+      'window.atmoColorFor = function(v) {\n',
+      '  if (v == null || v === undefined || v === "NA") return window.atmoNAColor;\n',
+      '  return window.atmoColors[String(v)] || window.atmoNAColor;\n',
+      '};\n',
+      'window.atmoFieldMap = { "qual_indice":"qual", "no2_indice":"no2", "o3_indice":"o3", "pm10_indice":"pm10", "pm25_indice":"pm25" };\n',
+      'window.atmoRecolor = function(pollutantCol) {\n',
+      '  var map = window.atmoMap;\n',
+      '  if (!map) return;\n',
+      '  var key = window.atmoFieldMap[pollutantCol] || "qual";\n',
+      '  map.eachLayer(function(layer) {\n',
+      '    if (!layer.options || !layer.options.layerId) return;\n',
+      '    var code = layer.options.layerId;\n',
+      '    var ent = window.atmoData[code];\n',
+      '    var v = ent ? ent[key] : null;\n',
+      '    layer.setStyle({ fillColor: window.atmoColorFor(v), fillOpacity: (v == null ? 0.25 : 0.85) });\n',
+      '  });\n',
+      '};\n',
+      'window.updateAirPanel = function(code) {\n',
+      '  var el = document.getElementById("air-panel");\n',
+      '  if (!el) return;\n',
+      '  var ent = window.atmoData[code];\n',
+      '  var elec = window.communeLookup && window.communeLookup[code];\n',
+      '  var nom = elec ? elec.nom_commune : code;\n',
+      '  var dept = elec ? (elec.libelle_dept + " (" + elec.code_dept + ")") : "";\n',
+      '  if (!ent) {\n',
+      '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Pas d\\u0027indice ATMO publié pour cette commune.</div>\';\n',
+      '    return;\n',
+      '  }\n',
+      '  function pill(label, v) {\n',
+      '    if (v == null) return "<div class=\\"atmo-row atmo-row-na\\"><span class=\\"atmo-pol\\">" + label + "</span><span class=\\"atmo-pill\\">—</span></div>";\n',
+      '    var bg = window.atmoColors[String(v)];\n',
+      '    var lib = window.atmoLabels[String(v)];\n',
+      '    return "<div class=\\"atmo-row\\"><span class=\\"atmo-pol\\">" + label + "</span><span class=\\"atmo-pill\\" style=\\"background:" + bg + ";\\">" + v + " · " + lib + "</span></div>";\n',
+      '  }\n',
+      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
+      '    \'<div class="cp-section">\' + pill("ATMO global", ent.qual) + \'</div>\' +\n',
+      '    \'<div class="cp-section"><h4>Sous-indices polluants</h4>\' +\n',
+      '    pill("NO₂", ent.no2) + pill("O₃", ent.o3) + pill("PM₁₀", ent.pm10) + pill("PM₂.₅", ent.pm25) + \'</div>\' +\n',
+      '    \'<div class="cp-section" style="font-size:0.78rem;color:#7A7A7A;">Source : \' + (ent.source || "—") + \'</div>\';\n',
       '};\n',
       '</script>\n',
       sep = ""
@@ -454,9 +534,78 @@ if (dvf_ready) {
 
 # Qualité de l'air
 
-::: {.card}
-**Étape 4 à venir** — stations Geod'air, rattachement commune ↔ station
-la plus proche dans un rayon ≤ 15 km.
+## Row {height="82%"}
+
+::: {.card title="Indice ATMO par commune" width="72%"}
+```{=html}
+<div class="dvf-controls">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Polluant</span>
+    <div class="dvf-ctrl-radios" id="atmo-radios">
+      <label><input type="radio" name="atmo-pol" value="qual_indice" checked> ATMO global</label>
+      <label><input type="radio" name="atmo-pol" value="no2_indice"> NO₂</label>
+      <label><input type="radio" name="atmo-pol" value="o3_indice"> O₃</label>
+      <label><input type="radio" name="atmo-pol" value="pm10_indice"> PM₁₀</label>
+      <label><input type="radio" name="atmo-pol" value="pm25_indice"> PM₂.₅</label>
+    </div>
+  </div>
+</div>
+```
+
+```{r}
+#| label: map-air
+if (atmo_ready) {
+  m <- choropleth_atmo(com_metro_only, dep_metro, atmo, display_date = atmo_date)
+  m |>
+    htmlwidgets::onRender(
+      sprintf(
+        "function(el, x) {
+           window.atmoMap = this;
+           var self = this;
+           function attach() {
+             self.eachLayer(function(layer) {
+               if (layer.options && layer.options.layerId && !layer._atmoClickOn) {
+                 layer._atmoClickOn = true;
+                 layer.on('click', function(e) {
+                   if (window.updateAirPanel) window.updateAirPanel(e.target.options.layerId);
+                 });
+               }
+             });
+           }
+           setTimeout(attach, 60);
+           self.on('layeradd', function() { setTimeout(attach, 0); });
+           function readSel() {
+             var p = document.querySelector('input[name=atmo-pol]:checked');
+             return p ? p.value : 'qual_indice';
+           }
+           function onChange() {
+             var pol = readSel();
+             if (window.atmoRecolor) window.atmoRecolor(pol);
+           }
+           setTimeout(function() {
+             document.querySelectorAll('input[name=atmo-pol]')
+               .forEach(function(r) { r.addEventListener('change', onChange); });
+           }, 300);
+         }"
+      )
+    )
+} else {
+  htmltools::HTML(
+    "<p style='padding:2rem;color:#7A7A7A;'>",
+    "Air non chargé. Lancer<br><code>Rscript scripts/04_air_atmo.R</code>",
+    "</p>"
+  )
+}
+```
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+<div id="air-panel" class="commune-panel">
+  <div class="cp-placeholder">
+    <p><strong>Cliquez sur une commune</strong> pour voir ses indices ATMO du jour.</p>
+    <p class="cp-hint">Snapshot du dernier jour disponible. L'indice ATMO synthétise 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅, SO₂). Échelle 1 (Bon) à 6 (Extrêmement mauvais).</p>
+  </div>
+</div>
 :::
 
 # Explorer

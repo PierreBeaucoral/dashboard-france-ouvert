@@ -314,6 +314,40 @@ pre.sourceCode {
 }
 
 // ============================================================
+// Indicateurs ATMO (pills colorées)
+// ============================================================
+.atmo-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px dashed $rule;
+  &:last-child { border-bottom: 0; }
+  .atmo-pol { color: $ink-soft; }
+  .atmo-pill {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: rgba(0,0,0,0.75);
+    font-family: $font-family-sans-serif;
+  }
+}
+.atmo-row-na .atmo-pill {
+  background: $rule;
+  color: $ink-muted;
+}
+// Sub-text dans la légende (date de référence)
+.lgd-sub {
+  font-size: 0.7rem;
+  color: $ink-muted;
+  margin-bottom: 6px;
+  font-family: $font-family-monospace;
+}
+
+// ============================================================
 // Panneau "Territoire sélectionné" (clic commune)
 // ============================================================
 .commune-panel {
