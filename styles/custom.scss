@@ -453,6 +453,12 @@ pre.sourceCode {
   }
   .cp-badge-t1 { background: lighten($warning, 35%); color: darken($warning, 5%); }
   .cp-badge-t2 { background: lighten($accent, 40%); color: darken($accent, 5%); }
+  .cp-badge-imp {
+    background: lighten($warning, 38%);
+    color: darken($warning, 10%);
+    font-style: italic;
+    cursor: help;
+  }
 
   .cp-result {
     display: flex;

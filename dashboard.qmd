@@ -322,7 +322,8 @@ if (atmo_ready) {
       code = code_commune, qual = qual_indice,
       no2 = no2_indice, o3 = o3_indice,
       pm10 = pm10_indice, pm25 = pm25_indice,
-      label = qual_label, source = source_aasqa
+      label = qual_label, source = source_aasqa,
+      imputed = as.logical(imputed)
     )
   atmo_json <- jsonlite::toJSON(atmo_for_js, auto_unbox = TRUE, na = "null")
 
@@ -370,11 +371,12 @@ if (atmo_ready) {
       '    var lib = window.atmoLabels[String(v)];\n',
       '    return "<div class=\\"atmo-row\\"><span class=\\"atmo-pol\\">" + label + "</span><span class=\\"atmo-pill\\" style=\\"background:" + bg + ";\\">" + v + " · " + lib + "</span></div>";\n',
       '  }\n',
-      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
+      '  var impBadge = ent.imputed ? \'<span class="cp-badge cp-badge-imp" title="Pas de mesure publiée pour cette commune ; valeur = moyenne des communes mesurées du même département.">Estimation dept</span>\' : "";\n',
+      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \' \' + impBadge + \'</div></div>\' +\n',
       '    \'<div class="cp-section">\' + pill("ATMO global", ent.qual) + \'</div>\' +\n',
       '    \'<div class="cp-section"><h4>Sous-indices polluants</h4>\' +\n',
       '    pill("NO₂", ent.no2) + pill("O₃", ent.o3) + pill("PM₁₀", ent.pm10) + pill("PM₂.₅", ent.pm25) + \'</div>\' +\n',
-      '    \'<div class="cp-section" style="font-size:0.78rem;color:#7A7A7A;">Source : \' + (ent.source || "—") + \'</div>\';\n',
+      '    \'<div class="cp-section" style="font-size:0.78rem;color:#7A7A7A;">Source : \' + (ent.source || (ent.imputed ? "Imputée (moy. dépt)" : "—")) + \'</div>\';\n',
       '};\n',
       '</script>\n',
       sep = ""
@@ -407,12 +409,14 @@ if (elec_ready) {
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
 <div id="commune-panel" class="commune-panel">
   <div class="cp-placeholder">
     <p><strong>Cliquez sur une commune</strong> pour voir le détail des résultats Législatives 2024.</p>
     <p class="cp-hint">Le panneau affichera la famille gagnante, l'écart au second, l'abstention et la répartition des voix par famille politique.</p>
   </div>
 </div>
+```
 :::
 
 ## Row {height="18%" .fill}
@@ -539,12 +543,14 @@ if (dvf_ready) {
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
 <div id="dvf-panel" class="commune-panel">
   <div class="cp-placeholder">
     <p><strong>Cliquez sur une commune</strong> pour voir l'évolution de son prix médian au m² entre 2021 et 2024.</p>
     <p class="cp-hint">Mono-local uniquement (appartements/maisons vendus seuls, sans dépendance). N &lt; 5 ventes/an : valeur non publiée.</p>
   </div>
 </div>
+```
 :::
 
 # Qualité de l'air
@@ -615,12 +621,14 @@ if (atmo_ready) {
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
 <div id="air-panel" class="commune-panel">
   <div class="cp-placeholder">
     <p><strong>Cliquez sur une commune</strong> pour voir ses indices ATMO du jour.</p>
     <p class="cp-hint">Snapshot du dernier jour disponible. L'indice ATMO synthétise 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅, SO₂). Échelle 1 (Bon) à 6 (Extrêmement mauvais).</p>
   </div>
 </div>
+```
 :::
 
 # Bivarié

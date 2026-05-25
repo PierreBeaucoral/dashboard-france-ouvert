@@ -103,6 +103,81 @@ snapshot <- df |>
   ) |>
   dplyr::filter(!is.na(qual_indice))
 
+# ---- Fallback : moyenne départementale pour les communes sans valeur directe ----
+# La couverture AASQA est très inégale : Air Breizh ne publie que 61 communes
+# sur ~1200 de Bretagne, Atmo Pays de la Loire 404/1240, Atmo-Occitanie
+# 164/4500. Pour boucher ces trous, on impute la moyenne du département
+# (à partir des communes effectivement publiées dans le département) et on
+# trace la provenance dans la colonne `imputed`.
+
+snapshot <- snapshot |>
+  dplyr::mutate(
+    code_dept = ifelse(substr(code_commune, 1, 2) == "97",
+                       substr(code_commune, 1, 3),
+                       substr(code_commune, 1, 2))
+  )
+
+dept_means <- snapshot |>
+  dplyr::group_by(code_dept) |>
+  dplyr::summarise(
+    qual_dept = round(mean(qual_indice, na.rm = TRUE)),
+    no2_dept  = round(mean(no2_indice,  na.rm = TRUE)),
+    o3_dept   = round(mean(o3_indice,   na.rm = TRUE)),
+    pm10_dept = round(mean(pm10_indice, na.rm = TRUE)),
+    pm25_dept = round(mean(pm25_indice, na.rm = TRUE)),
+    n_dept    = dplyr::n(),
+    .groups   = "drop"
+  )
+
+# Univers de toutes les communes : si possible depuis le parquet élections
+# (couverture quasi-totale 35k). Sinon on garde juste snapshot.
+elec_path <- here::here("data", "processed", "elections",
+                       "legislatives_2024_t2.parquet")
+
+if (file.exists(elec_path)) {
+  all_communes <- arrow::read_parquet(elec_path) |>
+    dplyr::transmute(
+      code_commune = code_insee,
+      nom_full     = nom_commune,
+      code_dept_e  = code_dept
+    )
+
+  full <- all_communes |>
+    dplyr::left_join(snapshot, by = "code_commune") |>
+    dplyr::mutate(
+      code_dept = dplyr::coalesce(code_dept, code_dept_e),
+      nom_commune = dplyr::coalesce(nom_commune, nom_full)
+    ) |>
+    dplyr::left_join(dept_means, by = "code_dept") |>
+    dplyr::mutate(
+      imputed = is.na(qual_indice) & !is.na(qual_dept),
+      # Si pas de valeur directe : fallback dept-moyenne
+      qual_indice = dplyr::coalesce(qual_indice, qual_dept),
+      no2_indice  = dplyr::coalesce(no2_indice,  no2_dept),
+      o3_indice   = dplyr::coalesce(o3_indice,   o3_dept),
+      pm10_indice = dplyr::coalesce(pm10_indice, pm10_dept),
+      pm25_indice = dplyr::coalesce(pm25_indice, pm25_dept),
+      qual_label  = dplyr::coalesce(qual_label,
+                                    c("0"="Absent","1"="Bon","2"="Moyen",
+                                      "3"="Dégradé","4"="Mauvais",
+                                      "5"="Très mauvais",
+                                      "6"="Extrêmement mauvais")[as.character(qual_indice)])
+    ) |>
+    # Normaliser la casse des labels (data Atmo mélange "Dégradé"/"dégradé")
+    dplyr::mutate(qual_label = stringr::str_to_sentence(qual_label)) |>
+    dplyr::select(code_commune, nom_commune, date_ech,
+                  qual_indice, qual_label,
+                  no2_indice, o3_indice, pm10_indice, pm25_indice,
+                  source_aasqa, imputed) |>
+    dplyr::filter(!is.na(qual_indice))
+
+  snapshot <- full
+  message(glue::glue("  Après fallback dept-mean : {nrow(snapshot)} communes ",
+                     "(dont {sum(snapshot$imputed)} imputées)"))
+} else {
+  message("⚠ legislatives_2024_t2.parquet non trouvé — pas de fallback dept-mean.")
+}
+
 arrow::write_parquet(snapshot, out_path)
 
 # ---- Rapport ----
