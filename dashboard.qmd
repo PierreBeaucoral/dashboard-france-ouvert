@@ -2,7 +2,7 @@
 title: "Tableau de bord · France"
 format:
   dashboard:
-    orientation: columns
+    orientation: rows
     nav-buttons:
       - icon: github
         href: https://github.com
@@ -11,76 +11,133 @@ format:
       - styles/custom.scss
 execute:
   echo: false
+  warning: false
+  message: false
 ---
 
-```{r setup}
+```{r}
+#| label: setup
 #| include: false
-# Helpers communs à toutes les pages
-# source("R/load_data.R")    # à activer dès qu'on a des données (Étape 2+)
-# source("R/map_helpers.R")
-# source("R/corr_helpers.R")
-# source("R/theme.R")
+suppressPackageStartupMessages({
+  library(leaflet)
+  library(sf)
+  library(dplyr)
+  library(htmltools)
+})
+
+source(here::here("R", "theme.R"))
+source(here::here("R", "map_helpers.R"))
+
+# ---- Chargement des contours (Étape 1) ----
+geo_path <- here::here("data", "processed", "geo", "departements.geojson")
+
+if (file.exists(geo_path)) {
+  dep <- sf::read_sf(geo_path, quiet = TRUE) |>
+    mutate(is_drom = code %in% c("971", "972", "973", "974", "976"))
+  dep_metro <- dep |> filter(!is_drom)
+  dep_drom  <- dep |> filter( is_drom)
+  data_ready <- TRUE
+} else {
+  data_ready <- FALSE
+}
 ```
 
-# Élections {orientation="columns"}
+# Élections
 
-## Column {width="20%"}
+## Row {height="78%"}
 
-::: {.card title="Sujet"}
-Sélection de la couche à afficher. (Sélecteurs à brancher en Étape 2.)
+::: {.card title="Carte · France · Législatives 2024 · 2nd tour"}
+```{r}
+#| label: map-metropole
+if (data_ready) {
+  base_map_metropole(dep_metro)
+} else {
+  htmltools::HTML(
+    "<p style='padding:2rem;color:#7A7A7A;'>",
+    "Données géographiques manquantes. ",
+    "Lancer <code>Rscript scripts/01_geo_boundaries.R</code>.",
+    "</p>"
+  )
+}
+```
+
+::: {.callout-note appearance="minimal"}
+*Étape 1 — squelette carte.* Les contours départementaux sont en place.
+La couche communale et le choroplèthe Législatives 2024 arrivent en Étape 2.
+:::
 :::
 
-::: {.card title="Période"}
-Slider temporel — pour DVF et qualité de l'air. (Étape 3.)
+## Row {height="22%" .fill}
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+#| label: drom-971
+if (data_ready) drom_inset(dep_drom, "971")
+```
 :::
 
-## Column {width="55%"}
-
-::: {.card title="Carte · Législatives 2024 · 2nd tour"}
-Carte (vide à ce stade — branchée en Étape 1 avec les contours départementaux,
-puis en Étape 2 avec les résultats par commune).
+::: {.card title="Martinique (972)"}
+```{r}
+#| label: drom-972
+if (data_ready) drom_inset(dep_drom, "972")
+```
 :::
 
-## Column {width="25%"}
-
-::: {.card title="Territoire sélectionné"}
-Indicateurs clés du territoire cliqué (vide à ce stade).
+::: {.card title="Guyane (973)"}
+```{r}
+#| label: drom-973
+if (data_ready) drom_inset(dep_drom, "973")
+```
 :::
 
-::: {.card title="Détails"}
-Tableau / graphique du sujet courant (vide à ce stade).
+::: {.card title="La Réunion (974)"}
+```{r}
+#| label: drom-974
+if (data_ready) drom_inset(dep_drom, "974")
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+#| label: drom-976
+if (data_ready) drom_inset(dep_drom, "976")
+```
 :::
 
 # Immobilier
 
 ::: {.card}
-Page Immobilier — à brancher en Étape 3 (agrégation DVF par commune × année).
+**Étape 3 à venir** — agrégation DVF par commune × année (médiane prix m²,
+filtres mono-local, App/Maison, surface > 9 m², bornes prix).
 :::
 
 # Qualité de l'air
 
 ::: {.card}
-Page Qualité de l'air — à brancher en Étape 4 (stations Geod'air, rattachement
-commune-station ≤ 15 km).
+**Étape 4 à venir** — stations Geod'air, rattachement commune ↔ station
+la plus proche dans un rayon ≤ 15 km.
 :::
 
 # Explorer
 
 ::: {.card title="Avertissement de lecture"}
 :::: {.callout-warning}
-**Corrélation n'est pas causalité.** Les liens observés ici sont descriptifs et
-agrégés au niveau communal. Ils sont sujets au **biais écologique** : une
-corrélation entre variables au niveau commune ne dit rien sur les individus.
+**Corrélation n'est pas causalité.** Les liens observés dans cet onglet seront
+descriptifs et agrégés au niveau communal. Ils sont sujets au **biais
+écologique** : une corrélation entre variables au niveau commune ne dit rien
+sur les individus.
 
-La densité urbaine est un **confondant majeur** : prix de l'immobilier, vote,
-pollution et abstention sont tous corrélés au caractère urbain/rural d'une commune.
-Utiliser la stratification (à brancher en Étape 6) pour démêler ces effets.
+La densité urbaine est un **confondant majeur** : prix immobilier, vote,
+pollution et abstention sont tous corrélés au caractère urbain/rural d'une
+commune. La stratification (Étape 6) permettra de démêler ces effets.
 
 Voir la [note méthodologique complète](docs/correlations.qmd).
 ::::
 :::
 
-::: {.card title="Vue à venir"}
-Scatter ↔ carte liés (crosstalk), matrice de corrélations (Spearman / Pearson),
-boxplots conditionnels par strate de densité. À brancher en Étape 6.
+::: {.card title="Vue à venir (Étape 6)"}
+- **Scatter ↔ carte liés** (crosstalk + ggiraph/plotly)
+- **Matrice de corrélations** Spearman / Pearson, globale et par strate
+- **Boxplots conditionnels** par classe de densité INSEE
+- **Bivariate choropleth 3 × 3** sur la carte principale (Étape 5)
 :::

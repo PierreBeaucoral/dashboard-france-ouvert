@@ -37,7 +37,7 @@ Le site rendu est dans `_site/`.
 ## État d'avancement
 
 - [x] **Étape 0 — Setup** : structure projet, thème, scaffolding
-- [ ] **Étape 1 — Squelette carte** : contours départements + DROM cartouches
+- [x] **Étape 1 — Squelette carte** : contours départements (101 entités, simplifiés à 299 KB), 5 cartouches DROM, navigation cliquable
 - [ ] **Étape 2 — Législatives 2024** : choroplèthe + panneau bout-en-bout
 - [ ] **Étape 3 — DVF** : agrégation + slider temporel
 - [ ] **Étape 4 — Qualité de l'air** : stations + rattachement commune

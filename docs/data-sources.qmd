@@ -6,15 +6,34 @@ Toutes les sources sont publiques et stables. Pour chaque jeu, on documente
 l'URL canonique, le format, la date du snapshot téléchargé et l'éventuel filtre
 appliqué en amont (script `scripts/`).
 
-## Contours administratifs
+## Contours administratifs — départements
 
-À documenter en Étape 1 — typiquement `geo.api.gouv.fr` (API Découpage administratif)
-ou le dépôt `etalab/france-geojson` pour les contours communaux et départementaux.
+- **URL métropole** : `https://france-geojson.gregoiredavid.fr/repo/departements.geojson`
+- **URLs DROM** (un fichier par département) :
+  - `https://france-geojson.gregoiredavid.fr/repo/departements/971-guadeloupe/departement-971-guadeloupe.geojson`
+  - `https://france-geojson.gregoiredavid.fr/repo/departements/972-martinique/departement-972-martinique.geojson`
+  - `https://france-geojson.gregoiredavid.fr/repo/departements/973-guyane/departement-973-guyane.geojson`
+  - `https://france-geojson.gregoiredavid.fr/repo/departements/974-la-reunion/departement-974-la-reunion.geojson`
+  - `https://france-geojson.gregoiredavid.fr/repo/departements/976-mayotte/departement-976-mayotte.geojson`
+- **Format** : GeoJSON, EPSG:4326 (WGS84)
+- **Source upstream** : IGN / OpenStreetMap (dépôt gregoiredavid largement utilisé en
+  data science francophone)
+- **Snapshot** : 2026-05-25
+- **Pourquoi pas l'API officielle `geo.api.gouv.fr`** : l'endpoint
+  `/departements?geometry=contour&format=geojson` ignore le paramètre `geometry`
+  et renvoie les attributs sans géométries. Le dépôt gregoiredavid fournit
+  directement les contours, version stable.
+- **Particularité** : le fichier global `departements.geojson` du dépôt couvre
+  uniquement la métropole. Les DROM sont récupérés séparément puis fusionnés
+  dans le pipeline.
+- **Traitement** : simplification Visvalingam-Whyatt via `rmapshaper::ms_simplify`
+  avec `keep = 0.20` → 96 + 5 = 101 polygones, ~299 KB.
+- **Script** : `scripts/01_geo_boundaries.R`
 
-- URL : *à compléter*
-- Format : GeoJSON
-- Snapshot : *à compléter*
-- Script : `scripts/01_geo_boundaries.R`
+## Contours administratifs — communes
+
+À documenter en Étape 2 — téléchargement effectif au moment où on a besoin du
+choroplèthe communal pour les Législatives.
 
 ## Élections — Législatives 2024, 2nd tour
 
