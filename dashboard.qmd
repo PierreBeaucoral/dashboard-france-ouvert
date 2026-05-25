@@ -331,8 +331,10 @@ if (atmo_ready) {
   atmo_for_js <- atmo |>
     dplyr::transmute(
       code = code_commune, qual = qual_indice,
+      qmean = qual_mean,
       no2 = no2_indice, o3 = o3_indice,
       pm10 = pm10_indice, pm25 = pm25_indice,
+      n_days, pct_bon, pct_mauvais_plus,
       label = qual_label, source = source_aasqa,
       imputed = as.logical(imputed)
     )
@@ -383,9 +385,16 @@ if (atmo_ready) {
       '    return "<div class=\\"atmo-row\\"><span class=\\"atmo-pol\\">" + label + "</span><span class=\\"atmo-pill\\" style=\\"background:" + bg + ";\\">" + v + " · " + lib + "</span></div>";\n',
       '  }\n',
       '  var impBadge = ent.imputed ? \'<span class="cp-badge cp-badge-imp" title="Pas de mesure publiée pour cette commune ; valeur = moyenne des communes mesurées du même département.">Estimation dept</span>\' : "";\n',
+      '  function num(x, dec) { if (x == null) return "—"; return Number(x).toFixed(dec || 1); }\n',
       '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \' \' + impBadge + \'</div></div>\' +\n',
-      '    \'<div class="cp-section">\' + pill("ATMO global", ent.qual) + \'</div>\' +\n',
-      '    \'<div class="cp-section"><h4>Sous-indices polluants</h4>\' +\n',
+      '    \'<div class="cp-section">\' + pill("ATMO moyen 30j", ent.qual) + \'</div>\' +\n',
+      '    \'<div class="cp-section cp-kvs">\' +\n',
+      '    \'<div class="cp-kv"><span>Indice moyen</span><span class="cp-num">\' + num(ent.qmean, 1) + \' / 6</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Jours observés</span><span class="cp-num">\' + (ent.n_days != null ? (ent.n_days + " / 30") : "—") + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>% jours « Bon »</span><span class="cp-num">\' + num(ent.pct_bon, 1) + \'%</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>% jours « Mauvais+ »</span><span class="cp-num">\' + num(ent.pct_mauvais_plus, 1) + \'%</span></div>\' +\n',
+      '    \'</div>\' +\n',
+      '    \'<div class="cp-section"><h4>Sous-indices polluants (moyenne 30j)</h4>\' +\n',
       '    pill("NO₂", ent.no2) + pill("O₃", ent.o3) + pill("PM₁₀", ent.pm10) + pill("PM₂.₅", ent.pm25) + \'</div>\' +\n',
       '    \'<div class="cp-section" style="font-size:0.78rem;color:#7A7A7A;">Source : \' + (ent.source || (ent.imputed ? "Imputée (moy. dépt)" : "—")) + \'</div>\';\n',
       '};\n',
@@ -594,20 +603,7 @@ if (dvf_ready) {
 
 ## Row {height="82%"}
 
-::: {.card title="Indice ATMO par commune" width="72%"}
-```{r}
-#| label: atmo-coverage-banner
-#| results: asis
-#| echo: false
-if (atmo_ready && length(atmo_aasqa_missing) > 0) {
-  cat(sprintf(
-    '<div class="atmo-banner">⚠️ <strong>%d AASQA n\'ont pas publié aujourd\'hui</strong> : %s. Les communes de ces régions apparaissent en crème (pas de fallback possible).</div>',
-    length(atmo_aasqa_missing),
-    paste(atmo_aasqa_missing, collapse = ", ")
-  ))
-}
-```
-
+::: {.card title="Indice ATMO moyen sur 30 jours · par commune" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
@@ -674,8 +670,8 @@ if (atmo_ready) {
 ```{=html}
 <div id="air-panel" class="commune-panel">
   <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir ses indices ATMO du jour.</p>
-    <p class="cp-hint">Snapshot du dernier jour disponible. L'indice ATMO synthétise 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅, SO₂). Échelle 1 (Bon) à 6 (Extrêmement mauvais).</p>
+    <p><strong>Cliquez sur une commune</strong> pour voir ses indices ATMO moyens sur 30 jours.</p>
+    <p class="cp-hint">Agrégation sur les 30 derniers jours (WFS Atmo France). Les indices publiés au niveau EPCI (Bretagne, Occitanie, Pays de la Loire) sont expandés à chaque commune membre. L'indice ATMO synthétise 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅, SO₂). Échelle 1 (Bon) à 6 (Extrêmement mauvais).</p>
   </div>
 </div>
 ```

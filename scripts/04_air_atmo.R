@@ -1,30 +1,39 @@
 # ============================================================
 # scripts/04_air_atmo.R
 #
-# Étape 4 — Qualité de l'air : indice ATMO journalier par commune.
+# Étape 4 — Qualité de l'air : indice ATMO MOYEN SUR 30 JOURS par commune.
 #
 # Source : Atmo France, dataset "Indice de la qualité de l'air quotidien
-#   par commune - indice ATMO" sur data.gouv.fr.
-#   Ressource CSV : api/1/datasets/r/d2b9e8e6-8b0b-4bb6-9851-b4fa2efc8201
+#   par commune - indice ATMO" — accédé via le service WFS GeoServer
+#   d'Atmo France pour avoir l'historique (la ressource CSV n'expose
+#   qu'une fenêtre glissante de 3 jours).
 #
-# Limite importante : le CSV publié ne contient que les 2-3 dates les plus
-# récentes (snapshot, ~25k communes/jour). Pour de l'historique, il faudrait
-# scraper le flux quotidien sur plusieurs mois ou utiliser le WFS avec
-# filtre date. À faire dans une itération ultérieure si pertinent.
+#   WFS URL : https://data.atmo-france.org/geoserver/ind/wfs
+#   Layer   : ind:ind_atmo
+#   Filtre  : CQL_FILTER=date_ech='YYYY-MM-DD'
+#   Format  : CSV
 #
-# Décision méthodo : pour cette étape, on traite le SNAPSHOT du jour J comme
-# représentatif de la "qualité de l'air courante". Cela suffit pour la
-# cartographie et l'analyse croisée Étape 6 (qui restera "à un instant t").
+# Couverture : 30 derniers jours, ~78k lignes/jour, ~2.3M lignes total.
+# Téléchargement jour par jour (caching), 30 requêtes WFS.
 #
-# Filtres / agrégation :
-#   - On garde la date d'échéance la plus récente complète (où couverture > seuil).
-#   - 1 ligne / commune avec : code_qual, code_no2, code_o3, code_pm10,
-#     code_pm25, lib_qual, lat, lng, source AASQA.
-#
-# Indice ATMO : 1 = Bon, 2 = Moyen, 3 = Dégradé, 4 = Mauvais,
-#               5 = Très mauvais, 6 = Extrêmement mauvais.
+# Décision clé : on agrège en MOYENNE par commune sur la fenêtre.
+#   - Lisse le bruit météorologique du jour J (vent, pluie).
+#   - Comble les NAs : les AASQA qui publient en intermittence (Atmo
+#     Occitanie, Air Breizh) ont au moins quelques jours de couverture
+#     sur 30 jours, là où le snapshot d'un jour J pouvait être totalement
+#     absent.
+#   - Plus comparable aux autres sources (élections, DVF) pour l'Étape 6.
 #
 # Sortie : data/processed/air/atmo_snapshot.parquet
+#   1 ligne / commune (~30k) avec :
+#     - qual_indice : moyenne arrondie sur la période (sert au choroplèthe)
+#     - qual_mean : moyenne exacte (1 décimale)
+#     - n_days : nombre de jours observés sur 30
+#     - pct_bon, pct_mauvais_plus : % de jours en bon vs ≥mauvais
+#     - moyennes par polluant (no2, o3, pm10, pm25)
+#     - imputed (boolean), imputation (direct/dept/region/na)
+#
+# Lancement : Rscript scripts/04_air_atmo.R
 # ============================================================
 
 suppressPackageStartupMessages({
@@ -35,94 +44,154 @@ suppressPackageStartupMessages({
   library(stringr)
   library(glue)
   library(curl)
+  library(purrr)
 })
 
-URL_CSV <- "https://www.data.gouv.fr/api/1/datasets/r/d2b9e8e6-8b0b-4bb6-9851-b4fa2efc8201"
+# ---- Paramètres ----
 
-raw_dir  <- here::here("data", "raw", "air")
-out_dir  <- here::here("data", "processed", "air")
-raw_path <- file.path(raw_dir, "indice_atmo_quotidien.csv")
-out_path <- file.path(out_dir, "atmo_snapshot.parquet")
+N_DAYS    <- 30L
+WFS_BASE  <- "https://data.atmo-france.org/geoserver/ind/wfs"
+WFS_LAYER <- "ind:ind_atmo"
 
-dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
-dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
+raw_dir   <- here::here("data", "raw", "air")
+daily_dir <- file.path(raw_dir, "daily")
+out_dir   <- here::here("data", "processed", "air")
+out_path  <- file.path(out_dir, "atmo_snapshot.parquet")
 
-# Téléchargement (idempotent — récupère la dernière version si absent ou ancien)
-if (!file.exists(raw_path) || file.size(raw_path) < 1e6) {
-  message(glue::glue("Téléchargement : {URL_CSV}"))
-  curl::curl_download(URL_CSV, raw_path, quiet = FALSE)
+dir.create(daily_dir, recursive = TRUE, showWarnings = FALSE)
+dir.create(out_dir,   recursive = TRUE, showWarnings = FALSE)
+
+# ---- Téléchargement 30 derniers jours via WFS ----
+
+dates <- format(seq.Date(Sys.Date() - (N_DAYS - 1L), Sys.Date(), by = "day"),
+                "%Y-%m-%d")
+
+build_url <- function(d) {
+  sprintf(
+    "%s?service=WFS&version=2.0.0&request=GetFeature&typeName=%s&CQL_FILTER=date_ech=%%27%s%%27&count=100000&outputFormat=csv",
+    WFS_BASE, WFS_LAYER, d
+  )
 }
 
-# Lecture (CSV virgule, encodage UTF-8)
-df <- readr::read_csv(
-  raw_path,
-  col_types = readr::cols(
-    .default        = readr::col_character(),
-    code_no2        = readr::col_integer(),
-    code_o3         = readr::col_integer(),
-    code_pm10       = readr::col_integer(),
-    code_pm25      = readr::col_integer(),
-    code_qual      = readr::col_integer(),
-    code_so2       = readr::col_integer(),
-    x_wgs84        = readr::col_double(),
-    y_wgs84        = readr::col_double()
-  ),
-  show_col_types = FALSE
-)
+message(glue::glue("Téléchargement {N_DAYS} jours d'indices ATMO (WFS Atmo France)…"))
 
-message(glue::glue("Lu : {nrow(df)} lignes ; dates : ",
-                   paste(unique(df$date_ech), collapse = ", ")))
+for (d in dates) {
+  out <- file.path(daily_dir, paste0(d, ".csv"))
+  if (file.exists(out) && file.size(out) > 1000L) next
+  message(glue::glue("  ↓ {d}"))
+  res <- try(curl::curl_download(build_url(d), out, quiet = TRUE),
+             silent = TRUE)
+  if (inherits(res, "try-error") || file.size(out) < 200L) {
+    message(glue::glue("    ⚠ téléchargement raté pour {d}"))
+    if (file.exists(out)) file.remove(out)
+  }
+}
 
-# Stratégie : agréger les 3 dates disponibles (J-1, J, J+1 selon le moment du
-# téléchargement) en prenant la valeur la plus récente par commune. Certaines
-# AASQA publient sur des dates différentes — combiner maximise la couverture.
-coverage_by_date <- df |>
-  dplyr::count(date_ech) |>
-  dplyr::arrange(dplyr::desc(date_ech))
-message("Couverture par date :")
-print(coverage_by_date)
+# ---- Lecture & concaténation ----
 
-best_date <- max(df$date_ech, na.rm = TRUE)
-message(glue::glue("Date la plus récente affichée : {best_date}"))
+read_one <- function(d) {
+  p <- file.path(daily_dir, paste0(d, ".csv"))
+  if (!file.exists(p) || file.size(p) < 1000L) return(NULL)
+  suppressWarnings(suppressMessages(
+    readr::read_csv(
+      p,
+      col_types = readr::cols(
+        .default        = readr::col_character(),
+        code_no2        = readr::col_integer(),
+        code_o3         = readr::col_integer(),
+        code_pm10       = readr::col_integer(),
+        code_pm25       = readr::col_integer(),
+        code_qual       = readr::col_integer(),
+        code_so2        = readr::col_integer(),
+        x_wgs84         = readr::col_double(),
+        y_wgs84         = readr::col_double()
+      )
+    )
+  ))
+}
 
-snapshot <- df |>
-  dplyr::filter(!is.na(code_qual)) |>
-  # Pour chaque commune, prendre l'observation la plus récente
-  dplyr::group_by(code_zone) |>
-  dplyr::slice_max(date_ech, n = 1, with_ties = FALSE) |>
-  dplyr::ungroup() |>
-  dplyr::transmute(
-    code_commune = stringr::str_pad(code_zone, 5, "left", "0"),
-    nom_commune  = lib_zone,
-    date_ech     = as.Date(date_ech),
-    qual_indice  = code_qual,
-    qual_label   = lib_qual,
-    no2_indice   = code_no2,
-    o3_indice    = code_o3,
-    pm10_indice  = code_pm10,
-    pm25_indice  = code_pm25,
-    so2_indice   = code_so2,
-    lon          = x_wgs84,
-    lat          = y_wgs84,
-    source_aasqa = source
-  ) |>
-  dplyr::filter(!is.na(qual_indice))
+raw <- purrr::map_dfr(dates, read_one)
 
-# ---- Fallback : moyenne départementale pour les communes sans valeur directe ----
-# La couverture AASQA est très inégale : Air Breizh ne publie que 61 communes
-# sur ~1200 de Bretagne, Atmo Pays de la Loire 404/1240, Atmo-Occitanie
-# 164/4500. Pour boucher ces trous, on impute la moyenne du département
-# (à partir des communes effectivement publiées dans le département) et on
-# trace la provenance dans la colonne `imputed`.
+if (nrow(raw) == 0) {
+  stop("Aucune donnée téléchargée — vérifier la connectivité au WFS.")
+}
 
-snapshot <- snapshot |>
+n_days_available <- length(unique(raw$date_ech))
+message(glue::glue("  {nrow(raw)} lignes lues sur {n_days_available} jours"))
+message(glue::glue("  type_zone : ",
+                   paste(names(table(raw$type_zone)),
+                         table(raw$type_zone), sep="=", collapse=", ")))
+
+# ---- Expansion EPCI → communes ----
+# Air Breizh (Bretagne), Atmo-Occitanie, Air Pays de la Loire publient
+# certains indices au niveau EPCI (intercommunalité). Sans expansion,
+# ces régions apparaissent vides sur la carte commune. On télécharge le
+# mapping commune→EPCI depuis geo.api.gouv.fr, on duplique chaque ligne
+# EPCI en autant de lignes que de communes-membres.
+
+epci_map_path <- file.path(raw_dir, "communes_to_epci.csv")
+if (!file.exists(epci_map_path) || file.size(epci_map_path) < 100000) {
+  message("Téléchargement mapping commune → EPCI (geo.api.gouv.fr)…")
+  curl::curl_download(
+    "https://geo.api.gouv.fr/communes?fields=code,codeEpci&format=json",
+    file.path(raw_dir, "communes_to_epci.json"),
+    quiet = TRUE
+  )
+  epci_json <- jsonlite::fromJSON(file.path(raw_dir, "communes_to_epci.json"))
+  readr::write_csv(epci_json, epci_map_path)
+}
+epci_map <- readr::read_csv(epci_map_path, show_col_types = FALSE) |>
+  dplyr::filter(!is.na(codeEpci)) |>
+  dplyr::transmute(code_commune = code, code_epci = as.character(codeEpci))
+
+# Lignes EPCI : on étend
+raw_epci <- raw |>
+  dplyr::filter(type_zone == "EPCI", !is.na(code_qual)) |>
+  dplyr::rename(code_epci = code_zone) |>
+  dplyr::inner_join(epci_map, by = "code_epci", relationship = "many-to-many") |>
   dplyr::mutate(
-    code_dept = ifelse(substr(code_commune, 1, 2) == "97",
-                       substr(code_commune, 1, 3),
-                       substr(code_commune, 1, 2))
+    code_zone   = code_commune,
+    type_zone   = "commune_via_epci"
+  ) |>
+  dplyr::select(-code_epci, -code_commune)
+
+# Lignes commune (incluant minuscule + MAJUSCULE)
+raw_commune <- raw |>
+  dplyr::filter(type_zone %in% c("commune", "COMMUNE"), !is.na(code_qual))
+
+raw <- dplyr::bind_rows(raw_commune, raw_epci)
+message(glue::glue("  Après expansion EPCI : {nrow(raw)} lignes commune-level"))
+
+# ---- Agrégation par commune sur la fenêtre 30 jours ----
+
+monthly <- raw |>
+  dplyr::filter(!is.na(code_qual)) |>
+  dplyr::mutate(code_commune = stringr::str_pad(code_zone, 5, "left", "0")) |>
+  dplyr::group_by(code_commune) |>
+  dplyr::summarise(
+    nom_commune      = dplyr::first(lib_zone),
+    n_days           = dplyr::n_distinct(date_ech),
+    qual_mean        = round(mean(code_qual, na.rm = TRUE), 1),
+    qual_indice      = as.integer(round(qual_mean)),
+    no2_indice       = as.integer(round(mean(code_no2,  na.rm = TRUE))),
+    o3_indice        = as.integer(round(mean(code_o3,   na.rm = TRUE))),
+    pm10_indice      = as.integer(round(mean(code_pm10, na.rm = TRUE))),
+    pm25_indice      = as.integer(round(mean(code_pm25, na.rm = TRUE))),
+    pct_bon          = round(mean(code_qual == 1L, na.rm = TRUE) * 100, 1),
+    pct_mauvais_plus = round(mean(code_qual >= 4L, na.rm = TRUE) * 100, 1),
+    source_aasqa    = dplyr::first(source),
+    .groups          = "drop"
+  ) |>
+  dplyr::mutate(
+    qual_label = c("0"="Absent","1"="Bon","2"="Moyen","3"="Dégradé",
+                   "4"="Mauvais","5"="Très mauvais",
+                   "6"="Extrêmement mauvais")[as.character(qual_indice)]
   )
 
-# Mapping dept → région (métropole + DROM) pour le fallback régional
+message(glue::glue("Après agrégation 30j : {nrow(monthly)} communes (directes)"))
+
+# ---- Fallback hiérarchique : dept → région ----
+
 dept_to_region <- c(
   # Auvergne-Rhône-Alpes
   "01"="ARA","03"="ARA","07"="ARA","15"="ARA","26"="ARA","38"="ARA",
@@ -161,21 +230,26 @@ dept_to_region <- c(
   "971"="GUA","972"="MAR","973"="GUY","974"="REU","976"="MAY"
 )
 
-snapshot$region <- unname(dept_to_region[snapshot$code_dept])
-
-dept_means <- snapshot |>
-  dplyr::group_by(code_dept) |>
-  dplyr::summarise(
-    qual_dept = round(mean(qual_indice, na.rm = TRUE)),
-    no2_dept  = round(mean(no2_indice,  na.rm = TRUE)),
-    o3_dept   = round(mean(o3_indice,   na.rm = TRUE)),
-    pm10_dept = round(mean(pm10_indice, na.rm = TRUE)),
-    pm25_dept = round(mean(pm25_indice, na.rm = TRUE)),
-    n_dept    = dplyr::n(),
-    .groups   = "drop"
+monthly <- monthly |>
+  dplyr::mutate(
+    code_dept = ifelse(substr(code_commune, 1, 2) == "97",
+                       substr(code_commune, 1, 3),
+                       substr(code_commune, 1, 2)),
+    region    = unname(dept_to_region[code_dept])
   )
 
-region_means <- snapshot |>
+dept_means <- monthly |>
+  dplyr::group_by(code_dept) |>
+  dplyr::summarise(
+    qual_dept  = round(mean(qual_indice, na.rm = TRUE)),
+    no2_dept   = round(mean(no2_indice,  na.rm = TRUE)),
+    o3_dept    = round(mean(o3_indice,   na.rm = TRUE)),
+    pm10_dept  = round(mean(pm10_indice, na.rm = TRUE)),
+    pm25_dept  = round(mean(pm25_indice, na.rm = TRUE)),
+    .groups    = "drop"
+  )
+
+region_means <- monthly |>
   dplyr::filter(!is.na(region)) |>
   dplyr::group_by(region) |>
   dplyr::summarise(
@@ -184,12 +258,11 @@ region_means <- snapshot |>
     o3_reg   = round(mean(o3_indice,   na.rm = TRUE)),
     pm10_reg = round(mean(pm10_indice, na.rm = TRUE)),
     pm25_reg = round(mean(pm25_indice, na.rm = TRUE)),
-    n_reg    = dplyr::n(),
     .groups  = "drop"
   )
 
-# Univers de toutes les communes : si possible depuis le parquet élections
-# (couverture quasi-totale 35k). Sinon on garde juste snapshot.
+# ---- Expansion à toutes les communes ----
+
 elec_path <- here::here("data", "processed", "elections",
                        "legislatives_2024_t2.parquet")
 
@@ -202,23 +275,22 @@ if (file.exists(elec_path)) {
     )
 
   full <- all_communes |>
-    dplyr::left_join(snapshot, by = "code_commune") |>
+    dplyr::left_join(monthly, by = "code_commune") |>
     dplyr::mutate(
-      code_dept = dplyr::coalesce(code_dept, code_dept_e),
+      code_dept   = dplyr::coalesce(code_dept, code_dept_e),
       nom_commune = dplyr::coalesce(nom_commune, nom_full),
-      region = unname(dept_to_region[code_dept])
+      region      = unname(dept_to_region[code_dept])
     ) |>
     dplyr::left_join(dept_means,   by = "code_dept") |>
     dplyr::left_join(region_means, by = "region") |>
     dplyr::mutate(
-      # 1) direct ; 2) dept-mean ; 3) région-mean
       imputation = dplyr::case_when(
-        !is.na(qual_indice)                          ~ "direct",
-        !is.na(qual_dept)                            ~ "dept",
-        !is.na(qual_reg)                             ~ "region",
-        TRUE                                          ~ "na"
+        !is.na(qual_indice)                    ~ "direct",
+        !is.na(qual_dept)                      ~ "dept",
+        !is.na(qual_reg)                       ~ "region",
+        TRUE                                    ~ "na"
       ),
-      imputed = imputation != "direct",
+      imputed     = imputation != "direct",
       qual_indice = dplyr::coalesce(qual_indice, qual_dept, qual_reg),
       no2_indice  = dplyr::coalesce(no2_indice,  no2_dept,  no2_reg),
       o3_indice   = dplyr::coalesce(o3_indice,   o3_dept,   o3_reg),
@@ -230,34 +302,33 @@ if (file.exists(elec_path)) {
                                       "5"="Très mauvais",
                                       "6"="Extrêmement mauvais")[as.character(qual_indice)])
     ) |>
-    # Normaliser la casse des labels (data Atmo mélange "Dégradé"/"dégradé")
-    dplyr::mutate(qual_label = stringr::str_to_sentence(qual_label)) |>
-    dplyr::select(code_commune, nom_commune, date_ech,
-                  qual_indice, qual_label,
+    dplyr::select(code_commune, nom_commune,
+                  qual_indice, qual_mean, qual_label,
+                  n_days, pct_bon, pct_mauvais_plus,
                   no2_indice, o3_indice, pm10_indice, pm25_indice,
                   source_aasqa, imputed, imputation) |>
     dplyr::filter(!is.na(qual_indice))
 
-  snapshot <- full
-  message(glue::glue("  Après fallback dept-mean : {nrow(snapshot)} communes ",
-                     "(dont {sum(snapshot$imputed)} imputées)"))
-} else {
-  message("⚠ legislatives_2024_t2.parquet non trouvé — pas de fallback dept-mean.")
+  monthly <- full
 }
 
-arrow::write_parquet(snapshot, out_path)
+arrow::write_parquet(monthly, out_path)
 
 # ---- Rapport ----
 
 cat(glue::glue("
 
-  ✔ {nrow(snapshot)} communes → {out_path}
-    Date : {best_date}
+  ✔ {nrow(monthly)} communes → {out_path}
     ({round(file.size(out_path)/1024)} KB)
+    Fenêtre : {dates[1]} → {dates[length(dates)]} ({n_days_available} jours observés)
 
-  Distribution indice ATMO :
+  Imputation :
 "))
-print(snapshot |> dplyr::count(qual_indice, qual_label, sort = TRUE))
+print(monthly |> dplyr::count(imputation))
 
-cat("\n  Sources AASQA actives :\n")
-print(snapshot |> dplyr::count(source_aasqa, sort = TRUE))
+cat("\n  Distribution indice ATMO moyen :\n")
+print(monthly |> dplyr::count(qual_indice, qual_label))
+
+cat("\n  Sources AASQA actives (sur la période) :\n")
+print(monthly |> dplyr::filter(!is.na(source_aasqa)) |>
+        dplyr::count(source_aasqa, sort = TRUE))
