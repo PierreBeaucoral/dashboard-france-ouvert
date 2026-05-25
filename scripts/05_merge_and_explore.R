@@ -29,6 +29,7 @@ elec_path <- here::here("data", "processed", "elections",
                         "legislatives_2024_t2.parquet")
 dvf_path  <- here::here("data", "processed", "dvf", "dvf_aggregated.parquet")
 air_path  <- here::here("data", "processed", "air", "atmo_snapshot.parquet")
+pop_path  <- here::here("data", "processed", "insee", "populations.parquet")
 out_dir   <- here::here("data", "processed", "explorer")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -36,6 +37,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 elec <- arrow::read_parquet(elec_path)
 dvf  <- arrow::read_parquet(dvf_path)
 air  <- arrow::read_parquet(air_path)
+pop  <- if (file.exists(pop_path)) arrow::read_parquet(pop_path) else NULL
 
 # ---- Préparer DVF : pivot 2024 App + Maison ----
 dvf_2024 <- dvf |>
@@ -83,24 +85,51 @@ elec_clean <- elec |>
     ctx_inscrits    = inscrits
   )
 
+# ---- Préparer populations (Bloc 1 INSEE) ----
+if (!is.null(pop)) {
+  pop_clean <- pop |>
+    dplyr::transmute(
+      code_commune,
+      ctx_pop_latest = pop_latest,
+      ctx_pop_2017   = pop_2017,
+      ctx_pop_2021   = pop_2021,
+      ctx_strate_pop = strate_pop
+    )
+}
+
 # ---- Merge ----
 merged <- elec_clean |>
   dplyr::left_join(dvf_2024,  by = "code_commune") |>
   dplyr::left_join(air_clean, by = "code_commune")
 
-# Strates : quartiles de log(inscrits) — proxy taille commune
+if (!is.null(pop)) {
+  merged <- merged |> dplyr::left_join(pop_clean, by = "code_commune")
+} else {
+  merged <- merged |> dplyr::mutate(
+    ctx_pop_latest = NA_integer_,
+    ctx_strate_pop = NA_character_
+  )
+}
+
+# Strates : quartiles de log(inscrits) — proxy taille (legacy)
+# + strate_pop INSEE (réelle, depuis recensement)
 merged <- merged |>
   dplyr::mutate(
     ctx_log_inscrits = log10(pmax(ctx_inscrits, 1)),
+    ctx_log_pop      = log10(pmax(ctx_pop_latest, 1)),
+    # Strate "taille commune" : INSEE pop si dispo, sinon proxy inscrits
     strate_taille = dplyr::case_when(
-      ctx_inscrits < 200             ~ "Très petite (< 200 inscrits)",
-      ctx_inscrits < 1000            ~ "Petite (200-1 000)",
-      ctx_inscrits < 5000            ~ "Moyenne (1 000-5 000)",
-      TRUE                            ~ "Grande (> 5 000)"
+      !is.na(ctx_strate_pop)         ~ as.character(ctx_strate_pop),
+      ctx_inscrits < 200             ~ "Très petite (< 500 hab.)",
+      ctx_inscrits < 1000            ~ "Rurale (500-2 000)",
+      ctx_inscrits < 5000            ~ "Bourg / périurbain (2 000-10 000)",
+      TRUE                            ~ "Ville moyenne (10 000-50 000)"
     ),
     strate_taille = factor(strate_taille,
-      levels = c("Très petite (< 200 inscrits)", "Petite (200-1 000)",
-                 "Moyenne (1 000-5 000)", "Grande (> 5 000)"))
+      levels = c("Très petite (< 500 hab.)", "Rurale (500-2 000)",
+                 "Bourg / périurbain (2 000-10 000)",
+                 "Ville moyenne (10 000-50 000)",
+                 "Grande ville (≥ 50 000)"))
   )
 
 arrow::write_parquet(merged, file.path(out_dir, "commune_merged.parquet"))
@@ -112,7 +141,7 @@ NUMERIC_VARS <- c(
   "elec_pct_divers", "elec_abstention", "elec_marge",
   "dvf_prix_app", "dvf_prix_mai",
   "air_qual", "air_no2", "air_o3", "air_pm10", "air_pm25",
-  "ctx_log_inscrits"
+  "ctx_log_inscrits", "ctx_log_pop"
 )
 
 corr_long <- function(df, method, strate_label = "Toutes") {

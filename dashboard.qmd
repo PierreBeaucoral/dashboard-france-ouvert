@@ -58,6 +58,18 @@ if (elec_ready) {
   com  <- sf::read_sf(geo_com_path, quiet = TRUE)
   elec <- arrow::read_parquet(elec_path)
 
+  # Populations INSEE (Bloc 1 — peut être absent si pipeline 06 pas lancé)
+  pop_path <- here::here("data", "processed", "insee", "populations.parquet")
+  if (file.exists(pop_path)) {
+    pop_insee <- arrow::read_parquet(pop_path) |>
+      dplyr::transmute(
+        code_insee = code_commune,
+        pop_latest,
+        strate_pop = as.character(strate_pop)
+      )
+    elec <- elec |> dplyr::left_join(pop_insee, by = "code_insee")
+  }
+
   # Paris / Lyon / Marseille : la data MI agrège au niveau "commune"
   # (codes 75056, 69123, 13055) mais le GeoJSON a les arrondissements
   # municipaux (75101-75120, 69381-69389, 13201-13216). On répercute le
@@ -122,7 +134,10 @@ if (elec_ready) {
       voix_second,
       inscrits,
       exprimes,
-      abstentions
+      abstentions,
+      # Bloc 1 INSEE : population + strate
+      pop_latest = if ("pop_latest" %in% names(com_metro_results)) pop_latest else NA_integer_,
+      strate_pop = if ("strate_pop" %in% names(com_metro_results)) strate_pop else NA_character_
     ) |>
     dplyr::filter(!is.na(famille_vainqueur))
 }
@@ -260,6 +275,8 @@ if (elec_ready) {
       '    \'<div class="cp-result"><div class="cp-swatch" style="background:\' + color + \'"></div><div><div class="cp-nuance">\' + (d.famille_vainqueur || "—") + \' · \' + (d.nuance_vainqueur || "—") + \'</div>\' +\n',
       '    \'<div class="cp-pct">\' + fmt(d.pct_vainqueur,1) + \'% &nbsp;·&nbsp; marge \' + fmt(d.marge_vainqueur,1) + \' pt</div></div></div>\' +\n',
       '    \'<div class="cp-section cp-kvs">\' +\n',
+      '    (d.pop_latest != null ? \'<div class="cp-kv"><span>Population</span><span class="cp-num">\' + fmtInt(d.pop_latest) + \' hab.</span></div>\' : "") +\n',
+      '    (d.strate_pop ? \'<div class="cp-kv"><span>Strate</span><span class="cp-num" style="font-family:Inter;font-size:0.78rem;">\' + d.strate_pop + \'</span></div>\' : "") +\n',
       '    \'<div class="cp-kv"><span>Inscrits</span><span class="cp-num">\' + fmtInt(d.inscrits) + \'</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Exprimés</span><span class="cp-num">\' + fmtInt(d.exprimes) + \'</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Abstention</span><span class="cp-num">\' + fmt(d.pct_abstention,1) + \'%</span></div>\' +\n',
