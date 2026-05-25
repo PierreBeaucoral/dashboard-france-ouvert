@@ -160,6 +160,21 @@ if (atmo_ready) {
   atmo       <- arrow::read_parquet(atmo_path)
   atmo_date  <- unique(atmo$date_ech)[1]
 }
+
+# ---- Explorer (Étapes 5 + 6) ----
+explorer_dir <- here::here("data", "processed", "explorer")
+merged_path  <- file.path(explorer_dir, "commune_merged.parquet")
+corr_path    <- file.path(explorer_dir, "correlations.parquet")
+biv_path     <- file.path(explorer_dir, "bivariate_bins.parquet")
+
+explorer_ready <- file.exists(merged_path) && file.exists(corr_path) &&
+                  file.exists(biv_path)
+
+if (explorer_ready) {
+  merged       <- arrow::read_parquet(merged_path)
+  correlations <- arrow::read_parquet(corr_path)
+  bivariate    <- arrow::read_parquet(biv_path)
+}
 ```
 
 ```{r}
@@ -608,26 +623,284 @@ if (atmo_ready) {
 </div>
 :::
 
-# Explorer
+# Bivarié
 
-::: {.card title="Avertissement de lecture"}
-:::: {.callout-warning}
-**Corrélation n'est pas causalité.** Les liens observés dans cet onglet seront
-descriptifs et agrégés au niveau communal. Ils sont sujets au **biais
-écologique** : une corrélation entre variables au niveau commune ne dit rien
-sur les individus.
+## Row {height="100%"}
 
-La densité urbaine est un **confondant majeur** : prix immobilier, vote,
-pollution et abstention sont tous corrélés au caractère urbain/rural d'une
-commune. La stratification (Étape 6) permettra de démêler ces effets.
+::: {.card title="Carte bivariée · 9 classes (terciles X × terciles Y)"}
+```{=html}
+<div class="dvf-controls">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Paire</span>
+    <div class="dvf-ctrl-radios" id="biv-pair-radios">
+      <label><input type="radio" name="biv-pair" value="elec_pct_rn × dvf_prix_app" checked> % RN × Prix App</label>
+      <label><input type="radio" name="biv-pair" value="elec_pct_nfp × dvf_prix_app"> % NFP × Prix App</label>
+      <label><input type="radio" name="biv-pair" value="elec_abstention × dvf_prix_app"> Abstention × Prix App</label>
+      <label><input type="radio" name="biv-pair" value="elec_pct_rn × air_pm25"> % RN × PM₂.₅</label>
+      <label><input type="radio" name="biv-pair" value="dvf_prix_app × air_qual"> Prix App × ATMO</label>
+    </div>
+  </div>
+</div>
+<div id="biv-legend" class="biv-legend-container"></div>
+```
 
-Voir la [note méthodologique complète](docs/correlations.qmd).
-::::
+```{r}
+#| label: map-bivariate
+if (explorer_ready) {
+  # Carte par défaut : couleur cream uniforme (les couleurs sont injectées
+  # côté JS au chargement et au changement de sélecteur)
+  pretty_pair <- function(p) {
+    gsub("elec_pct_rn","% RN",
+      gsub("elec_pct_nfp","% NFP",
+        gsub("elec_abstention","Abstention",
+          gsub("dvf_prix_app","Prix App",
+            gsub("dvf_prix_mai","Prix Maison",
+              gsub("air_pm25","PM2.5",
+                gsub("air_qual","ATMO", p))))))) }
+
+  m <- leaflet::leaflet(
+    com_metro_only,
+    options = leaflet::leafletOptions(
+      preferCanvas       = TRUE,
+      zoomControl        = TRUE,
+      attributionControl = FALSE,
+      minZoom            = 4, maxZoom = 12
+    )
+  ) |>
+    .fit_to_sf(com_metro_only, padding = c(20, 20)) |>
+    leaflet::addPolygons(
+      data = com_metro_only,
+      fillColor    = "#E8E4DC",
+      fillOpacity  = 0.3,
+      color        = "#FFFFFF",
+      weight       = 0.1,
+      opacity      = 0.4,
+      smoothFactor = 0.4,
+      layerId      = ~code
+    ) |>
+    leaflet::addPolygons(
+      data         = dep_metro,
+      fill         = FALSE,
+      color        = "#1A1A1A",
+      weight       = 0.6,
+      opacity      = 0.55,
+      smoothFactor = 0.4,
+      options      = leaflet::pathOptions(interactive = FALSE)
+    ) |>
+    .add_resize_handler() |>
+    htmlwidgets::onRender(
+      "function(el, x) {
+         window.bivMap = this;
+         var self = this;
+         setTimeout(function() {
+           if (window.bivApplyDefault) window.bivApplyDefault();
+         }, 60);
+         function onChange() {
+           var sel = document.querySelector('input[name=biv-pair]:checked');
+           if (sel && window.bivApplyPair) window.bivApplyPair(sel.value);
+         }
+         setTimeout(function() {
+           document.querySelectorAll('input[name=biv-pair]')
+             .forEach(function(r) { r.addEventListener('change', onChange); });
+         }, 300);
+       }"
+    )
+  m
+}
+```
 :::
 
-::: {.card title="Vue à venir (Étape 6)"}
-- **Scatter ↔ carte liés** (crosstalk + ggiraph/plotly)
-- **Matrice de corrélations** Spearman / Pearson, globale et par strate
-- **Boxplots conditionnels** par classe de densité INSEE
-- **Bivariate choropleth 3 × 3** sur la carte principale (Étape 5)
+```{r}
+#| label: inject-bivariate-data
+#| results: asis
+#| echo: false
+if (explorer_ready) {
+  # Palette Stevens 3x3
+  biv_palette <- c(
+    "#E8E8E8", "#B0D5DF", "#64ACBE",
+    "#E4ACAC", "#AD9EA5", "#627F8C",
+    "#C85A5A", "#985356", "#574249"
+  )
+
+  # JSON : pour chaque commune, classe par paire
+  biv_lookup <- bivariate |>
+    dplyr::filter(!is.na(classe)) |>
+    dplyr::select(code_commune, pair, classe)
+  biv_json <- jsonlite::toJSON(biv_lookup, auto_unbox = TRUE, na = "null")
+  palette_js <- jsonlite::toJSON(biv_palette)
+
+  cat('<script>\n',
+      'window.bivRaw = ', as.character(biv_json), ';\n',
+      'window.bivPalette = ', as.character(palette_js), ';\n',
+      'window.bivData = {};\n',
+      'window.bivRaw.forEach(function(r) {\n',
+      '  if (!window.bivData[r.pair]) window.bivData[r.pair] = {};\n',
+      '  window.bivData[r.pair][r.code_commune] = r.classe;\n',
+      '});\n',
+      'window.bivApplyPair = function(pair) {\n',
+      '  var map = window.bivMap;\n',
+      '  if (!map) return;\n',
+      '  var entries = window.bivData[pair] || {};\n',
+      '  map.eachLayer(function(layer) {\n',
+      '    if (!layer.options || !layer.options.layerId) return;\n',
+      '    var code = layer.options.layerId;\n',
+      '    var cl = entries[code];\n',
+      '    if (cl) layer.setStyle({ fillColor: window.bivPalette[cl-1], fillOpacity: 0.85 });\n',
+      '    else layer.setStyle({ fillColor: "#E8E4DC", fillOpacity: 0.20 });\n',
+      '  });\n',
+      '  // Légende 3x3\n',
+      '  var legendEl = document.getElementById("biv-legend");\n',
+      '  if (legendEl) {\n',
+      '    var parts = pair.split(" × ");\n',
+      '    var xname = parts[0]; var yname = parts[1];\n',
+      '    var rename = { "elec_pct_rn":"% RN", "elec_pct_nfp":"% NFP", "elec_abstention":"Abstention", "dvf_prix_app":"Prix App", "dvf_prix_mai":"Prix Maison", "air_pm25":"PM₂.₅", "air_qual":"ATMO" };\n',
+      '    var xlbl = rename[xname] || xname;\n',
+      '    var ylbl = rename[yname] || yname;\n',
+      '    var html = "<div class=\\"biv-legend\\"><div class=\\"biv-legend-title\\">Terciles ×</div><div class=\\"biv-grid-wrap\\"><div class=\\"biv-yarrow\\">↑ " + ylbl + "</div><div class=\\"biv-grid\\">";\n',
+      '    for (var by = 3; by >= 1; by--) {\n',
+      '      for (var bx = 1; bx <= 3; bx++) {\n',
+      '        var cl = (by-1)*3 + bx;\n',
+      '        html += "<div class=\\"biv-cell\\" style=\\"background:" + window.bivPalette[cl-1] + "\\"></div>";\n',
+      '      }\n',
+      '    }\n',
+      '    html += "</div></div><div class=\\"biv-xarrow\\">" + xlbl + " →</div></div>";\n',
+      '    legendEl.innerHTML = html;\n',
+      '  }\n',
+      '};\n',
+      'window.bivApplyDefault = function() {\n',
+      '  var sel = document.querySelector("input[name=biv-pair]:checked");\n',
+      '  if (sel) window.bivApplyPair(sel.value);\n',
+      '};\n',
+      '</script>\n',
+      sep = ""
+  )
+}
+```
+
+# Explorer
+
+## Row {height="30%"}
+
+::: {.card title="Lecture · biais écologique"}
+**Corrélation n'est pas causalité.** Les liens montrés sont descriptifs au
+niveau communal. Ils sont sujets au **biais écologique** : une corrélation
+entre variables au niveau commune ne dit rien sur les individus.
+
+La densité urbaine est un **confondant majeur** — prix immobilier, vote,
+pollution et abstention sont tous corrélés au caractère urbain/rural.
+La stratification par taille de commune permet d'en démêler une partie.
+[Note méthodologique complète](docs/correlations.qmd).
+:::
+
+## Row {height="70%"}
+
+::: {.card title="Corrélations entre variables · Spearman, global" width="50%"}
+```{r}
+#| label: corr-heatmap
+#| fig-width: 7
+#| fig-height: 7
+if (explorer_ready) {
+  suppressPackageStartupMessages({ library(ggplot2); library(ggiraph) })
+
+  pretty_label <- c(
+    "elec_pct_nfp"     = "% NFP",
+    "elec_pct_ens"     = "% Ensemble",
+    "elec_pct_rn"      = "% RN",
+    "elec_pct_lr"      = "% LR",
+    "elec_pct_divers"  = "% Divers",
+    "elec_abstention"  = "Abstention",
+    "elec_marge"       = "Marge vainqueur",
+    "dvf_prix_app"     = "Prix m² App 2024",
+    "dvf_prix_mai"     = "Prix m² Maison 2024",
+    "air_qual"         = "ATMO global",
+    "air_no2"          = "NO₂",
+    "air_o3"           = "O₃",
+    "air_pm10"         = "PM₁₀",
+    "air_pm25"         = "PM₂.₅",
+    "ctx_log_inscrits" = "log10(inscrits)"
+  )
+
+  d <- correlations |>
+    dplyr::filter(method == "spearman", strate == "Toutes") |>
+    dplyr::mutate(
+      v1_label = factor(pretty_label[v1], levels = unname(pretty_label)),
+      v2_label = factor(pretty_label[v2], levels = unname(pretty_label))
+    )
+
+  # Matrice symétrique (les paires en haut-droite)
+  d_sym <- dplyr::bind_rows(
+    d,
+    d |> dplyr::transmute(v1 = v2, v2 = v1, method, strate, n, rho,
+                          v1_label = v2_label, v2_label = v1_label)
+  )
+
+  p <- ggplot(d_sym, aes(x = v2_label, y = v1_label, fill = rho)) +
+    geom_tile_interactive(aes(
+      tooltip = sprintf("%s × %s\nρ = %.2f (n = %d)",
+                        v1_label, v2_label, rho, n)
+    ), color = "white", linewidth = 0.3) +
+    scale_fill_gradient2(
+      low = "#1B3A57", mid = "#F5F2EC", high = "#A4243B",
+      midpoint = 0, limits = c(-1, 1), na.value = "#E8E4DC",
+      name = "ρ"
+    ) +
+    coord_fixed() +
+    theme_minimal(base_family = "Inter") +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+      axis.text.y = element_text(size = 9),
+      axis.title = element_blank(),
+      panel.grid = element_blank(),
+      legend.position = "right"
+    )
+
+  girafe(ggobj = p, width_svg = 6.5, height_svg = 6.5,
+         options = list(opts_tooltip(css = "background:white;color:#1A1A1A;padding:6px 10px;border:1px solid #DCD8CF;border-radius:4px;font-family:Inter;font-size:12px;")))
+}
+```
+:::
+
+::: {.card title="Scatter : % RN T2 × prix m² Appartement 2024" width="50%"}
+```{r}
+#| label: scatter-rn-prix
+#| fig-width: 6
+#| fig-height: 5
+if (explorer_ready) {
+  suppressPackageStartupMessages({ library(ggplot2); library(ggiraph) })
+
+  d <- merged |>
+    dplyr::filter(!is.na(elec_pct_rn), !is.na(dvf_prix_app))
+
+  # Hexbin pour gérer la densité
+  p <- ggplot(d, aes(x = elec_pct_rn, y = dvf_prix_app)) +
+    stat_binhex(bins = 35, color = "white", linewidth = 0.05) +
+    scale_fill_gradient(low = "#E0D8B5", high = "#2F5145",
+                        trans = "log10", name = "Communes") +
+    geom_smooth(method = "loess", color = "#A4243B", se = FALSE,
+                linewidth = 0.8, formula = y ~ x) +
+    scale_y_log10(labels = function(x) format(x, big.mark = " ")) +
+    labs(
+      x = "% RN au 2nd tour (Législatives 2024)",
+      y = "Prix médian €/m² appartement (2024, log)"
+    ) +
+    theme_minimal(base_family = "Inter") +
+    theme(
+      panel.grid.minor = element_blank(),
+      plot.subtitle = element_text(color = "#7A7A7A", size = 9)
+    ) +
+    labs(subtitle = sprintf(
+      "%d communes · ρ (Spearman) = %.2f",
+      nrow(d),
+      cor(d$elec_pct_rn, d$dvf_prix_app, method = "spearman")
+    ))
+
+  p
+}
+```
+
+::: {.cp-hint style="padding: 4px 0; font-size: 0.8rem; color: #7A7A7A;"}
+La ligne rouge est un lissage LOESS. La corrélation négative reflète
+largement le confondant urbain/rural — communes plus grandes = prix plus
+hauts + RN plus bas. Voir la note méthodologique.
+:::
 :::

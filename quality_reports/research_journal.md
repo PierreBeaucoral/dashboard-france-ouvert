@@ -24,6 +24,40 @@ Bascule depuis `geo.api.gouv.fr` parce que son endpoint ignore le paramètre
 `geometry=contour` (cf. `docs/data-sources.qmd`).
 **Rapport :** `docs/data-sources.qmd` (sources), `docs/decisions.qmd` (méthodo)
 
+### 2026-05-25 — Étape 3 (DVF)
+**Phase :** Étape 3
+**Cible :** `scripts/03_dvf_aggregate.R`, `R/dvf_helpers.R`, page Immobilier
+**Verdict :** pipeline duckdb sur 4 années DVF (2021-2024) — Etalab "latest" ne
+garde pas 2019/2020. 655k ventes mono-local filtrées, 148k lignes en sortie
+(commune × année × type). Choroplèthe avec sélecteurs radio JS, recoloration
+via setStyle() sans rebuild. Panneau trend temporel par barres verticales.
+
+### 2026-05-25 — Étape 4 (Qualité de l'air)
+**Phase :** Étape 4
+**Cible :** `scripts/04_air_atmo.R`, `R/air_helpers.R`, page Air
+**Verdict :** bascule de l'approche "stations en points" vers commune-level
+via indice ATMO (Atmo France). Avantages : maille cohérente avec élections
+et DVF, pas de rattachement spatial. Limite : snapshot uniquement (pas
+d'historique ; le flux ne contient que J + J+1 + J+2). 25 089 communes
+couvertes pour le jour J. Sélecteur sous-polluant (NO₂, O₃, PM₁₀, PM₂.₅),
+palette officielle Atmo France 6 classes.
+
+### 2026-05-25 — Étapes 5 + 6 (Bivariate + Explorer)
+**Phase :** Étapes 5 et 6
+**Cible :** `scripts/05_merge_and_explore.R`, page Bivarié, page Explorer
+**Verdict :**
+- Merge inter-sources au niveau commune : 35k communes × variables élec +
+  DVF (2024) + ATMO. Stratification par quartiles d'inscrits (proxy taille
+  faute de grille INSEE).
+- Corrélations Spearman + Pearson, global et par strate. Patterns connus
+  confirmés : LR/RN ρ=-0.65, ENS/RN -0.59, log(inscrits)/prix maison +0.50.
+- Page Bivarié : 5 paires pré-calculées (terciles X × terciles Y),
+  palette Stevens 3x3, sélecteur radio. JS recolore les polygones à la
+  sélection. Légende grille 3x3 interactive.
+- Page Explorer : heatmap interactive ggiraph des corrélations (clic-survol →
+  tooltip avec ρ et n), scatter hexbin %RN × prix App + LOESS, note
+  méthodo permanente (biais écologique + confondant urbain/rural).
+
 ### 2026-05-25 — Législatives 2024 T2 + choroplèthe communal
 **Phase :** Étape 2 (Législatives bout-en-bout)
 **Cible :** `scripts/02_elections.R`, extension `01_geo_boundaries.R` (communes),

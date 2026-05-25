@@ -38,11 +38,11 @@ Le site rendu est dans `_site/`.
 
 - [x] **Étape 0 — Setup** : structure projet, thème, scaffolding
 - [x] **Étape 1 — Squelette carte** : contours départements (101 entités, simplifiés à 299 KB), 5 cartouches DROM, navigation cliquable
-- [x] **Étape 2 — Législatives 2024** : choroplèthe communal par famille gagnante (NFP/ENS/LR/RN/Divers) sur 31 392 communes T2, tooltip riche, légende, rendu canvas pour les perfs
-- [ ] **Étape 3 — DVF** : agrégation + slider temporel
-- [ ] **Étape 4 — Qualité de l'air** : stations + rattachement commune
-- [ ] **Étape 5 — Mode bivarié** : choroplèthe 3×3 sur la carte principale
-- [ ] **Étape 6 — Explorer** : scatter, matrice corrélations, stratification
+- [x] **Étape 2 — Législatives 2024** : choroplèthe communal par famille gagnante (NFP/ENS/LR/RN/Divers) sur 35 232 communes T1+T2, tooltip riche, légende, rendu canvas, panneau latéral au clic
+- [x] **Étape 3 — DVF** : agrégation duckdb 4 ans (2021-2024), choroplèthe prix m² par commune, sélecteurs année/type, panneau trend temporel
+- [x] **Étape 4 — Qualité de l'air** : indice ATMO snapshot par commune (~25k), sélecteur sous-polluant (NO₂/O₃/PM₁₀/PM₂.₅), panneau pills colorées
+- [x] **Étape 5 — Mode bivarié** : choroplèthe 3×3 sur paires pré-calculées (% RN × Prix App, % NFP × Prix, Abstention × Prix, % RN × PM₂.₅, Prix × ATMO), légende Stevens
+- [x] **Étape 6 — Explorer** : heatmap interactive ggiraph des corrélations Spearman, scatter hexbin %RN × prix App avec LOESS, note méthodo
 
 ## Structure
 

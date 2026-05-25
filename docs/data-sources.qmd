@@ -68,19 +68,52 @@ appliqué en amont (script `scripts/`).
 
 ## Immobilier — DVF (Demandes de Valeurs Foncières)
 
-À documenter en Étape 3.
+- **URL** : `https://files.data.gouv.fr/geo-dvf/latest/csv/{YYYY}/full.csv.gz`
+- **Source** : DVF géolocalisé Etalab
+- **Format** : CSV gz, ~50-120 MB par année compressé
+- **Années retenues** : 2021-2024 (le service "latest" ne conserve que les 4
+  dernières années ; les snapshots datés (`/{YYYY-MM}/`) seraient nécessaires
+  pour les années plus anciennes)
+- **Filtres méthodo** :
+  - `nature_mutation = "Vente"`
+  - `type_local ∈ {"Appartement", "Maison"}`
+  - `surface_reelle_bati > 9 m²`
+  - `valeur_fonciere / surface_reelle_bati ∈ [200, 30000] €/m²`
+  - Mono-local : `COUNT(*) PARTITION BY id_mutation = 1`
+- **Snapshot** : 2026-05-25
+- **Script** : `scripts/03_dvf_aggregate.R` (duckdb stream + agrégation)
+- **Sortie** : 148 019 lignes (commune × année × type) sur 655 495 ventes filtrées
 
-- URL : *à compléter — DVF Etalab*
-- Format : CSV annuel (un fichier par année)
-- Années retenues : 2019 → 2024
-- Snapshot : *à compléter*
-- Script : `scripts/03_dvf_aggregate.R`
+## Qualité de l'air — Indice ATMO par commune (Atmo France)
 
-## Qualité de l'air — Geod'air / LCSQA
+- **Dataset** : *Indice de la qualité de l'air quotidien par commune - indice ATMO*
+- **Organisation** : Atmo France
+- **Page** : <https://www.data.gouv.fr/datasets/indice-de-la-qualite-de-lair-quotidien-par-commune-indice-atmo>
+- **Ressource CSV** : `https://www.data.gouv.fr/api/1/datasets/r/d2b9e8e6-8b0b-4bb6-9851-b4fa2efc8201`
+- **Format** : CSV virgule, UTF-8, ~16 MB
+- **Limite** : snapshot, contient seulement les 2-3 dates les plus récentes
+  (jour J + prévisions J+1, J+2). Pour de l'historique annuel, il faudrait
+  scraper le flux quotidien sur plusieurs mois ou utiliser le WFS avec
+  filtre date.
+- **Variables retenues** : `code_qual` (ATMO global), `code_no2`, `code_o3`,
+  `code_pm10`, `code_pm25` (sous-indices), `source` (AASQA), `x_wgs84`/`y_wgs84` (coords).
+- **Couverture** : ~25 000 communes (métropole + DROM partiel ; absence
+  Réunion + Nouvelle-Calédonie selon doc Atmo)
+- **Snapshot** : 2026-05-25
+- **Script** : `scripts/04_air_atmo.R`
 
-À documenter en Étape 4.
+## Données agrégées (Explorer)
 
-- URL : *à compléter*
-- Format : *à compléter*
-- Snapshot : *à compléter*
-- Script : `scripts/04_air_stations.R`
+- **Source amont** : merge interne des trois sources ci-dessus
+- **Stratification** : quartiles d'inscrits (proxy taille de commune,
+  faute d'avoir téléchargé la grille de densité INSEE). Catégories :
+  Très petite (< 200), Petite (200-1 000), Moyenne (1 000-5 000),
+  Grande (> 5 000).
+- **Métriques de corrélation** : Spearman (défaut) + Pearson
+- **Paires bivariate pré-calculées** :
+  - `% RN × Prix m² App 2024`
+  - `% NFP × Prix m² App 2024`
+  - `Abstention × Prix m² App 2024`
+  - `% RN × PM2.5`
+  - `Prix m² App × ATMO`
+- **Script** : `scripts/05_merge_and_explore.R`
