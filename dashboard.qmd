@@ -83,6 +83,11 @@ if (elec_ready) {
   dgfip_ready <- file.exists(dgfip_path)
   if (dgfip_ready) dgfip_data <- arrow::read_parquet(dgfip_path)
 
+  # APL DREES (Bloc 5 — désert médical)
+  apl_path  <- here::here("data", "processed", "drees", "apl_medecins.parquet")
+  apl_ready <- file.exists(apl_path)
+  if (apl_ready) apl_data <- arrow::read_parquet(apl_path)
+
   # Paris / Lyon / Marseille : la data MI agrège au niveau "commune"
   # (codes 75056, 69123, 13055) mais le GeoJSON a les arrondissements
   # municipaux (75101-75120, 69381-69389, 13201-13216). On répercute le
@@ -677,6 +682,83 @@ if (ssmsi_ready) {
 ```
 
 ```{r}
+#| label: inject-sante-data
+#| results: asis
+#| echo: false
+if (apl_ready) {
+  sante_for_js <- apl_data |>
+    dplyr::transmute(
+      code = code_commune,
+      apl  = round(apl_medecins, 2),
+      aplj = round(apl_medecins_jeunes, 2),
+      pop  = round(pop_referenced)
+    )
+  sante_json <- jsonlite::toJSON(sante_for_js, auto_unbox = TRUE, na = "null")
+  rev_red_js <- jsonlite::toJSON(rev(.palette_red))
+
+  cat('<script>\n',
+      'window.santeRaw = ', as.character(sante_json), ';\n',
+      'window.santePalette = ', as.character(rev_red_js), ';\n',
+      'window.santeData = {};\n',
+      'window.santeRaw.forEach(function(r) { window.santeData[r.code] = r; });\n',
+      'window.santeFieldMap = { apl_medecins:"apl", apl_medecins_jeunes:"aplj" };\n',
+      'window.santeBreaks = {};\n',
+      'Object.keys(window.santeFieldMap).forEach(function(field) {\n',
+      '  var key = window.santeFieldMap[field];\n',
+      '  var vals = window.santeRaw.map(function(r) { return r[key]; }).filter(function(v) { return v != null; }).sort(function(a,b){return a-b;});\n',
+      '  var n = vals.length;\n',
+      '  window.santeBreaks[field] = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return vals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
+      '});\n',
+      'window.santeColorFor = function(v, field) {\n',
+      '  if (v == null) return "#E8E4DC";\n',
+      '  var br = window.santeBreaks[field];\n',
+      '  for (var i = 1; i < 5; i++) { if (v < br[i]) return window.santePalette[i-1]; }\n',
+      '  return window.santePalette[4];\n',
+      '};\n',
+      'window.santeRecolor = function(field) {\n',
+      '  if (!window.santeMap) return;\n',
+      '  var key = window.santeFieldMap[field];\n',
+      '  window.santeMap.eachLayer(function(layer) {\n',
+      '    if (!layer.options || !layer.options.layerId) return;\n',
+      '    var ent = window.santeData[layer.options.layerId];\n',
+      '    var v = ent ? ent[key] : null;\n',
+      '    layer.setStyle({ fillColor: window.santeColorFor(v, field), fillOpacity: (v != null ? 0.85 : 0.25) });\n',
+      '  });\n',
+      '};\n',
+      'window.updateSantePanel = function(code) {\n',
+      '  var el = document.getElementById("sante-panel");\n',
+      '  if (!el) return;\n',
+      '  var d = window.santeData[code];\n',
+      '  var elec = window.communeLookup && window.communeLookup[code];\n',
+      '  var nom = elec ? elec.nom_commune : code;\n',
+      '  var dept = elec ? (elec.libelle_dept + " (" + elec.code_dept + ")") : "";\n',
+      '  if (!d) {\n',
+      '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Pas d\\u0027APL pour cette commune.</div>\';\n',
+      '    return;\n',
+      '  }\n',
+      '  function fmt(x) { if (x == null) return "—"; return Number(x).toFixed(2).replace(".", ","); }\n',
+      '  function fmtInt(x) { if (x == null) return "—"; return Number(x).toLocaleString("fr-FR"); }\n',
+      '  // Statut désert médical\n',
+      '  var status = "", statusClass = "";\n',
+      '  if (d.apl < 2.5) { status = "⚠️ Désert médical"; statusClass = "cp-badge-imp"; }\n',
+      '  else if (d.apl < 3.5) { status = "Sous-doté"; statusClass = "cp-badge-t1"; }\n',
+      '  else { status = "Bien doté"; statusClass = "cp-badge-t2"; }\n',
+      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \' · <span class="cp-badge \' + statusClass + \'">\' + status + \'</span></div></div>\' +\n',
+      '    \'<div class="cp-section"><h4>APL aux médecins généralistes (2023)</h4>\' +\n',
+      '    \'<div class="cp-kvs">\' +\n',
+      '    \'<div class="cp-kv"><span>Tous médecins</span><span class="cp-num">\' + fmt(d.apl) + \' c/an/hab</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Médecins ≤ 65 ans</span><span class="cp-num">\' + fmt(d.aplj) + \' c/an/hab</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Population réf.</span><span class="cp-num">\' + fmtInt(d.pop) + \' hab.</span></div>\' +\n',
+      '    \'</div></div>\' +\n',
+      '    \'<div class="cp-section" style="font-size:0.78rem;color:#7A7A7A;">Seuil de désert médical conventionnel : &lt; 2,5 consultations/an/hab. Soutenabilité future : APL des médecins ≤ 65 ans.</div>\';\n',
+      '};\n',
+      '</script>\n',
+      sep = ""
+  )
+}
+```
+
+```{r}
 #| label: inject-fin-data
 #| results: asis
 #| echo: false
@@ -1197,6 +1279,83 @@ if (dgfip_ready) {
   <div class="cp-placeholder">
     <p><strong>Cliquez sur une commune</strong> pour voir son budget communal.</p>
     <p class="cp-hint">Source : DGFiP, comptes individuels des communes 2024. Tous les montants en €/habitant. Taxes locales : taux votés par la commune.</p>
+  </div>
+</div>
+```
+:::
+
+# Santé
+
+## Row {height="82%"}
+
+::: {.card title="Désert médical · APL médecins généralistes 2023 (consultations/an/hab)" width="72%"}
+```{=html}
+<div class="dvf-controls">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Indicateur</span>
+    <div class="dvf-ctrl-radios" id="sante-radios">
+      <label><input type="radio" name="sante-ind" value="apl_medecins" checked> APL tous médecins</label>
+      <label><input type="radio" name="sante-ind" value="apl_medecins_jeunes"> APL médecins ≤ 65 ans</label>
+    </div>
+  </div>
+</div>
+```
+
+```{r}
+#| label: map-sante
+if (apl_ready) {
+  vals0 <- apl_data |>
+    dplyr::transmute(code_commune, value = apl_medecins)
+  # Palette inversée : valeurs faibles = désert = rouge
+  m <- choropleth_socio(com_metro_only, dep_metro, vals0,
+                        palette = rev(.palette_red),
+                        legend_title = "APL · consultations/an/hab",
+                        value_unit   = "",
+                        value_fmt    = function(x) format(round(x, 2), nsmall = 2,
+                                                          decimal.mark = ","))
+  m |>
+    htmlwidgets::onRender(
+      "function(el, x) {
+         window.santeMap = this;
+         var self = this;
+         function attach() {
+           self.eachLayer(function(layer) {
+             if (layer.options && layer.options.layerId && !layer._santeClickOn) {
+               layer._santeClickOn = true;
+               layer.on('click', function(e) {
+                 if (window.updateSantePanel) window.updateSantePanel(e.target.options.layerId);
+               });
+             }
+           });
+         }
+         self._cpReattach = attach;
+         setTimeout(attach, 60);
+         setTimeout(attach, 500);
+         setTimeout(attach, 2000);
+         self.on('layeradd', function() { setTimeout(attach, 0); });
+         function onChange() {
+           var sel = document.querySelector('input[name=sante-ind]:checked');
+           if (sel && window.santeRecolor) window.santeRecolor(sel.value);
+         }
+         setTimeout(function() {
+           document.querySelectorAll('input[name=sante-ind]').forEach(function(r) {
+             r.addEventListener('change', onChange);
+           });
+         }, 300);
+       }"
+    )
+} else {
+  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>APL non chargé. Lancer <code>Rscript scripts/08_drees_apl.R</code>.</p>")
+}
+```
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
+<div id="sante-panel" class="commune-panel">
+  <div class="cp-placeholder">
+    <p><strong>Cliquez sur une commune</strong> pour voir son indicateur de désert médical.</p>
+    <p class="cp-hint">Source : DREES, APL 2023. L'indicateur exprime le nombre de consultations de médecine générale accessibles par an et par habitant, pondéré par distance et structure d'âge. Seuil de désert médical conventionnel : <strong>&lt; 2,5</strong>.</p>
   </div>
 </div>
 ```
