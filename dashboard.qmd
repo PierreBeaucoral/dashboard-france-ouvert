@@ -159,6 +159,17 @@ atmo_ready <- file.exists(atmo_path) && elec_ready
 if (atmo_ready) {
   atmo       <- arrow::read_parquet(atmo_path)
   atmo_date  <- unique(atmo$date_ech)[1]
+
+  # Calcul de la couverture régionale (pour l'indicateur du dashboard)
+  atmo_regions_covered <- sort(unique(atmo$source_aasqa))
+  atmo_regions_covered <- atmo_regions_covered[!is.na(atmo_regions_covered)]
+  atmo_all_aasqa <- c("Airparif", "Air Breizh", "Air Pays de la Loire",
+                      "Atmo Auvergne-Rhône-Alpes", "ATMO Bourgogne-Franche-Comté",
+                      "Atmo Grand Est", "Atmo Hauts-de-France",
+                      "Atmo Normandie", "Atmo Nouvelle-Aquitaine",
+                      "Atmo-Occitanie", "AtmoSud", "Lig'Air",
+                      "Qualitair Corse")
+  atmo_aasqa_missing <- setdiff(atmo_all_aasqa, atmo_regions_covered)
 }
 
 # ---- Explorer (Étapes 5 + 6) ----
@@ -393,7 +404,33 @@ if (atmo_ready) {
 #| label: map-metropole
 if (elec_ready) {
   m <- choropleth_metropole(com_metro_results, dep_metro)
-  m |> .attach_panel_click()
+  m |>
+    htmlwidgets::onRender(
+      "function(el, x) {
+         window.elecMap = this;
+         var self = this;
+         function attach() {
+           self.eachLayer(function(layer) {
+             if (layer.options && layer.options.layerId && !layer._cpClickOn) {
+               layer._cpClickOn = true;
+               layer.on('click', function(e) {
+                 var code = e.target.options.layerId;
+                 console.log('[elec] click code=', code);
+                 var data = window.communeLookup ? window.communeLookup[code] : null;
+                 if (data && window.updateCommunePanel) {
+                   window.updateCommunePanel(data);
+                 } else {
+                   var el = document.getElementById('commune-panel');
+                   if (el) el.innerHTML = '<div class=\"cp-header\"><h3>' + code + '</h3><div class=\"cp-meta\">Pas de résultat Législatives publié pour cette commune (vintage ou DROM partiel).</div></div>';
+                 }
+               });
+             }
+           });
+         }
+         setTimeout(attach, 60);
+         self.on('layeradd', function() { setTimeout(attach, 0); });
+       }"
+    )
 } else if (data_ready) {
   base_map_metropole(dep_metro)
 } else {
@@ -558,6 +595,19 @@ if (dvf_ready) {
 ## Row {height="82%"}
 
 ::: {.card title="Indice ATMO par commune" width="72%"}
+```{r}
+#| label: atmo-coverage-banner
+#| results: asis
+#| echo: false
+if (atmo_ready && length(atmo_aasqa_missing) > 0) {
+  cat(sprintf(
+    '<div class="atmo-banner">⚠️ <strong>%d AASQA n\'ont pas publié aujourd\'hui</strong> : %s. Les communes de ces régions apparaissent en crème (pas de fallback possible).</div>',
+    length(atmo_aasqa_missing),
+    paste(atmo_aasqa_missing, collapse = ", ")
+  ))
+}
+```
+
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
