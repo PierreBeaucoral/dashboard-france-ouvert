@@ -1,0 +1,45 @@
+---
+title: "Sources de données"
+---
+
+Toutes les sources sont publiques et stables. Pour chaque jeu, on documente
+l'URL canonique, le format, la date du snapshot téléchargé et l'éventuel filtre
+appliqué en amont (script `scripts/`).
+
+## Contours administratifs
+
+À documenter en Étape 1 — typiquement `geo.api.gouv.fr` (API Découpage administratif)
+ou le dépôt `etalab/france-geojson` pour les contours communaux et départementaux.
+
+- URL : *à compléter*
+- Format : GeoJSON
+- Snapshot : *à compléter*
+- Script : `scripts/01_geo_boundaries.R`
+
+## Élections — Législatives 2024, 2nd tour
+
+À documenter en Étape 2.
+
+- URL : *à compléter — Ministère de l'Intérieur via data.gouv.fr*
+- Format : *à compléter après inspection*
+- Snapshot : *à compléter*
+- Script : `scripts/02_elections.R`
+
+## Immobilier — DVF (Demandes de Valeurs Foncières)
+
+À documenter en Étape 3.
+
+- URL : *à compléter — DVF Etalab*
+- Format : CSV annuel (un fichier par année)
+- Années retenues : 2019 → 2024
+- Snapshot : *à compléter*
+- Script : `scripts/03_dvf_aggregate.R`
+
+## Qualité de l'air — Geod'air / LCSQA
+
+À documenter en Étape 4.
+
+- URL : *à compléter*
+- Format : *à compléter*
+- Snapshot : *à compléter*
+- Script : `scripts/04_air_stations.R`

@@ -1,0 +1,91 @@
+---
+title: "Décisions méthodologiques"
+---
+
+Journal des décisions structurantes. Chaque entrée donne **la règle**, **la
+raison**, et les **alternatives écartées**.
+
+## 2026-05-25 — Format & stack
+
+**Règle.** Quarto Dashboard en R, déploiement statique (GitHub Pages / Netlify),
+interactivité via `crosstalk` + `leaflet` + `plotly`/`ggiraph`.
+Pipeline data en R (`duckdb` + `sf` + `arrow`).
+
+**Pourquoi.** L'utilisateur veut un format notebook lisible et modifiable cellule
+par cellule, pas un HTML/JS opaque. Quarto fournit le literate computing ; R reste
+le langage primaire (cf. `CLAUDE.md` global) ; crosstalk évite le besoin d'un
+serveur Shiny.
+
+**Alternatives écartées.**
+
+- HTML/JS pur (Vite + TypeScript + MapLibre) — rejeté : pas un notebook.
+- Shiny serveur — rejeté : hébergement non statique.
+- Shinylive (WebR) — gardé en option si crosstalk devient limitant.
+
+## 2026-05-25 — Périmètre géographique
+
+**Règle.** France métropolitaine + DROM en cartouches (convention IGN).
+DROM = Guadeloupe, Martinique, Guyane, Réunion, Mayotte.
+
+**Pourquoi.** Inclusivité sans dégrader la lisibilité de la carte principale.
+
+**Alternative écartée.** Carte unique étirée sur Atlantique/Indien (illisible).
+
+## 2026-05-25 — Couche élections
+
+**Règle.** Législatives 2024, second tour. Variable cartographiée : **nuance
+gagnante** (couleur) avec **opacité proportionnelle à la marge**.
+
+**Pourquoi.** Législatives 2024 = scrutin le plus récent à enjeu national. Le
+multipartisme (NFP, ENS, RN, LR+UDR, divers) se rend bien par couleur catégorielle.
+L'opacité ajoute une information continue (force de la victoire) sans surcharger.
+
+## 2026-05-25 — Filtres DVF
+
+**Règle.** Pour le calcul du prix médian au m² par commune et par année :
+
+- `nature_mutation = "Vente"`
+- `type_local ∈ {"Appartement", "Maison"}`
+- `surface_reelle_bati > 9 m²`
+- Bornes prix/m² : `200 €/m² < x < 30 000 €/m²`
+- **Mutations mono-local uniquement** (un seul bien par `id_mutation`)
+- **Médiane** comme statistique d'agrégation (robuste aux outliers)
+- Communes avec `N < 5` transactions/an : valeur marquée "insuffisant" et
+  grisée sur la carte
+
+**Pourquoi.** Convention DVF standard. Mono-local évite le casse-tête de la
+répartition du prix sur les lots. Bornes éliminent les saisies aberrantes
+et les ventes symboliques (1 €).
+
+**Alternatives écartées.** Moyenne (sensible aux outliers). Répartition
+proportionnelle des lots (introduit du bruit difficile à tracer).
+
+## 2026-05-25 — Rattachement commune ↔ station de mesure (air)
+
+**Règle.** Chaque commune reçoit la mesure de la **station la plus proche** dans
+un **rayon de 15 km**. Au-delà : NA, commune exclue des analyses incluant l'air.
+
+**Pourquoi.** Au-delà de 15 km, la mesure n'est plus représentative (gradient
+spatial de la pollution). NA explicite > extrapolation silencieuse.
+
+**Trace.** Variable `distance_station_km` conservée comme covariable de qualité.
+
+## 2026-05-25 — Métrique de corrélation par défaut
+
+**Règle.** **Spearman** par défaut, Pearson en alternative (toggle).
+
+**Pourquoi.** Les distributions de prix m² et de pollution ont des queues
+lourdes. Spearman (monotone, non paramétrique) est robuste. Pearson disponible
+pour comparaison.
+
+## 2026-05-25 — Stratification
+
+**Règle.** Quatre strates issues de la **grille de densité INSEE** :
+
+- Commune densément peuplée
+- Commune de densité intermédiaire
+- Commune peu dense
+- Commune très peu dense
+
+**Pourquoi.** La densité urbaine est le principal confondant entre les trois
+sujets. Stratifier permet d'isoler des corrélations intra-strate.

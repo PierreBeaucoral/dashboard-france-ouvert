@@ -1,0 +1,185 @@
+/*-- scss:defaults --*/
+
+// ============================================================
+// Palette
+// ============================================================
+$cream:        #F5F2EC;
+$ink:          #1A1A1A;
+$ink-soft:     #4A4A4A;
+$ink-muted:    #7A7A7A;
+$rule:         #DCD8CF;
+$paper:        #FFFFFF;
+$accent:       #2A6F97;
+$accent-soft:  #5B95B5;
+$warning:      #B5651D;
+$danger:       #A4243B;
+$success:      #4F7942;
+
+// Couleurs politiques (Législatives 2024)
+$pol-nfp:      #C73659;  // Nouveau Front Populaire — rose-rouge
+$pol-ens:      #E6B800;  // Ensemble — jaune
+$pol-rn:       #1B3A57;  // Rassemblement National — bleu marine
+$pol-lr:       #4A90D9;  // Les Républicains / UDR — bleu clair
+$pol-divers:   #8A8A8A;  // Divers — gris
+
+// ============================================================
+// Bootstrap / Quarto overrides
+// ============================================================
+$body-bg:        $cream;
+$body-color:     $ink;
+$primary:        $accent;
+$secondary:      $ink-soft;
+$link-color:     $accent;
+$link-hover-color: darken($accent, 12%);
+$border-color:   $rule;
+
+// Typographie
+$font-family-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+$font-family-monospace:  "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+$font-size-base:         0.95rem;
+$headings-font-weight:   600;
+$headings-line-height:   1.25;
+$headings-color:         $ink;
+
+// Cards
+$card-bg:                $paper;
+$card-border-color:      $rule;
+$card-border-radius:     6px;
+$card-cap-bg:            $paper;
+
+// Navbar
+$navbar-bg:              $paper;
+
+/*-- scss:rules --*/
+
+// ============================================================
+// Imports de polices
+// ============================================================
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+// ============================================================
+// Base
+// ============================================================
+body {
+  font-feature-settings: "ss01", "cv11";  // Inter : style alternates
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// Chiffres en mono pour lisibilité dans les tableaux et indicateurs
+.value-box-value,
+.numeric,
+td.numeric,
+.tabular-nums {
+  font-family: $font-family-monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+// ============================================================
+// Navbar — sobre, sans ombre
+// ============================================================
+.navbar {
+  border-bottom: 1px solid $rule;
+  box-shadow: none;
+  .navbar-title {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+}
+
+// ============================================================
+// Cards — bordures fines, pas d'ombre
+// ============================================================
+.card {
+  box-shadow: none;
+  border: 1px solid $rule;
+  .card-header {
+    border-bottom: 1px solid $rule;
+    font-weight: 500;
+    font-size: 0.9rem;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    color: $ink-soft;
+  }
+}
+
+// ============================================================
+// Dashboard — layout
+// ============================================================
+.quarto-dashboard {
+  .card {
+    border-radius: 4px;
+  }
+  .nav-tabs {
+    border-bottom: 1px solid $rule;
+    .nav-link {
+      color: $ink-soft;
+      border: none;
+      &.active {
+        color: $ink;
+        border-bottom: 2px solid $accent;
+        background: transparent;
+      }
+    }
+  }
+}
+
+// ============================================================
+// Valueboxes (KPI tiles)
+// ============================================================
+.value-box {
+  border-radius: 4px;
+  .value-box-title {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.85;
+  }
+  .value-box-value {
+    font-size: 1.8rem;
+    font-weight: 500;
+  }
+}
+
+// ============================================================
+// Carte (leaflet) — fond transparent, contours nets
+// ============================================================
+.leaflet-container {
+  background: $cream !important;
+  font-family: $font-family-sans-serif;
+}
+.leaflet-tooltip {
+  font-family: $font-family-sans-serif;
+  font-size: 0.85rem;
+  background: $paper;
+  border: 1px solid $rule;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  color: $ink;
+}
+
+// ============================================================
+// Code chunks (puisque le code est visible)
+// ============================================================
+pre.sourceCode {
+  background: $paper;
+  border: 1px solid $rule;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+// ============================================================
+// Footer
+// ============================================================
+.nav-footer {
+  border-top: 1px solid $rule;
+  font-size: 0.85rem;
+  color: $ink-muted;
+}
+
+// ============================================================
+// Méthodo / avertissement
+// ============================================================
+.callout-warning, .callout-note {
+  border-left-width: 3px;
+  border-radius: 3px;
+}

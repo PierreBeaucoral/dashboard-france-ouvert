@@ -1,0 +1,81 @@
+---
+title: "Note sur les corrélations"
+---
+
+::: {.callout-warning}
+**Corrélation n'est pas causalité.** Ce dashboard montre des associations
+descriptives au niveau communal. Aucun lien causal n'est établi.
+:::
+
+## Granularité
+
+Les trois sources n'ont pas la même maille native :
+
+| Sujet         | Maille native              | Couverture |
+|---------------|----------------------------|------------|
+| Élections     | Commune (~35 000)          | Quasi-totale |
+| DVF           | Commune (~35 000)          | Variable selon N transactions |
+| Qualité air   | **Station** (~700)         | Inégale, urbaine surtout |
+
+Pour les analyses croisées, chaque commune est rattachée à la **station la plus
+proche dans un rayon de 15 km**. Au-delà, la valeur air est manquante — typiquement
+30 à 40 % des communes rurales sont exclues des analyses incluant l'air.
+
+## Biais écologique
+
+Une corrélation entre deux variables au niveau **commune** ne dit rien sur leur
+corrélation au niveau **individuel**. Exemple classique :
+
+> Si les communes où le vote RN est élevé ont aussi des prix au m² faibles, on
+> ne peut **pas** en déduire que les électeurs RN paient leur logement moins
+> cher individuellement. Le lien commune n'est pas le lien individu.
+
+C'est l'**ecological fallacy** (Robinson, 1950). Tout l'onglet *Explorer* est
+soumis à cette limite.
+
+## Confondant urbain/rural
+
+La densité urbaine est corrélée à presque toutes les variables d'intérêt :
+
+- **Vote** : les communes denses votent plus à gauche / au centre ; les communes
+  rurales votent davantage RN (effet largement documenté).
+- **Prix immobilier** : croissant avec la densité.
+- **Pollution** : NO₂ surtout, croissant avec la densité (trafic).
+- **Abstention** : variable selon les scrutins, mais souvent plus forte en
+  périurbain.
+
+Toute corrélation **brute** entre ces variables capture en grande partie cet
+effet. La **stratification** par classe de densité (grille INSEE, 4 classes)
+permet d'observer les liens **intra-strate** et de dégonfler ce confondant.
+
+## Métriques
+
+- **Spearman** (défaut) — coefficient de rang. Capture les relations monotones,
+  robuste aux outliers. Adapté aux distributions à queues lourdes (prix m²).
+- **Pearson** (optionnel) — coefficient linéaire. Plus interprétable mais
+  sensible aux valeurs extrêmes.
+
+Les coefficients sont calculés **par paire de variables × strate de densité**,
+pré-calculés en amont du dashboard (cf. `scripts/07_correlations.R`).
+
+## Lecture du *bivariate choropleth*
+
+La carte bivariée encode deux variables sur une palette **3 × 3** (Stevens,
+2015) :
+
+- Axe horizontal — tercile de la variable X
+- Axe vertical — tercile de la variable Y
+- 9 classes au total, chaque commune appartient à une cellule
+
+Les coins de la palette donnent les associations extrêmes ; le centre rassemble
+les communes "moyennes" sur les deux variables. La légende sert aussi de filtre :
+cliquer une cellule met en évidence les communes correspondantes.
+
+## Limites supplémentaires
+
+- **Snapshot temporel** différent par source — vote 2024, DVF 2019-2024, air
+  selon disponibilité. Les croisements impliquent une comparaison **dernière
+  observation contre dernière observation**.
+- **Couverture air** très inégale géographiquement.
+- **Petites communes** : les médianes DVF avec N < 5 sont grisées ; les
+  pourcentages électoraux restent calculables mais bruités.

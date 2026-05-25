@@ -1,0 +1,42 @@
+# Données brutes — téléchargées localement, jamais commit
+data/raw/
+*.csv.gz
+*.zip
+
+# Données processées volumineuses (à filtrer selon poids)
+# data/processed/  # commit par défaut, sauf si > 100 Mo
+
+# Quarto
+_site/
+_freeze/
+.quarto/
+
+# R
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+
+# renv : on commit lockfile et activate, pas la library locale
+renv/library/
+renv/local/
+renv/staging/
+renv/python/
+renv/cellar/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Éditeurs
+.vscode/
+.idea/
+
+# Logs / temporaires
+*.log
+session_logs/*.md
+!session_logs/.gitkeep
+
+/.quarto/
+**/*.quarto_ipynb

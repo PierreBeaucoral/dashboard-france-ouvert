@@ -1,0 +1,86 @@
+---
+title: "Tableau de bord · France"
+format:
+  dashboard:
+    orientation: columns
+    nav-buttons:
+      - icon: github
+        href: https://github.com
+    theme:
+      - cosmo
+      - styles/custom.scss
+execute:
+  echo: false
+---
+
+```{r setup}
+#| include: false
+# Helpers communs à toutes les pages
+# source("R/load_data.R")    # à activer dès qu'on a des données (Étape 2+)
+# source("R/map_helpers.R")
+# source("R/corr_helpers.R")
+# source("R/theme.R")
+```
+
+# Élections {orientation="columns"}
+
+## Column {width="20%"}
+
+::: {.card title="Sujet"}
+Sélection de la couche à afficher. (Sélecteurs à brancher en Étape 2.)
+:::
+
+::: {.card title="Période"}
+Slider temporel — pour DVF et qualité de l'air. (Étape 3.)
+:::
+
+## Column {width="55%"}
+
+::: {.card title="Carte · Législatives 2024 · 2nd tour"}
+Carte (vide à ce stade — branchée en Étape 1 avec les contours départementaux,
+puis en Étape 2 avec les résultats par commune).
+:::
+
+## Column {width="25%"}
+
+::: {.card title="Territoire sélectionné"}
+Indicateurs clés du territoire cliqué (vide à ce stade).
+:::
+
+::: {.card title="Détails"}
+Tableau / graphique du sujet courant (vide à ce stade).
+:::
+
+# Immobilier
+
+::: {.card}
+Page Immobilier — à brancher en Étape 3 (agrégation DVF par commune × année).
+:::
+
+# Qualité de l'air
+
+::: {.card}
+Page Qualité de l'air — à brancher en Étape 4 (stations Geod'air, rattachement
+commune-station ≤ 15 km).
+:::
+
+# Explorer
+
+::: {.card title="Avertissement de lecture"}
+:::: {.callout-warning}
+**Corrélation n'est pas causalité.** Les liens observés ici sont descriptifs et
+agrégés au niveau communal. Ils sont sujets au **biais écologique** : une
+corrélation entre variables au niveau commune ne dit rien sur les individus.
+
+La densité urbaine est un **confondant majeur** : prix de l'immobilier, vote,
+pollution et abstention sont tous corrélés au caractère urbain/rural d'une commune.
+Utiliser la stratification (à brancher en Étape 6) pour démêler ces effets.
+
+Voir la [note méthodologique complète](docs/correlations.qmd).
+::::
+:::
+
+::: {.card title="Vue à venir"}
+Scatter ↔ carte liés (crosstalk), matrice de corrélations (Spearman / Pearson),
+boxplots conditionnels par strate de densité. À brancher en Étape 6.
+:::

@@ -1,0 +1,50 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - dashboard.qmd
+    - docs/*.qmd
+
+website:
+  title: "France · Données ouvertes"
+  description: "Tableau de bord exploratoire — élections, immobilier, qualité de l'air"
+  navbar:
+    background: light
+    pinned: true
+    left:
+      - href: index.qmd
+        text: Accueil
+      - href: dashboard.qmd
+        text: Dashboard
+      - text: Méthodologie
+        menu:
+          - href: docs/data-sources.qmd
+            text: Sources de données
+          - href: docs/decisions.qmd
+            text: Décisions méthodologiques
+          - href: docs/correlations.qmd
+            text: Note sur les corrélations
+  page-footer:
+    left: "Sources · data.gouv.fr"
+    right: "Construit avec Quarto"
+
+format:
+  html:
+    theme:
+      - cosmo
+      - styles/custom.scss
+    toc: false
+    code-fold: true
+    code-tools: true
+    code-copy: true
+    fig-responsive: true
+    smooth-scroll: true
+
+execute:
+  echo: true
+  warning: false
+  message: false
+  freeze: auto
+
+lang: fr

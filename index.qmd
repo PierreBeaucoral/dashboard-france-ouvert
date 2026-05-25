@@ -1,0 +1,36 @@
+---
+title: "France · Données ouvertes"
+subtitle: "Tableau de bord exploratoire"
+---
+
+## Ce projet
+
+Tableau de bord interactif sur la France métropolitaine et les DROM, croisant trois sources
+ouvertes :
+
+- **Élections** — résultats des Législatives 2024 (second tour) par commune, depuis le
+  Ministère de l'Intérieur via [data.gouv.fr](https://www.data.gouv.fr).
+- **Immobilier** — prix médian au m² par commune, calculé sur les Demandes de Valeurs
+  Foncières (DVF) de 2019 à 2024.
+- **Qualité de l'air** — mesures des stations AASQA / Geod'air (NO₂, PM₂.₅, PM₁₀, O₃).
+
+L'objectif est triple :
+
+1. Explorer chaque sujet en cartographie choroplèthe (élections, immobilier) ou en
+   semis de points (stations).
+2. Croiser les variables via un **mode bivarié** sur la carte principale et un onglet
+   **Explorer** dédié aux corrélations.
+3. Documenter chaque choix méthodologique (filtres DVF, rattachement commune-station,
+   stratification urbain/rural) de façon transparente — le code source est visible.
+
+## Accès
+
+- 🗺️  [Dashboard](dashboard.qmd) — la carte et les panneaux interactifs.
+- 📚 [Sources de données](docs/data-sources.qmd) — URL, formats, dates de snapshot.
+- ⚙️  [Décisions méthodologiques](docs/decisions.qmd) — filtres et conventions.
+- ⚠️  [Note sur les corrélations](docs/correlations.qmd) — biais écologique, stratification.
+
+::: {.callout-note}
+Ce dashboard est un projet exploratoire et itératif. Toute corrélation observée est
+descriptive — elle n'établit pas de relation causale. Voir la note méthodologique.
+:::
