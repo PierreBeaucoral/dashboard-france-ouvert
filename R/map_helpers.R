@@ -259,6 +259,7 @@ choropleth_metropole <- function(com_sf, dep_sf) {
     "<div class='lgd-row'>",
     "<span class='lgd-swatch' style='background:", .famille_colors, ";'></span>",
     "<span class='lgd-label'>", labels[names(.famille_colors)], "</span>",
+    "<span class='lgd-hex'>", toupper(.famille_colors), "</span>",
     "</div>",
     collapse = ""
   )

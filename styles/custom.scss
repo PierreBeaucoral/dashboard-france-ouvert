@@ -347,6 +347,16 @@ pre.sourceCode {
     border-radius: 2px;
     flex: 0 0 auto;
   }
+  .lgd-hex {
+    font-family: $font-family-monospace;
+    font-size: 0.68rem;
+    color: $ink-muted;
+    margin-left: auto;
+    padding-left: 8px;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .lgd-label { flex: 1 1 auto; }
 }
 
 // ============================================================

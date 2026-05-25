@@ -136,6 +136,7 @@ choropleth_dvf <- function(com_sf, dep_sf, dvf_default, breaks) {
     "<div class='lgd-row'>",
     "<span class='lgd-swatch' style='background:", .dvf_palette, ";'></span>",
     "<span class='lgd-label'>", labels, "</span>",
+    "<span class='lgd-hex'>", toupper(.dvf_palette), "</span>",
     "</div>",
     collapse = ""
   )
@@ -146,6 +147,7 @@ choropleth_dvf <- function(com_sf, dep_sf, dvf_default, breaks) {
     "<div class='lgd-row' style='margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;'>",
     "<span class='lgd-swatch' style='background:", .dvf_na_color, ";'></span>",
     "<span class='lgd-label' style='color:#7A7A7A;'>N &lt; 5 ou non publié</span>",
+    "<span class='lgd-hex'>", toupper(.dvf_na_color), "</span>",
     "</div>",
     "</div>"
   ))

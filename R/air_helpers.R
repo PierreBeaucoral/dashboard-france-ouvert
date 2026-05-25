@@ -108,6 +108,7 @@ choropleth_atmo <- function(com_sf, dep_sf, atmo_df, indice_col = "qual_indice",
     "<div class='lgd-row'>",
     "<span class='lgd-swatch' style='background:", .atmo_colors[as.character(1:6)], ";'></span>",
     "<span class='lgd-label'>", as.character(1:6), " — ", .atmo_labels[as.character(1:6)], "</span>",
+    "<span class='lgd-hex'>", toupper(.atmo_colors[as.character(1:6)]), "</span>",
     "</div>",
     collapse = ""
   )

@@ -137,6 +137,7 @@ choropleth_socio <- function(com_sf, dep_sf, values_df,
     "<div class='lgd-row'>",
     "<span class='lgd-swatch' style='background:", palette, ";'></span>",
     "<span class='lgd-label'>", labels, "</span>",
+    "<span class='lgd-hex'>", toupper(palette), "</span>",
     "</div>",
     collapse = ""
   )
@@ -147,6 +148,7 @@ choropleth_socio <- function(com_sf, dep_sf, values_df,
     "<div class='lgd-row' style='margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;'>",
     "<span class='lgd-swatch' style='background:", .socio_na_color, ";'></span>",
     "<span class='lgd-label' style='color:#7A7A7A;'>Non publié</span>",
+    "<span class='lgd-hex'>", toupper(.socio_na_color), "</span>",
     "</div>",
     "</div>"
   ))
