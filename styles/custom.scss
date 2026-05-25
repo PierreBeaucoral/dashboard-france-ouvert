@@ -180,13 +180,13 @@ pre.sourceCode {
 // Zone "Acronymes & sources" sous chaque carte
 // ============================================================
 .acronymes, .cp-source {
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   color: $ink-muted;
-  padding: 8px 12px;
+  padding: 6px 10px;
   border-top: 1px solid $rule;
   background: lighten($cream, 1%);
   font-family: $font-family-sans-serif;
-  line-height: 1.4;
+  line-height: 1.35;
   strong { color: $ink-soft; font-weight: 600; }
   em { color: $ink-soft; font-style: italic; }
 }

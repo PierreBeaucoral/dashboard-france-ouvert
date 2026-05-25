@@ -1015,9 +1015,8 @@ if (elec_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · Ministère de l'Intérieur · data.gouv.fr.<br>
-    <strong>NFP</strong> <em>Nouveau Front Populaire</em> (UG, FI, SOC, COM, VEC) · <strong>ENS</strong> <em>Ensemble</em> + <strong>HOR</strong> <em>Horizons</em> · <strong>LR</strong> <em>Les Républicains</em> + <strong>UDI</strong> · <strong>RN</strong> <em>Rassemblement National</em> + <strong>UXD</strong>.<br>
-    <strong>T1/T2</strong> · 1ᵉʳ et 2nd tour. ~6 000 communes élues dès T1 — résultat = T1.
+    <strong>Source</strong> · Min. Intérieur · Législatives 2024.<br>
+    NFP / ENS / LR / RN = familles regroupant les nuances officielles. T1/T2 = 1ᵉʳ / 2nd tour.
   </div>
 </div>
 ```
@@ -1159,8 +1158,8 @@ if (dvf_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · <strong>DVF</strong> <em>Demandes de Valeurs Foncières</em> — Etalab via data.gouv.fr. Gestionnaire <strong>DGFiP</strong>.<br>
-    <strong>Filtres méthodo</strong> : Ventes, App/Maison, surface > 9 m², 200 < €/m² < 30 000, mutations <strong>mono-local</strong>. N < 5 ventes/an : valeur non publiée.
+    <strong>Source</strong> · DVF Etalab · DGFiP · 2021-2024.<br>
+    Mono-local, App/Maison, surf > 9 m². N < 5 ventes/an : non publié.
   </div>
 </div>
 ```
@@ -1247,9 +1246,8 @@ if (atmo_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · Atmo France via <strong>WFS</strong> <em>Web Feature Service</em> GeoServer. Agrégation 30 jours.<br>
-    <strong>AASQA</strong> <em>Associations Agréées de Surveillance de la Qualité de l'Air</em>. <strong>ATMO</strong> = indice synthétique 1 (Bon) à 6 (Extrêmement mauvais) calculé sur 5 polluants : <strong>NO₂</strong>, <strong>O₃</strong>, <strong>PM₁₀</strong>, <strong>PM₂.₅</strong>, SO₂.<br>
-    <strong>EPCI</strong> <em>Établissement Public de Coopération Intercommunale</em> : pour Bretagne, Occitanie, Pays de la Loire, valeur répercutée sur chaque commune membre.
+    <strong>Source</strong> · Atmo France · agrégation 30 jours.<br>
+    Indice ATMO 1 (Bon) → 6 (Extrême mauvais), 5 polluants. EPCI expandés (Bretagne, Occitanie, PdL).
   </div>
 </div>
 ```
@@ -1342,9 +1340,8 @@ if (ssmsi_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · <strong>SSMSI</strong> <em>Service Statistique Ministériel de la Sécurité Intérieure</em> (Ministère de l'Intérieur), base communale 2025.<br>
-    <strong>Taux pour 1 000 habitants</strong> : faits constatés par police + gendarmerie ÷ pop INSEE × 1000.<br>
-    <strong>Secret statistique</strong> : <5 faits constatés sur 3 ans = non publié. <strong>Échelle log</strong> sur la carte pour distinguer les valeurs hautes (distribution skewée).
+    <strong>Source</strong> · SSMSI 2025 (délinquance) + BAAC 2024 (accidents) · Min. Intérieur.<br>
+    Taux ‰ habitants. Secret stat : &lt;5 faits/3 ans = non publié. Échelle log sur la carte.
   </div>
 </div>
 ```
@@ -1428,9 +1425,8 @@ if (dgfip_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · <strong>DGFiP</strong> <em>Direction Générale des Finances Publiques</em>, comptes individuels des communes 2024.<br>
-    Tous les montants en <strong>€/habitant</strong>. <strong>CAF</strong> <em>Capacité d'Auto-Financement</em> = recettes − charges (≠ Caisse d'Allocations Familiales).<br>
-    Taxes locales (taux votés par le conseil municipal) : <strong>TH</strong> <em>Taxe d'Habitation</em> (résidences secondaires depuis 2023), <strong>TFB</strong> <em>Foncière sur le Bâti</em>, <strong>TFNB</strong> <em>Foncière sur le Non Bâti</em>.
+    <strong>Source</strong> · DGFiP · comptes communaux 2024.<br>
+    €/habitant. CAF = capacité d'auto-financement. TH/TFB/TFNB = taxes habitation / foncière bâti / non-bâti.
   </div>
 </div>
 ```
@@ -1515,9 +1511,8 @@ if (filo_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · <strong>INSEE</strong> <em>Institut National de la Statistique et des Études Économiques</em>, <strong>FiLoSoFi</strong> <em>Fichier Localisé Social et Fiscal</em>, millésime 2021.<br>
-    <strong>Revenu disponible</strong> = revenu après prestations sociales et impôts. <strong>D1</strong>/<strong>D9</strong> = 1ᵉʳ et 9ᵉ déciles (10% sous D1, 10% au-dessus de D9).<br>
-    <strong>Indice de Gini</strong> : 0 = égalité parfaite, 1 = inégalité maximale.
+    <strong>Source</strong> · INSEE FiLoSoFi 2021.<br>
+    Revenu disponible (après prestations + impôts). D1/D9 = 1ᵉʳ / 9ᵉ déciles. Gini : 0 (égalité) → 1 (inégalité max).
   </div>
 </div>
 ```
@@ -1608,9 +1603,8 @@ if (apl_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · <strong>DREES</strong> <em>Direction de la Recherche, des Études, de l'Évaluation et des Statistiques</em> (Ministère de la Santé), millésime 2023.<br>
-    <strong>APL</strong> <em>Accessibilité Potentielle Localisée</em> aux médecins généralistes : nombre de consultations/an/hab, pondéré distance et structure d'âge.<br>
-    <strong>Seuil conventionnel désert médical</strong> : APL < 2,5. Palette divergente sur la carte : rouge = désert, vert = bien doté, transition au seuil.
+    <strong>Source</strong> · DREES · APL 2023 · 5 professions.<br>
+    APL médecins en consultations/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab.
   </div>
 </div>
 ```
