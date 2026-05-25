@@ -30,6 +30,8 @@ elec_path <- here::here("data", "processed", "elections",
 dvf_path  <- here::here("data", "processed", "dvf", "dvf_aggregated.parquet")
 air_path  <- here::here("data", "processed", "air", "atmo_snapshot.parquet")
 pop_path  <- here::here("data", "processed", "insee", "populations.parquet")
+ssmsi_path <- here::here("data", "processed", "ssmsi", "delinquance_commune.parquet")
+dgfip_path <- here::here("data", "processed", "dgfip", "comptes_communes.parquet")
 out_dir   <- here::here("data", "processed", "explorer")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -38,6 +40,8 @@ elec <- arrow::read_parquet(elec_path)
 dvf  <- arrow::read_parquet(dvf_path)
 air  <- arrow::read_parquet(air_path)
 pop  <- if (file.exists(pop_path)) arrow::read_parquet(pop_path) else NULL
+ssmsi <- if (file.exists(ssmsi_path)) arrow::read_parquet(ssmsi_path) else NULL
+dgfip <- if (file.exists(dgfip_path)) arrow::read_parquet(dgfip_path) else NULL
 
 # ---- Préparer DVF : pivot 2024 App + Maison ----
 dvf_2024 <- dvf |>
@@ -111,6 +115,28 @@ if (!is.null(pop)) {
   )
 }
 
+# Bloc 4 — Délinquance SSMSI
+if (!is.null(ssmsi)) {
+  ssmsi_clean <- ssmsi |>
+    dplyr::select(code_commune,
+                  dplyr::any_of(c(
+                    "del_violences_sex", "del_cambriolages", "del_vols_pers",
+                    "del_vols_violents", "del_vols_vehicules",
+                    "del_degradations", "del_trafic_stup", "del_usage_stup",
+                    "del_total_pour_mille"
+                  )))
+  merged <- merged |> dplyr::left_join(ssmsi_clean, by = "code_commune")
+}
+
+# Bloc 8 — Finances communales DGFiP
+if (!is.null(dgfip)) {
+  dgfip_clean <- dgfip |>
+    dplyr::select(code_commune,
+                  fin_recettes, fin_charges, fin_dette, fin_caf,
+                  fin_taux_taxe_hab, fin_taux_fonc_bati)
+  merged <- merged |> dplyr::left_join(dgfip_clean, by = "code_commune")
+}
+
 # Strates : quartiles de log(inscrits) — proxy taille (legacy)
 # + strate_pop INSEE (réelle, depuis recensement)
 merged <- merged |>
@@ -137,11 +163,21 @@ message(glue::glue("✔ commune_merged.parquet : {nrow(merged)} communes"))
 
 # ---- Corrélations ----
 NUMERIC_VARS <- c(
+  # Élections
   "elec_pct_nfp", "elec_pct_ens", "elec_pct_rn", "elec_pct_lr",
   "elec_pct_divers", "elec_abstention", "elec_marge",
+  # Immobilier
   "dvf_prix_app", "dvf_prix_mai",
+  # Qualité de l'air
   "air_qual", "air_no2", "air_o3", "air_pm10", "air_pm25",
-  "ctx_log_inscrits", "ctx_log_pop"
+  # Contexte démographique
+  "ctx_log_inscrits", "ctx_log_pop",
+  # Délinquance (Bloc 4 SSMSI)
+  "del_total_pour_mille", "del_cambriolages", "del_violences_sex",
+  "del_trafic_stup", "del_degradations", "del_vols_pers",
+  # Finances communales (Bloc 8 DGFiP)
+  "fin_recettes", "fin_charges", "fin_dette", "fin_caf",
+  "fin_taux_taxe_hab", "fin_taux_fonc_bati"
 )
 
 corr_long <- function(df, method, strate_label = "Toutes") {

@@ -1040,15 +1040,28 @@ if (explorer_ready) {
     "elec_pct_lr"      = "% LR",
     "elec_pct_divers"  = "% Divers",
     "elec_abstention"  = "Abstention",
-    "elec_marge"       = "Marge vainqueur",
-    "dvf_prix_app"     = "Prix m² App 2024",
-    "dvf_prix_mai"     = "Prix m² Maison 2024",
+    "elec_marge"       = "Marge vainq.",
+    "dvf_prix_app"     = "Prix m² App",
+    "dvf_prix_mai"     = "Prix m² Mai",
     "air_qual"         = "ATMO global",
     "air_no2"          = "NO₂",
     "air_o3"           = "O₃",
     "air_pm10"         = "PM₁₀",
     "air_pm25"         = "PM₂.₅",
-    "ctx_log_inscrits" = "log10(inscrits)"
+    "ctx_log_inscrits" = "log(inscrits)",
+    "ctx_log_pop"      = "log(population)",
+    "del_total_pour_mille" = "Délinq. totale ‰",
+    "del_cambriolages" = "Cambriolages ‰",
+    "del_violences_sex" = "Viol. sexuelles ‰",
+    "del_trafic_stup"  = "Trafic stup. ‰",
+    "del_degradations" = "Dégradations ‰",
+    "del_vols_pers"    = "Vols personnes ‰",
+    "fin_recettes"     = "Recettes €/hab",
+    "fin_charges"      = "Charges €/hab",
+    "fin_dette"        = "Dette €/hab",
+    "fin_caf"          = "CAF €/hab",
+    "fin_taux_taxe_hab" = "Taxe hab. (%)",
+    "fin_taux_fonc_bati" = "Foncier bâti (%)"
   )
 
   d <- correlations |>
