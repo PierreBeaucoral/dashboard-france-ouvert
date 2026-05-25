@@ -23,6 +23,32 @@ drom_long_names <- c(
   )
 }
 
+# Helper : attache un handler de clic qui remplit le panneau latéral
+# (#commune-panel) à partir d'un lookup JS global `window.communeLookup`
+# (construit en amont par dashboard.qmd à partir d'un JSON embed).
+.attach_panel_click <- function(map) {
+  htmlwidgets::onRender(map,
+    "function(el, x) {
+       var self = this;
+       function attach() {
+         self.eachLayer(function(layer) {
+           if (layer.options && layer.options.layerId && !layer._cpClickOn) {
+             layer._cpClickOn = true;
+             layer.on('click', function(e) {
+               var code = e.target.options.layerId;
+               var data = window.communeLookup ? window.communeLookup[code] : null;
+               if (data && window.updateCommunePanel) {
+                 window.updateCommunePanel(data);
+               }
+             });
+           }
+         });
+       }
+       setTimeout(attach, 60);
+       self.on('layeradd', function() { setTimeout(attach, 0); });
+     }")
+}
+
 # Helper interne : ajoute un hook JS qui re-trigge map.invalidateSize() à
 # chaque changement de taille du conteneur (expansion modale de la card
 # Quarto Dashboard, redimensionnement fenêtre, etc.). Sans ce hook, leaflet

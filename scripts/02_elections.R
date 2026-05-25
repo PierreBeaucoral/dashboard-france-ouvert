@@ -126,11 +126,19 @@ parse_tour <- function(csv_path, tour_label) {
     ) |>
     dplyr::filter(!is.na(`Nuance candidat`) & `Nuance candidat` != "")
 
+  # Important : la CSV T1 stocke les codes sans zéros initiaux pour les
+  # départements 01-09 ("1", "1001" au lieu de "01", "01001") alors que T2
+  # les conserve. On normalise systématiquement avec str_pad pour avoir des
+  # codes 5 chars (commune) et 2 chars (département). Sans cette étape,
+  # ~5000 communes (Aisne, Alpes-Maritimes, Ariège, Cantal, Aube, etc.) ne
+  # joignent pas avec le GeoJSON.
   df_long |>
     dplyr::transmute(
-      code_insee        = `Code commune`,
+      code_insee        = stringr::str_pad(`Code commune`,      width = 5,
+                                           side = "left", pad = "0"),
       nom_commune       = `Libellé commune`,
-      code_dept         = `Code département`,
+      code_dept         = stringr::str_pad(`Code département`,  width = 2,
+                                           side = "left", pad = "0"),
       libelle_dept      = `Libellé département`,
       inscrits          = clean_int(Inscrits),
       votants           = clean_int(Votants),

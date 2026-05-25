@@ -212,6 +212,143 @@ pre.sourceCode {
 }
 
 // ============================================================
+// Panneau "Territoire sélectionné" (clic commune)
+// ============================================================
+.commune-panel {
+  font-family: $font-family-sans-serif;
+  font-size: 0.9rem;
+  color: $ink;
+  padding: 14px 16px;
+  height: 100%;
+  overflow-y: auto;
+
+  .cp-placeholder {
+    color: $ink-muted;
+    p { margin: 0 0 8px 0; }
+    .cp-hint { font-size: 0.82rem; line-height: 1.45; }
+  }
+
+  .cp-header {
+    border-bottom: 1px solid $rule;
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin: 0 0 4px 0;
+      color: $ink;
+    }
+  }
+  .cp-meta {
+    color: $ink-muted;
+    font-size: 0.78rem;
+    font-family: $font-family-monospace;
+    letter-spacing: 0.02em;
+  }
+  .cp-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    margin-left: 4px;
+    background: $rule;
+    color: $ink-soft;
+    font-family: $font-family-sans-serif;
+  }
+  .cp-badge-t1 { background: lighten($warning, 35%); color: darken($warning, 5%); }
+  .cp-badge-t2 { background: lighten($accent, 40%); color: darken($accent, 5%); }
+
+  .cp-result {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: $cream;
+    border-radius: 4px;
+    margin-bottom: 14px;
+    .cp-swatch {
+      width: 32px;
+      height: 32px;
+      border-radius: 4px;
+      flex: 0 0 auto;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.1);
+    }
+    .cp-nuance {
+      font-weight: 600;
+      font-size: 1.0rem;
+      color: $ink;
+    }
+    .cp-pct {
+      color: $ink-soft;
+      font-size: 0.82rem;
+      font-family: $font-family-monospace;
+      margin-top: 1px;
+    }
+  }
+
+  .cp-section {
+    margin-bottom: 14px;
+    h4 {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: $ink-muted;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+    }
+  }
+  .cp-kvs .cp-kv {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px dashed $rule;
+    font-size: 0.85rem;
+    &:last-child { border-bottom: 0; }
+    .cp-num {
+      font-family: $font-family-monospace;
+      font-variant-numeric: tabular-nums;
+      color: $ink;
+    }
+  }
+
+  .cp-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+    font-size: 0.8rem;
+    .cp-bar-label {
+      width: 48px;
+      color: $ink-soft;
+      flex: 0 0 auto;
+    }
+    .cp-bar {
+      flex: 1;
+      height: 10px;
+      background: $cream;
+      border-radius: 2px;
+      overflow: hidden;
+      border: 1px solid $rule;
+    }
+    .cp-bar-fill {
+      height: 100%;
+      transition: width 200ms ease;
+    }
+    .cp-bar-val {
+      width: 48px;
+      text-align: right;
+      font-family: $font-family-monospace;
+      font-variant-numeric: tabular-nums;
+      color: $ink-soft;
+    }
+    &.cp-bar-na .cp-bar-val { color: $rule; }
+  }
+}
+
+// ============================================================
 // Méthodo / avertissement
 // ============================================================
 .callout-warning, .callout-note {
