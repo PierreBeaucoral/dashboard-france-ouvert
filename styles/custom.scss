@@ -179,16 +179,24 @@ pre.sourceCode {
 // ============================================================
 // Zone "Acronymes & sources" sous chaque carte
 // ============================================================
-.acronymes {
-  font-size: 0.78rem;
+.acronymes, .cp-source {
+  font-size: 0.74rem;
   color: $ink-muted;
   padding: 8px 12px;
   border-top: 1px solid $rule;
   background: lighten($cream, 1%);
   font-family: $font-family-sans-serif;
-  line-height: 1.5;
+  line-height: 1.4;
   strong { color: $ink-soft; font-weight: 600; }
   em { color: $ink-soft; font-style: italic; }
+}
+// Bottom-anchored source in panels
+.commune-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  .cp-content { flex: 1 1 auto; overflow-y: auto; }
+  .cp-source { flex: 0 0 auto; }
 }
 
 // ============================================================

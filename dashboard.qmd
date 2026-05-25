@@ -252,7 +252,7 @@ if (elec_ready) {
       'window.fammilleColors = {"NFP":"#C73659","ENS":"#E6B800",',
       '"RN":"#1B3A57","LR":"#4A90D9","Divers":"#8A8A8A"};\n',
       'window.updateCommunePanel = function(code) {\n',
-      '  var el = document.getElementById("commune-panel");\n',
+      '  var el = document.getElementById("commune-content");\n',
       '  if (!el) return;\n',
       '  var d = window.communeLookup ? window.communeLookup[code] : null;\n',
       '  if (!d) {\n',
@@ -361,7 +361,7 @@ if (dvf_ready) {
       '};\n',
       '// Panneau DVF\n',
       'window.updateDvfPanel = function(code) {\n',
-      '  var el = document.getElementById("dvf-panel");\n',
+      '  var el = document.getElementById("dvf-content");\n',
       '  if (!el) return;\n',
       '  var entries = window.dvfData[code];\n',
       '  var elecInfo = window.communeLookup && window.communeLookup[code];\n',
@@ -483,32 +483,13 @@ if (dvf_ready) {
 
   function bind() {
     snapshotPlaceholders();
-
-    // 1) MutationObserver sur les tab-panes (méthode principale)
+    // MutationObserver sur les tab-panes — seule méthode fiable et
+    // non-intrusive. Les anciens listeners click document/nav-link
+    // faisaient resetAllPanels() sur des clics innocents, ce qui cassait
+    // le panneau après quelques interactions.
     watchTabPanes();
     setTimeout(watchTabPanes, 1000);
     setTimeout(watchTabPanes, 3000);
-
-    // 2) Listener clic sur les nav-tabs (fallback si MutationObserver
-    //    ne couvre pas tout)
-    document.addEventListener("click", function (e) {
-      var t = e.target && e.target.closest &&
-              e.target.closest('.nav-link, [data-bs-toggle="tab"], .nav-item');
-      if (t) {
-        resetAllPanels();
-        pulseAfterTabChange();
-      }
-    }, true);  // capture phase pour fire avant que Bootstrap intercepte
-
-    // 3) Bootstrap event shown.bs.tab (best case)
-    document.querySelectorAll('[data-bs-toggle="tab"], .nav-link').forEach(
-      function (tab) {
-        tab.addEventListener("shown.bs.tab", function () {
-          resetAllPanels();
-          pulseAfterTabChange();
-        });
-      }
-    );
   }
 
   if (document.readyState === "loading") {
@@ -567,7 +548,7 @@ if (atmo_ready) {
       '  });\n',
       '};\n',
       'window.updateAirPanel = function(code) {\n',
-      '  var el = document.getElementById("air-panel");\n',
+      '  var el = document.getElementById("air-content");\n',
       '  if (!el) return;\n',
       '  var ent = window.atmoData[code];\n',
       '  var elec = window.communeLookup && window.communeLookup[code];\n',
@@ -629,13 +610,15 @@ if (ssmsi_ready) {
       'window.secData = {};\n',
       'window.secRaw.forEach(function(r) { window.secData[r.code] = r; });\n',
       'window.secFieldMap = { del_total_pour_mille:"tot", del_cambriolages:"camb", del_vols_pers:"vols", del_violences_sex:"viols", del_degradations:"degr", del_trafic_stup:"stup" };\n',
-      '// Compute quintile thresholds per field once\n',
+      '// Log-quantile bins : meilleure résolution sur les valeurs hautes\n',
       'window.secBreaks = {};\n',
       'Object.keys(window.secFieldMap).forEach(function(field) {\n',
       '  var key = window.secFieldMap[field];\n',
-      '  var vals = window.secRaw.map(function(r) { return r[key]; }).filter(function(v) { return v != null; }).sort(function(a,b){return a-b;});\n',
-      '  var n = vals.length;\n',
-      '  window.secBreaks[field] = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return vals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
+      '  var vals = window.secRaw.map(function(r) { return r[key]; }).filter(function(v) { return v != null && v >= 0; }).sort(function(a,b){return a-b;});\n',
+      '  var logVals = vals.map(function(v) { return Math.log1p(v); });\n',
+      '  var n = logVals.length;\n',
+      '  var qLog = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return logVals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
+      '  window.secBreaks[field] = qLog.map(function(q) { return Math.expm1(q); });\n',
       '});\n',
       'window.secColorFor = function(v, field) {\n',
       '  if (v == null) return "#E8E4DC";\n',
@@ -654,7 +637,7 @@ if (ssmsi_ready) {
       '  });\n',
       '};\n',
       'window.updateSecPanel = function(code) {\n',
-      '  var el = document.getElementById("sec-panel");\n',
+      '  var el = document.getElementById("sec-content");\n',
       '  if (!el) return;\n',
       '  var d = window.secData[code];\n',
       '  var elec = window.communeLookup && window.communeLookup[code];\n',
@@ -737,7 +720,7 @@ if (filo_ready) {
       '  });\n',
       '};\n',
       'window.updateRevPanel = function(code) {\n',
-      '  var el = document.getElementById("rev-panel");\n',
+      '  var el = document.getElementById("rev-content");\n',
       '  if (!el) return;\n',
       '  var d = window.revData[code];\n',
       '  var elec = window.communeLookup && window.communeLookup[code];\n',
@@ -784,21 +767,20 @@ if (apl_ready) {
       pop  = round(pop_referenced)
     )
   sante_json <- jsonlite::toJSON(sante_for_js, auto_unbox = TRUE, na = "null")
-  rev_red_js <- jsonlite::toJSON(rev(.palette_red))
+  apl_div_palette <- jsonlite::toJSON(c("#7A2424", "#D49687", "#E8E4DC",
+                                        "#94B091", "#2F5145"))
 
   cat('<script>\n',
       'window.santeRaw = ', as.character(sante_json), ';\n',
-      'window.santePalette = ', as.character(rev_red_js), ';\n',
+      'window.santePalette = ', as.character(apl_div_palette), ';\n',
       'window.santeData = {};\n',
       'window.santeRaw.forEach(function(r) { window.santeData[r.code] = r; });\n',
       'window.santeFieldMap = { apl_medecins:"apl", apl_medecins_jeunes:"aplj" };\n',
-      'window.santeBreaks = {};\n',
-      'Object.keys(window.santeFieldMap).forEach(function(field) {\n',
-      '  var key = window.santeFieldMap[field];\n',
-      '  var vals = window.santeRaw.map(function(r) { return r[key]; }).filter(function(v) { return v != null; }).sort(function(a,b){return a-b;});\n',
-      '  var n = vals.length;\n',
-      '  window.santeBreaks[field] = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return vals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
-      '});\n',
+      '// Breaks fixes au seuil de désert médical (2.5) : palette divergente\n',
+      'window.santeBreaks = {\n',
+      '  apl_medecins:        [0, 1.5, 2.5, 3.5, 5, 50],\n',
+      '  apl_medecins_jeunes: [0, 1.5, 2.5, 3.5, 5, 50]\n',
+      '};\n',
       'window.santeColorFor = function(v, field) {\n',
       '  if (v == null) return "#E8E4DC";\n',
       '  var br = window.santeBreaks[field];\n',
@@ -816,7 +798,7 @@ if (apl_ready) {
       '  });\n',
       '};\n',
       'window.updateSantePanel = function(code) {\n',
-      '  var el = document.getElementById("sante-panel");\n',
+      '  var el = document.getElementById("sante-content");\n',
       '  if (!el) return;\n',
       '  var d = window.santeData[code];\n',
       '  var elec = window.communeLookup && window.communeLookup[code];\n',
@@ -899,7 +881,7 @@ if (dgfip_ready) {
       '  });\n',
       '};\n',
       'window.updateFinPanel = function(code) {\n',
-      '  var el = document.getElementById("fin-panel");\n',
+      '  var el = document.getElementById("fin-content");\n',
       '  if (!el) return;\n',
       '  var d = window.finData[code];\n',
       '  var elec = window.communeLookup && window.communeLookup[code];\n',
@@ -980,21 +962,21 @@ if (elec_ready) {
   )
 }
 ```
-
-::: {.acronymes}
-**Source** : Ministère de l'Intérieur · data.gouv.fr.
-**Familles politiques** · NFP *Nouveau Front Populaire* (UG, FI *France Insoumise*, SOC *Socialiste*, COM *Communiste*, VEC *Verts/Écologistes*) · ENS *Ensemble* (Renaissance + MoDem) + HOR *Horizons* · LR *Les Républicains* (+ UDI *Union des Démocrates et Indépendants*) · RN *Rassemblement National* (+ UXD *Union de l'Extrême-Droite*) · Divers (DVD, DVG, DVC, REG, ECO).
-**T1/T2** : 1er / 2nd tour. ~6 000 communes ont été élues dès le T1 — pour celles-ci, le résultat affiché est celui du T1.
-**Opacité du polygone** : proportionnelle à la marge sur le second candidat.
-:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
 <div id="commune-panel" class="commune-panel">
-  <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir le détail des résultats Législatives 2024.</p>
-    <p class="cp-hint">Le panneau affichera la famille gagnante, l'écart au second, l'abstention et la répartition des voix par famille politique.</p>
+  <div id="commune-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir le détail des résultats Législatives 2024.</p>
+      <p class="cp-hint">Famille gagnante, marge sur le second, abstention, répartition T1 et T2 par famille.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · Ministère de l'Intérieur · data.gouv.fr.<br>
+    <strong>NFP</strong> <em>Nouveau Front Populaire</em> (UG, FI, SOC, COM, VEC) · <strong>ENS</strong> <em>Ensemble</em> + <strong>HOR</strong> <em>Horizons</em> · <strong>LR</strong> <em>Les Républicains</em> + <strong>UDI</strong> · <strong>RN</strong> <em>Rassemblement National</em> + <strong>UXD</strong>.<br>
+    <strong>T1/T2</strong> · 1ᵉʳ et 2nd tour. ~6 000 communes élues dès T1 — résultat = T1.
   </div>
 </div>
 ```
@@ -1124,20 +1106,20 @@ if (dvf_ready) {
   )
 }
 ```
-
-::: {.acronymes}
-**DVF** *Demandes de Valeurs Foncières* · base Etalab des transactions immobilières géolocalisées, gérée par la DGFiP *Direction Générale des Finances Publiques* et publiée sur data.gouv.fr.
-**Filtres méthodologiques** : *Vente* uniquement ; appartements et maisons (pas locaux commerciaux) ; surface bâtie > 9 m² ; prix m² entre 200 et 30 000 € ; **mono-local** seulement (1 seul bien par mutation, pour éviter la répartition arbitraire du prix sur des lots multiples).
-**N < 5** ventes/an/commune : valeur non publiée pour fiabilité statistique.
-:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
 <div id="dvf-panel" class="commune-panel">
-  <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir l'évolution de son prix médian au m² entre 2021 et 2024.</p>
-    <p class="cp-hint">Mono-local uniquement (appartements/maisons vendus seuls, sans dépendance). N &lt; 5 ventes/an : valeur non publiée.</p>
+  <div id="dvf-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir l'évolution de son prix médian au m² entre 2021 et 2024.</p>
+      <p class="cp-hint">Évolution annuelle prix m² Appartement + Maison.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · <strong>DVF</strong> <em>Demandes de Valeurs Foncières</em> — Etalab via data.gouv.fr. Gestionnaire <strong>DGFiP</strong>.<br>
+    <strong>Filtres méthodo</strong> : Ventes, App/Maison, surface > 9 m², 200 < €/m² < 30 000, mutations <strong>mono-local</strong>. N < 5 ventes/an : valeur non publiée.
   </div>
 </div>
 ```
@@ -1212,21 +1194,21 @@ if (atmo_ready) {
   )
 }
 ```
-
-::: {.acronymes}
-**Source** : Atmo France (fédération des AASQA *Associations Agréées de Surveillance de la Qualité de l'Air*), agrégation 30 jours glissants via WFS *Web Feature Service* GeoServer.
-**Indice ATMO** : indicateur synthétique 1 (Bon) à 6 (Extrêmement mauvais), calculé à partir de 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅, SO₂).
-**EPCI** *Établissement Public de Coopération Intercommunale* — pour les régions où l'AASQA publie au niveau EPCI (Bretagne, Occitanie, Pays de la Loire), la valeur est répercutée sur chaque commune membre.
-**Imputation dépt** : pour les communes sans mesure directe, moyenne du département (badge visible dans le panneau).
-:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
 <div id="air-panel" class="commune-panel">
-  <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir ses indices ATMO moyens sur 30 jours.</p>
-    <p class="cp-hint">Agrégation sur les 30 derniers jours (WFS Atmo France). Les indices publiés au niveau EPCI (Bretagne, Occitanie, Pays de la Loire) sont expandés à chaque commune membre. L'indice ATMO synthétise 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅, SO₂). Échelle 1 (Bon) à 6 (Extrêmement mauvais).</p>
+  <div id="air-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir ses indices ATMO moyens sur 30 jours.</p>
+      <p class="cp-hint">Indice global + 4 sous-polluants, % jours bon/mauvais, source AASQA.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · Atmo France via <strong>WFS</strong> <em>Web Feature Service</em> GeoServer. Agrégation 30 jours.<br>
+    <strong>AASQA</strong> <em>Associations Agréées de Surveillance de la Qualité de l'Air</em>. <strong>ATMO</strong> = indice synthétique 1 (Bon) à 6 (Extrêmement mauvais) calculé sur 5 polluants : <strong>NO₂</strong>, <strong>O₃</strong>, <strong>PM₁₀</strong>, <strong>PM₂.₅</strong>, SO₂.<br>
+    <strong>EPCI</strong> <em>Établissement Public de Coopération Intercommunale</em> : pour Bretagne, Occitanie, Pays de la Loire, valeur répercutée sur chaque commune membre.
   </div>
 </div>
 ```
@@ -1258,10 +1240,14 @@ if (atmo_ready) {
 if (ssmsi_ready) {
   vals0 <- ssmsi_data |>
     dplyr::transmute(code_commune, value = del_total_pour_mille)
+  # Échelle log_quantile : la distribution des taux de délinquance est très
+  # skewée (la plupart des communes <10‰, queue jusqu'à 200+). Quantiles
+  # sur log(1+v) écrasent moins le bas et donnent plus de granularité.
   m <- choropleth_socio(com_metro_only, dep_metro, vals0,
                         palette = .palette_red,
-                        legend_title = "Délinquance · total ‰",
-                        value_unit   = "‰")
+                        legend_title = "Délinquance ‰ (échelle log)",
+                        value_unit   = "‰",
+                        scale        = "log_quantile")
   m |>
     htmlwidgets::onRender(
       "function(el, x) {
@@ -1302,21 +1288,21 @@ if (ssmsi_ready) {
   htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>SSMSI non chargé. Lancer <code>Rscript scripts/07_ssmsi_dgfip.R</code>.</p>")
 }
 ```
-
-::: {.acronymes}
-**SSMSI** *Service Statistique Ministériel de la Sécurité Intérieure* (Ministère de l'Intérieur). Base communale 2025 publiée sur data.gouv.fr.
-**Taux pour 1 000 habitants** : nombre de faits constatés par les services de police et de gendarmerie, divisé par la population INSEE × 1 000.
-**Secret statistique** : communes avec moins de 5 faits constatés sur 3 ans consécutifs ne sont pas publiées (diffusion = "ndiff" dans la source).
-**Catégories** : violences sexuelles, vols (avec/sans violence, véhicules, dans véhicules), cambriolages, dégradations volontaires, trafic et usage de stupéfiants.
-:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
 <div id="sec-panel" class="commune-panel">
-  <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir ses taux de délinquance.</p>
-    <p class="cp-hint">Source : SSMSI (Ministère de l'Intérieur), bases communales 2025. Taux pour 1 000 habitants. N &lt; 5 faits sur 3 ans = non publié (secret stat).</p>
+  <div id="sec-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir ses taux de délinquance.</p>
+      <p class="cp-hint">8 indicateurs SSMSI : vols, violences, dégradations, drogue.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · <strong>SSMSI</strong> <em>Service Statistique Ministériel de la Sécurité Intérieure</em> (Ministère de l'Intérieur), base communale 2025.<br>
+    <strong>Taux pour 1 000 habitants</strong> : faits constatés par police + gendarmerie ÷ pop INSEE × 1000.<br>
+    <strong>Secret statistique</strong> : <5 faits constatés sur 3 ans = non publié. <strong>Échelle log</strong> sur la carte pour distinguer les valeurs hautes (distribution skewée).
   </div>
 </div>
 ```
@@ -1388,21 +1374,21 @@ if (dgfip_ready) {
   htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>DGFiP non chargé.</p>")
 }
 ```
-
-::: {.acronymes}
-**DGFiP** *Direction Générale des Finances Publiques* (Ministère de l'Économie). Fichier global des comptes individuels des communes 2024.
-**Tous les montants sont en €/habitant** pour permettre la comparaison entre communes de taille différente.
-**CAF** *Capacité d'Auto-Financement* — différence entre recettes courantes et charges courantes. Mesure la marge de manœuvre budgétaire de la commune (et non la Caisse d'Allocations Familiales).
-**Taxes locales** : taux votés par le conseil municipal. TH *Taxe d'Habitation* (résidences secondaires depuis la réforme) · TFB *Taxe Foncière sur le Bâti* · TFNB *Taxe Foncière sur le Non Bâti*.
-:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
 <div id="fin-panel" class="commune-panel">
-  <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir son budget communal.</p>
-    <p class="cp-hint">Source : DGFiP, comptes individuels des communes 2024. Tous les montants en €/habitant. Taxes locales : taux votés par la commune.</p>
+  <div id="fin-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir son budget communal.</p>
+      <p class="cp-hint">Recettes, charges, dette, CAF + taux des 3 taxes locales.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · <strong>DGFiP</strong> <em>Direction Générale des Finances Publiques</em>, comptes individuels des communes 2024.<br>
+    Tous les montants en <strong>€/habitant</strong>. <strong>CAF</strong> <em>Capacité d'Auto-Financement</em> = recettes − charges (≠ Caisse d'Allocations Familiales).<br>
+    Taxes locales (taux votés par le conseil municipal) : <strong>TH</strong> <em>Taxe d'Habitation</em> (résidences secondaires depuis 2023), <strong>TFB</strong> <em>Foncière sur le Bâti</em>, <strong>TFNB</strong> <em>Foncière sur le Non Bâti</em>.
   </div>
 </div>
 ```
@@ -1475,20 +1461,21 @@ if (filo_ready) {
   htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>FiLoSoFi non chargé.</p>")
 }
 ```
-
-::: {.acronymes}
-**Source** : INSEE *Institut national de la statistique et des études économiques* · FiLoSoFi *Fichier Localisé Social et Fiscal*, millésime 2021.
-**Indice de Gini** : 0 = égalité parfaite, 1 = inégalité maximale.
-**1ᵉʳ et 9ᵉ déciles** : 10% des ménages ont un revenu inférieur au D1 ; 10% l'ont supérieur au D9.
-:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
 <div id="rev-panel" class="commune-panel">
-  <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir ses indicateurs de revenu et inégalité.</p>
-    <p class="cp-hint">Revenu disponible = revenu fiscal après prestations et impôts. Médiane = revenu qui sépare la commune en deux moitiés égales.</p>
+  <div id="rev-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir ses indicateurs de revenu et d'inégalité.</p>
+      <p class="cp-hint">Médiane + déciles + Gini + part prestations/activité.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · <strong>INSEE</strong> <em>Institut National de la Statistique et des Études Économiques</em>, <strong>FiLoSoFi</strong> <em>Fichier Localisé Social et Fiscal</em>, millésime 2021.<br>
+    <strong>Revenu disponible</strong> = revenu après prestations sociales et impôts. <strong>D1</strong>/<strong>D9</strong> = 1ᵉʳ et 9ᵉ déciles (10% sous D1, 10% au-dessus de D9).<br>
+    <strong>Indice de Gini</strong> : 0 = égalité parfaite, 1 = inégalité maximale.
   </div>
 </div>
 ```
@@ -1516,10 +1503,15 @@ if (filo_ready) {
 if (apl_ready) {
   vals0 <- apl_data |>
     dplyr::transmute(code_commune, value = apl_medecins)
-  # Palette inversée : valeurs faibles = désert = rouge
+  # Palette divergente autour du seuil de désert médical 2,5 :
+  # rouge foncé → rouge clair → cream → vert clair → vert foncé.
+  # Le break à 2,5 sépare clairement "désert" / "doté".
+  apl_breaks <- c(0, 1.5, 2.5, 3.5, 5, max(vals0$value, na.rm = TRUE) + 0.01)
+  apl_palette <- c("#7A2424", "#D49687", "#E8E4DC", "#94B091", "#2F5145")
   m <- choropleth_socio(com_metro_only, dep_metro, vals0,
-                        palette = rev(.palette_red),
-                        legend_title = "APL · consultations/an/hab",
+                        palette      = apl_palette,
+                        breaks       = apl_breaks,
+                        legend_title = "APL · seuil désert à 2,5",
                         value_unit   = "",
                         value_fmt    = function(x) format(round(x, 2), nsmall = 2,
                                                           decimal.mark = ","))
@@ -1558,21 +1550,21 @@ if (apl_ready) {
   htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>APL non chargé. Lancer <code>Rscript scripts/08_drees_apl.R</code>.</p>")
 }
 ```
-
-::: {.acronymes}
-**APL** *Accessibilité Potentielle Localisée* aux médecins généralistes (DREES *Direction de la Recherche, des Études, de l'Évaluation et des Statistiques*, Ministère de la Santé). Millésime 2023.
-**Lecture** : nombre de consultations de médecine générale accessibles par an et par habitant, pondéré par la distance aux médecins environnants et la structure d'âge de la population (les âgés consultent plus).
-**Seuil conventionnel de désert médical** : APL < 2,5 consultations/an/hab.
-**APL médecins ≤ 65 ans** : exclut les médecins proches de la retraite — mesure la **soutenabilité future** de l'offre médicale dans la commune.
-:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
 <div id="sante-panel" class="commune-panel">
-  <div class="cp-placeholder">
-    <p><strong>Cliquez sur une commune</strong> pour voir son indicateur de désert médical.</p>
-    <p class="cp-hint">Source : DREES, APL 2023. L'indicateur exprime le nombre de consultations de médecine générale accessibles par an et par habitant, pondéré par distance et structure d'âge. Seuil de désert médical conventionnel : <strong>&lt; 2,5</strong>.</p>
+  <div id="sante-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir son indicateur de désert médical.</p>
+      <p class="cp-hint">APL tous médecins + APL ≤ 65 ans (soutenabilité future).</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · <strong>DREES</strong> <em>Direction de la Recherche, des Études, de l'Évaluation et des Statistiques</em> (Ministère de la Santé), millésime 2023.<br>
+    <strong>APL</strong> <em>Accessibilité Potentielle Localisée</em> aux médecins généralistes : nombre de consultations/an/hab, pondéré distance et structure d'âge.<br>
+    <strong>Seuil conventionnel désert médical</strong> : APL < 2,5. Palette divergente sur la carte : rouge = désert, vert = bien doté, transition au seuil.
   </div>
 </div>
 ```

@@ -26,17 +26,32 @@ choropleth_socio <- function(com_sf, dep_sf, values_df,
                              value_unit = "",
                              value_fmt = function(x) format(round(x, 1),
                                                             big.mark = " ",
-                                                            decimal.mark = ",")) {
+                                                            decimal.mark = ","),
+                             breaks = NULL,
+                             scale = c("quantile", "log_quantile", "linear")) {
   joined <- com_sf |>
     dplyr::left_join(values_df, by = c("code" = "code_commune"))
 
-  # Bornes par quintiles (sur valeurs non-NA)
   vals <- joined$value
-  breaks <- unname(quantile(vals, probs = seq(0, 1, by = 0.2),
-                            na.rm = TRUE))
-  if (length(unique(breaks)) < 6) {
-    # Pas assez de variance pour 5 bins distincts
-    breaks <- seq(min(vals, na.rm=TRUE), max(vals, na.rm=TRUE), length.out = 6)
+  scale <- match.arg(scale)
+
+  if (is.null(breaks)) {
+    if (scale == "log_quantile") {
+      # Quantiles sur log(1+v) — donne plus de résolution dans les valeurs
+      # élevées d'une distribution skewée (cas typique : taux délinquance,
+      # consommation énergie, etc.)
+      logv <- log1p(vals[!is.na(vals) & vals >= 0])
+      logbr <- unname(quantile(logv, probs = seq(0, 1, by = 0.2), na.rm = TRUE))
+      breaks <- expm1(logbr)
+    } else if (scale == "linear") {
+      breaks <- seq(min(vals, na.rm=TRUE), max(vals, na.rm=TRUE), length.out = 6)
+    } else {
+      breaks <- unname(quantile(vals, probs = seq(0, 1, by = 0.2),
+                                na.rm = TRUE))
+    }
+    if (length(unique(breaks)) < 6) {
+      breaks <- seq(min(vals, na.rm=TRUE), max(vals, na.rm=TRUE), length.out = 6)
+    }
   }
 
   pick_color <- function(v) {
