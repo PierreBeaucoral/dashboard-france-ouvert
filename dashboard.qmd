@@ -368,61 +368,80 @@ if (dvf_ready) {
       });
   }
 
-  // IntersectionObserver : appelle invalidateSize quand le conteneur
-  // d'une carte transitionne de display:none vers display:block (passage
-  // d'onglet). Sans ça, leaflet garde une taille 0×0 mesurée au démarrage
-  // et son hit-test du clic vise des coordonnées caduques.
-  function observeMapVisibility() {
-    var maps = [window.elecMap, window.dvfMap, window.atmoMap, window.bivMap];
-    maps.forEach(function (m) {
-      if (!m || !m.getContainer || m._cpVisObserved) return;
-      var c = m.getContainer();
-      if (!c) return;
-      m._cpVisObserved = true;
-      if (typeof IntersectionObserver === "undefined") {
-        setTimeout(function () { m.invalidateSize(); }, 100);
-        return;
-      }
-      var io = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (entry.isIntersecting) {
-            setTimeout(function () {
-              m.invalidateSize();
-              if (typeof m._cpReattach === "function") m._cpReattach();
-            }, 50);
-            setTimeout(function () {
-              m.invalidateSize();
-              if (typeof m._cpReattach === "function") m._cpReattach();
-            }, 300);
+  function reattachAllMaps() {
+    [window.elecMap, window.dvfMap, window.atmoMap, window.bivMap]
+      .forEach(function (m) {
+        if (m && typeof m._cpReattach === "function") m._cpReattach();
+      });
+  }
+
+  // Burst : appelle plusieurs fois invalidate + reattach à délais croissants
+  // pour rattraper les widgets qui s'initialisent en différé après
+  // display:none → display:block.
+  function pulseAfterTabChange() {
+    [50, 250, 600, 1200, 2500].forEach(function (delay) {
+      setTimeout(function () {
+        invalidateAllMaps();
+        reattachAllMaps();
+      }, delay);
+    });
+  }
+
+  // MutationObserver sur les tab-panes : Bootstrap toggle la classe "active"
+  // sur eux. IntersectionObserver ne fire pas fiablement sur display:none
+  // → display:block (l'élément est sorti du layout pendant qu'il est caché).
+  function watchTabPanes() {
+    var panes = document.querySelectorAll(
+      '.tab-pane, .dashboard-page, [role="tabpanel"]'
+    );
+    panes.forEach(function (pane) {
+      if (pane._cpObs) return;
+      pane._cpObs = true;
+      new MutationObserver(function (mutations) {
+        mutations.forEach(function (m) {
+          if (m.attributeName === "class" || m.attributeName === "style") {
+            var visible = pane.classList.contains("active") ||
+                          pane.classList.contains("show") ||
+                          (window.getComputedStyle(pane).display !== "none" &&
+                           pane.offsetParent !== null);
+            if (visible) {
+              resetAllPanels();
+              pulseAfterTabChange();
+            }
           }
         });
-      }, { threshold: 0.01 });
-      io.observe(c);
+      }).observe(pane, { attributes: true, attributeFilter: ["class", "style"] });
     });
   }
 
   function bind() {
     snapshotPlaceholders();
-    // Quarto Dashboard utilise des tabs bootstrap — attache aux deux events
+
+    // 1) MutationObserver sur les tab-panes (méthode principale)
+    watchTabPanes();
+    setTimeout(watchTabPanes, 1000);
+    setTimeout(watchTabPanes, 3000);
+
+    // 2) Listener clic sur les nav-tabs (fallback si MutationObserver
+    //    ne couvre pas tout)
+    document.addEventListener("click", function (e) {
+      var t = e.target && e.target.closest &&
+              e.target.closest('.nav-link, [data-bs-toggle="tab"], .nav-item');
+      if (t) {
+        resetAllPanels();
+        pulseAfterTabChange();
+      }
+    }, true);  // capture phase pour fire avant que Bootstrap intercepte
+
+    // 3) Bootstrap event shown.bs.tab (best case)
     document.querySelectorAll('[data-bs-toggle="tab"], .nav-link').forEach(
       function (tab) {
         tab.addEventListener("shown.bs.tab", function () {
           resetAllPanels();
-          invalidateAllMaps();
-        });
-        tab.addEventListener("click", function () {
-          setTimeout(function () {
-            resetAllPanels();
-            invalidateAllMaps();
-          }, 300);
+          pulseAfterTabChange();
         });
       }
     );
-    // Observer visibilité — appelé en boucle pour rattraper les maps
-    // qui se déclarent après le DOMContentLoaded
-    observeMapVisibility();
-    setTimeout(observeMapVisibility, 1000);
-    setTimeout(observeMapVisibility, 3000);
   }
 
   if (document.readyState === "loading") {
