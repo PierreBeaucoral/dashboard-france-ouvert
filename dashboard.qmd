@@ -330,6 +330,75 @@ if (dvf_ready) {
 }
 ```
 
+```{=html}
+<script>
+// ============================================================
+// Reset des panneaux au changement de page + invalidateSize() forcé.
+//
+// Sans ce hook : (1) le panneau de la page précédente reste affiché
+// dans son card de droite, (2) certaines leaflet ne ré-attachent pas
+// leurs handlers clic correctement après un display:none → display:block,
+// d'où le bug "je ne peux plus cliquer sur l'immobilier après la météo".
+// ============================================================
+(function () {
+  var PANELS = ["commune-panel", "dvf-panel", "air-panel"];
+  var placeholders = {};
+
+  function snapshotPlaceholders() {
+    PANELS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && !placeholders[id]) placeholders[id] = el.innerHTML;
+    });
+  }
+
+  function resetAllPanels() {
+    PANELS.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && placeholders[id]) el.innerHTML = placeholders[id];
+    });
+  }
+
+  function invalidateAllMaps() {
+    [window.elecMap, window.dvfMap, window.atmoMap, window.bivMap]
+      .forEach(function (m) {
+        if (m && typeof m.invalidateSize === "function") {
+          setTimeout(function () { m.invalidateSize(); }, 80);
+        }
+      });
+  }
+
+  function bind() {
+    snapshotPlaceholders();
+    // Bootstrap 5 tabs : événement officiel
+    document.querySelectorAll('[data-bs-toggle="tab"], .nav-link').forEach(
+      function (tab) {
+        tab.addEventListener("shown.bs.tab", function () {
+          resetAllPanels();
+          invalidateAllMaps();
+        });
+        // Fallback : certains tabs Quarto ne déclenchent pas
+        // shown.bs.tab — on écoute aussi le click
+        tab.addEventListener("click", function () {
+          setTimeout(function () {
+            resetAllPanels();
+            invalidateAllMaps();
+          }, 200);
+        });
+      }
+    );
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bind);
+  } else {
+    // Si le script tourne après DOMContentLoaded, attendre un peu que
+    // les panneaux soient rendus par Quarto Dashboard
+    setTimeout(bind, 300);
+  }
+})();
+</script>
+```
+
 ```{r}
 #| label: inject-air-data
 #| results: asis
