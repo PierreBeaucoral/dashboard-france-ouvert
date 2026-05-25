@@ -363,29 +363,60 @@ if (dvf_ready) {
       .forEach(function (m) {
         if (m && typeof m.invalidateSize === "function") {
           setTimeout(function () { m.invalidateSize(); }, 80);
+          setTimeout(function () { m.invalidateSize(); }, 300);
         }
       });
   }
 
+  // IntersectionObserver : appelle invalidateSize quand le conteneur
+  // d'une carte transitionne de display:none vers display:block (passage
+  // d'onglet). Sans ça, leaflet garde une taille 0×0 mesurée au démarrage
+  // et son hit-test du clic vise des coordonnées caduques.
+  function observeMapVisibility() {
+    var maps = [window.elecMap, window.dvfMap, window.atmoMap, window.bivMap];
+    maps.forEach(function (m) {
+      if (!m || !m.getContainer || m._cpVisObserved) return;
+      var c = m.getContainer();
+      if (!c) return;
+      m._cpVisObserved = true;
+      if (typeof IntersectionObserver === "undefined") {
+        setTimeout(function () { m.invalidateSize(); }, 100);
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            setTimeout(function () { m.invalidateSize(); }, 50);
+            setTimeout(function () { m.invalidateSize(); }, 250);
+          }
+        });
+      }, { threshold: 0.01 });
+      io.observe(c);
+    });
+  }
+
   function bind() {
     snapshotPlaceholders();
-    // Bootstrap 5 tabs : événement officiel
+    // Quarto Dashboard utilise des tabs bootstrap — attache aux deux events
     document.querySelectorAll('[data-bs-toggle="tab"], .nav-link').forEach(
       function (tab) {
         tab.addEventListener("shown.bs.tab", function () {
           resetAllPanels();
           invalidateAllMaps();
         });
-        // Fallback : certains tabs Quarto ne déclenchent pas
-        // shown.bs.tab — on écoute aussi le click
         tab.addEventListener("click", function () {
           setTimeout(function () {
             resetAllPanels();
             invalidateAllMaps();
-          }, 200);
+          }, 300);
         });
       }
     );
+    // Observer visibilité — appelé en boucle pour rattraper les maps
+    // qui se déclarent après le DOMContentLoaded
+    observeMapVisibility();
+    setTimeout(observeMapVisibility, 1000);
+    setTimeout(observeMapVisibility, 3000);
   }
 
   if (document.readyState === "loading") {
@@ -493,19 +524,15 @@ if (elec_ready) {
     htmlwidgets::onRender(
       "function(el, x) {
          window.elecMap = this;
-         var self = this;
-         function attach() {
-           self.eachLayer(function(layer) {
-             if (layer.options && layer.options.layerId && !layer._cpClickOn) {
-               layer._cpClickOn = true;
-               layer.on('click', function(e) {
-                 if (window.updateCommunePanel) window.updateCommunePanel(e.target.options.layerId);
-               });
-             }
-           });
-         }
-         setTimeout(attach, 60);
-         self.on('layeradd', function() { setTimeout(attach, 0); });
+         // Listener au niveau de la carte : leaflet hit-teste les polygones
+         // et fournit e.layer. Plus robuste que eachLayer (qui peut rater
+         // les polygones ajoutés après le timeout initial, surtout quand la
+         // carte démarre dans une tab cachée display:none).
+         this.on('click', function(e) {
+           if (e.layer && e.layer.options && e.layer.options.layerId) {
+             if (window.updateCommunePanel) window.updateCommunePanel(e.layer.options.layerId);
+           }
+         });
        }"
     )
 } else if (data_ready) {
@@ -605,19 +632,12 @@ if (dvf_ready) {
       "function(el, x) {
          window.dvfMap = this;
          var self = this;
-         // Click sur commune → met à jour le panneau DVF
-         function attach() {
-           self.eachLayer(function(layer) {
-             if (layer.options && layer.options.layerId && !layer._dvfClickOn) {
-               layer._dvfClickOn = true;
-               layer.on('click', function(e) {
-                 if (window.updateDvfPanel) window.updateDvfPanel(e.target.options.layerId);
-               });
-             }
-           });
-         }
-         setTimeout(attach, 60);
-         self.on('layeradd', function() { setTimeout(attach, 0); });
+         // Click au niveau de la carte (robuste tab-cachée)
+         this.on('click', function(e) {
+           if (e.layer && e.layer.options && e.layer.options.layerId) {
+             if (window.updateDvfPanel) window.updateDvfPanel(e.layer.options.layerId);
+           }
+         });
          // Bind radios → recolor
          function readSel() {
            var y = document.querySelector('input[name=dvf-year]:checked');
@@ -697,18 +717,12 @@ if (atmo_ready) {
         "function(el, x) {
            window.atmoMap = this;
            var self = this;
-           function attach() {
-             self.eachLayer(function(layer) {
-               if (layer.options && layer.options.layerId && !layer._atmoClickOn) {
-                 layer._atmoClickOn = true;
-                 layer.on('click', function(e) {
-                   if (window.updateAirPanel) window.updateAirPanel(e.target.options.layerId);
-                 });
-               }
-             });
-           }
-           setTimeout(attach, 60);
-           self.on('layeradd', function() { setTimeout(attach, 0); });
+           // Click au niveau de la carte (robuste tab-cachée)
+           this.on('click', function(e) {
+             if (e.layer && e.layer.options && e.layer.options.layerId) {
+               if (window.updateAirPanel) window.updateAirPanel(e.layer.options.layerId);
+             }
+           });
            function readSel() {
              var p = document.querySelector('input[name=atmo-pol]:checked');
              return p ? p.value : 'qual_indice';
