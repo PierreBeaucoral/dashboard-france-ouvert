@@ -40,6 +40,35 @@ gagnante** (couleur) avec **opacité proportionnelle à la marge**.
 multipartisme (NFP, ENS, RN, LR+UDR, divers) se rend bien par couleur catégorielle.
 L'opacité ajoute une information continue (force de la victoire) sans surcharger.
 
+### T1 en fallback des communes sans T2
+
+Les ~4 500 communes dont la circonscription a été décidée au 1er tour
+(majorité absolue + seuil d'inscrits) n'apparaissent pas dans le fichier T2.
+Pour avoir une carte complète, on parse aussi `resultats-definitifs-par-communes.csv`
+du 1er tour (~77 MB) et on **bascule au résultat T1 pour ces communes**.
+
+La colonne `tour` du parquet de sortie trace si le résultat affiché vient de
+T1 ou T2 — c'est nécessaire pour l'honnêteté analytique (un résultat T1 n'a
+pas la même nature qu'un résultat T2). Dans le dashboard, les deux sont
+représentés avec la même palette : ce qui compte pour la lecture est *la
+famille gagnante en voix dans la commune au tour décisif*.
+
+Couverture : 31 392 T2 + 6 026 T1-only = **37 418 communes** (vs ~36 000 réelles ;
+les ~1 400 entrées en excès correspondent à des communes déléguées, à
+Saint-Pierre-et-Miquelon ou à la Polynésie française, hors de notre périmètre
+cartographique).
+
+### Paris / Lyon / Marseille
+
+La data MI agrège ces trois villes au niveau **commune** (75056, 69123, 13055)
+alors que le GeoJSON `france-geojson` les expose par **arrondissement
+municipal** (75101–75120, 69381–69389, 13201–13216). Côté join, on répercute
+le résultat de la ville sur chacun de ses arrondissements (tous reçoivent la
+même couleur). Limitation : on perd le détail intra-PLM. Pour le récupérer,
+il faudrait utiliser la ressource MI *par bureau de vote*, plus lourde (16 MB),
+agréger par arrondissement, ce qui peut être fait en Étape 5 si l'analyse
+intra-grandes-villes devient pertinente.
+
 ### Mapping nuance MI → famille politique
 
 Nuances officielles du Ministère de l'Intérieur regroupées en 5 familles :

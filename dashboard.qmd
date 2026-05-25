@@ -54,9 +54,30 @@ if (elec_ready) {
   com  <- sf::read_sf(geo_com_path, quiet = TRUE)
   elec <- arrow::read_parquet(elec_path)
 
-  # Join communes (sf) × résultats (df) sur code INSEE
+  # Paris / Lyon / Marseille : la data MI agrège au niveau "commune"
+  # (codes 75056, 69123, 13055) mais le GeoJSON a les arrondissements
+  # municipaux (75101-75120, 69381-69389, 13201-13216). On répercute le
+  # résultat de la ville sur chaque arrondissement pour avoir une carte
+  # complète.
+  plm_map <- tibble::tibble(
+    arrond = c(
+      sprintf("751%02d", 1:20),     # Paris 75101..75120
+      sprintf("693%02d", 81:89),    # Lyon  69381..69389
+      sprintf("132%02d", 1:16)      # Marseille 13201..13216
+    ),
+    city = c(rep("75056", 20), rep("69123",  9), rep("13055", 16))
+  )
+
+  # Construction d'un `join_code` : code arrondissement → code ville si PLM,
+  # sinon code commune inchangé.
   com_results <- com |>
-    left_join(elec, by = c("code" = "code_insee"))
+    mutate(
+      join_code = dplyr::coalesce(
+        plm_map$city[match(code, plm_map$arrond)],
+        code
+      )
+    ) |>
+    left_join(elec, by = c("join_code" = "code_insee"))
 
   com_metro_results <- com_results |>
     filter(!substr(code, 1, 3) %in% DROM_CODES)

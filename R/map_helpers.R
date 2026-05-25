@@ -23,6 +23,24 @@ drom_long_names <- c(
   )
 }
 
+# Helper interne : ajoute un hook JS qui re-trigge map.invalidateSize() à
+# chaque changement de taille du conteneur (expansion modale de la card
+# Quarto Dashboard, redimensionnement fenêtre, etc.). Sans ce hook, leaflet
+# garde la taille initiale et la carte reste minuscule dans la modale.
+.add_resize_handler <- function(map) {
+  htmlwidgets::onRender(map,
+    "function(el, x) {
+       var self = this;
+       var refresh = function () {
+         setTimeout(function () { self.invalidateSize(); }, 80);
+       };
+       if (typeof ResizeObserver !== 'undefined') {
+         new ResizeObserver(refresh).observe(el);
+       }
+       window.addEventListener('resize', refresh);
+     }")
+}
+
 # ---- Carte principale (métropole) ---------------------------
 
 #' Carte de France métropolitaine — couche départements sans données métier.
@@ -78,7 +96,8 @@ base_map_metropole <- function(sf_data,
         direction = "auto"
       ),
       layerId = ~code
-    )
+    ) |>
+    .add_resize_handler()
 }
 
 # ---- Cartouche DROM ----------------------------------------
@@ -194,7 +213,8 @@ choropleth_metropole <- function(com_sf, dep_sf) {
       html     = .famille_legend_html(),
       position = "bottomright",
       className = "famille-legend"
-    )
+    ) |>
+    .add_resize_handler()
 }
 
 #' Légende HTML des familles politiques (utilisée par addControl).
@@ -247,7 +267,8 @@ choropleth_drom_inset <- function(com_drom_sf, drom_code) {
       color        = "#FFFFFF",
       weight       = 0.3,
       smoothFactor = 0.3
-    )
+    ) |>
+    .add_resize_handler()
 }
 
 drom_inset <- function(sf_data, drom_code) {
@@ -275,5 +296,6 @@ drom_inset <- function(sf_data, drom_code) {
       color        = "#4A4A4A",
       weight       = 0.8,
       smoothFactor = 0.3
-    )
+    ) |>
+    .add_resize_handler()
 }
