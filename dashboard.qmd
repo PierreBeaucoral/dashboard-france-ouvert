@@ -78,6 +78,20 @@ if (elec_ready) {
   ssmsi_ready <- file.exists(ssmsi_path)
   if (ssmsi_ready) ssmsi_data <- arrow::read_parquet(ssmsi_path)
 
+  # BAAC accidents → joint à SSMSI pour partager l'onglet Sécurité
+  baac_path_d <- here::here("data", "processed", "baac",
+                           "accidents_commune.parquet")
+  if (file.exists(baac_path_d) && ssmsi_ready) {
+    baac_d <- arrow::read_parquet(baac_path_d)
+    ssmsi_data <- ssmsi_data |>
+      dplyr::left_join(baac_d, by = "code_commune") |>
+      dplyr::mutate(
+        acc_pour_mille = ifelse(is.na(ssmsi_pop_ref) | ssmsi_pop_ref == 0,
+                                NA_real_,
+                                n_accidents_2024 / ssmsi_pop_ref * 1000)
+      )
+  }
+
   dgfip_path  <- here::here("data", "processed", "dgfip",
                            "comptes_communes.parquet")
   dgfip_ready <- file.exists(dgfip_path)
@@ -599,7 +613,9 @@ if (ssmsi_ready) {
       degr  = round(del_degradations,     1),
       stup  = round(del_trafic_stup,      1),
       ucan  = round(del_usage_stup,       1),
-      vehs  = round(del_vols_vehicules,   1)
+      vehs  = round(del_vols_vehicules,   1),
+      acc   = if ("acc_pour_mille" %in% names(ssmsi_data)) round(acc_pour_mille, 2) else NA_real_,
+      n_acc = if ("n_accidents_2024" %in% names(ssmsi_data)) n_accidents_2024 else NA_integer_
     )
   sec_json <- jsonlite::toJSON(sec_for_js, auto_unbox = TRUE, na = "null")
   red_palette_js <- jsonlite::toJSON(.palette_red)
@@ -609,7 +625,7 @@ if (ssmsi_ready) {
       'window.secPalette = ', as.character(red_palette_js), ';\n',
       'window.secData = {};\n',
       'window.secRaw.forEach(function(r) { window.secData[r.code] = r; });\n',
-      'window.secFieldMap = { del_total_pour_mille:"tot", del_cambriolages:"camb", del_vols_pers:"vols", del_violences_sex:"viols", del_degradations:"degr", del_trafic_stup:"stup" };\n',
+      'window.secFieldMap = { del_total_pour_mille:"tot", del_cambriolages:"camb", del_vols_pers:"vols", del_violences_sex:"viols", del_degradations:"degr", del_trafic_stup:"stup", acc_pour_mille:"acc" };\n',
       '// Log-quantile bins : meilleure résolution sur les valeurs hautes\n',
       'window.secBreaks = {};\n',
       'Object.keys(window.secFieldMap).forEach(function(field) {\n',
@@ -652,7 +668,7 @@ if (ssmsi_ready) {
       '    return \'<div class="cp-kv"><span>\' + label + \'</span><span class="cp-num">\' + fmt(v) + \' ‰</span></div>\';\n',
       '  }\n',
       '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
-      '    \'<div class="cp-section"><h4>Taux pour 1 000 habitants (2025)</h4>\' +\n',
+      '    \'<div class="cp-section"><h4>Délinquance SSMSI 2025 · taux ‰</h4>\' +\n',
       '    \'<div class="cp-kvs">\' +\n',
       '    row("Total", d.tot) +\n',
       '    row("Cambriolages", d.camb) +\n',
@@ -662,7 +678,8 @@ if (ssmsi_ready) {
       '    row("Violences sex.", d.viols) +\n',
       '    row("Trafic stup.", d.stup) +\n',
       '    row("Usage stup.", d.ucan) +\n',
-      '    \'</div></div>\';\n',
+      '    \'</div></div>\' +\n',
+      '    (d.acc != null ? \'<div class="cp-section"><h4>Accidents BAAC 2024</h4><div class="cp-kvs"><div class="cp-kv"><span>Nombre</span><span class="cp-num">\' + (d.n_acc != null ? d.n_acc : "—") + \'</span></div><div class="cp-kv"><span>Taux ‰</span><span class="cp-num">\' + (d.acc != null ? d.acc : "—") + \'</span></div></div></div>\' : "");\n',
       '};\n',
       '</script>\n',
       sep = ""
@@ -764,7 +781,10 @@ if (apl_ready) {
       code = code_commune,
       apl  = round(apl_medecins, 2),
       aplj = round(apl_medecins_jeunes, 2),
-      pop  = round(pop_referenced)
+      apli = round(apl_infirmieres, 2),
+      apls = round(apl_sagefemmes, 2),
+      apld = round(apl_dentistes, 2),
+      aplk = round(apl_kines, 2)
     )
   sante_json <- jsonlite::toJSON(sante_for_js, auto_unbox = TRUE, na = "null")
   apl_div_palette <- jsonlite::toJSON(c("#7A2424", "#D49687", "#E8E4DC",
@@ -775,12 +795,28 @@ if (apl_ready) {
       'window.santePalette = ', as.character(apl_div_palette), ';\n',
       'window.santeData = {};\n',
       'window.santeRaw.forEach(function(r) { window.santeData[r.code] = r; });\n',
-      'window.santeFieldMap = { apl_medecins:"apl", apl_medecins_jeunes:"aplj" };\n',
-      '// Breaks fixes au seuil de désert médical (2.5) : palette divergente\n',
+      'window.santeFieldMap = {\n',
+      '  apl_medecins:        "apl",\n',
+      '  apl_medecins_jeunes: "aplj",\n',
+      '  apl_infirmieres:     "apli",\n',
+      '  apl_sagefemmes:      "apls",\n',
+      '  apl_dentistes:       "apld",\n',
+      '  apl_kines:           "aplk"\n',
+      '};\n',
+      '// Médecins : breaks fixes au seuil désert médical 2.5\n',
+      '// Autres pros : quintiles auto (échelles incomparables — pour\n',
+      '// infirmières/kinés mesure en ETP/100k hab, ordres ~100)\n',
       'window.santeBreaks = {\n',
       '  apl_medecins:        [0, 1.5, 2.5, 3.5, 5, 50],\n',
       '  apl_medecins_jeunes: [0, 1.5, 2.5, 3.5, 5, 50]\n',
       '};\n',
+      '// Compute quintiles for the other 4 pros\n',
+      '["apl_infirmieres","apl_sagefemmes","apl_dentistes","apl_kines"].forEach(function(field) {\n',
+      '  var key = window.santeFieldMap[field];\n',
+      '  var vals = window.santeRaw.map(function(r) { return r[key]; }).filter(function(v) { return v != null && v >= 0; }).sort(function(a,b){return a-b;});\n',
+      '  var n = vals.length;\n',
+      '  window.santeBreaks[field] = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return vals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
+      '});\n',
       'window.santeColorFor = function(v, field) {\n',
       '  if (v == null) return "#E8E4DC";\n',
       '  var br = window.santeBreaks[field];\n',
@@ -816,13 +852,18 @@ if (apl_ready) {
       '  else if (d.apl < 3.5) { status = "Sous-doté"; statusClass = "cp-badge-t1"; }\n',
       '  else { status = "Bien doté"; statusClass = "cp-badge-t2"; }\n',
       '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \' · <span class="cp-badge \' + statusClass + \'">\' + status + \'</span></div></div>\' +\n',
-      '    \'<div class="cp-section"><h4>APL aux médecins généralistes (2023)</h4>\' +\n',
+      '    \'<div class="cp-section"><h4>APL médecins généralistes 2023</h4>\' +\n',
       '    \'<div class="cp-kvs">\' +\n',
       '    \'<div class="cp-kv"><span>Tous médecins</span><span class="cp-num">\' + fmt(d.apl) + \' c/an/hab</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Médecins ≤ 65 ans</span><span class="cp-num">\' + fmt(d.aplj) + \' c/an/hab</span></div>\' +\n',
-      '    \'<div class="cp-kv"><span>Population réf.</span><span class="cp-num">\' + fmtInt(d.pop) + \' hab.</span></div>\' +\n',
       '    \'</div></div>\' +\n',
-      '    \'<div class="cp-section" style="font-size:0.78rem;color:#7A7A7A;">Seuil de désert médical conventionnel : &lt; 2,5 consultations/an/hab. Soutenabilité future : APL des médecins ≤ 65 ans.</div>\';\n',
+      '    \'<div class="cp-section"><h4>APL autres pros (ETP / 100k hab)</h4>\' +\n',
+      '    \'<div class="cp-kvs">\' +\n',
+      '    \'<div class="cp-kv"><span>Infirmières</span><span class="cp-num">\' + fmt(d.apli) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Sages-femmes</span><span class="cp-num">\' + fmt(d.apls) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Dentistes</span><span class="cp-num">\' + fmt(d.apld) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Kinésithérapeutes</span><span class="cp-num">\' + fmt(d.aplk) + \'</span></div>\' +\n',
+      '    \'</div></div>\';\n',
       '};\n',
       '</script>\n',
       sep = ""
@@ -1224,12 +1265,13 @@ if (atmo_ready) {
   <div class="dvf-ctrl-group">
     <span class="dvf-ctrl-label">Indicateur</span>
     <div class="dvf-ctrl-radios" id="sec-radios">
-      <label><input type="radio" name="sec-ind" value="del_total_pour_mille" checked> Total</label>
+      <label><input type="radio" name="sec-ind" value="del_total_pour_mille" checked> Délinq. totale</label>
       <label><input type="radio" name="sec-ind" value="del_cambriolages"> Cambriolages</label>
       <label><input type="radio" name="sec-ind" value="del_vols_pers"> Vols pers.</label>
       <label><input type="radio" name="sec-ind" value="del_violences_sex"> Violences sex.</label>
       <label><input type="radio" name="sec-ind" value="del_degradations"> Dégradations</label>
       <label><input type="radio" name="sec-ind" value="del_trafic_stup"> Trafic stup.</label>
+      <label><input type="radio" name="sec-ind" value="acc_pour_mille"> Accidents BAAC</label>
     </div>
   </div>
 </div>
@@ -1491,8 +1533,12 @@ if (filo_ready) {
   <div class="dvf-ctrl-group">
     <span class="dvf-ctrl-label">Indicateur</span>
     <div class="dvf-ctrl-radios" id="sante-radios">
-      <label><input type="radio" name="sante-ind" value="apl_medecins" checked> APL tous médecins</label>
-      <label><input type="radio" name="sante-ind" value="apl_medecins_jeunes"> APL médecins ≤ 65 ans</label>
+      <label><input type="radio" name="sante-ind" value="apl_medecins" checked> Médecins généralistes</label>
+      <label><input type="radio" name="sante-ind" value="apl_medecins_jeunes"> Médecins ≤ 65 ans</label>
+      <label><input type="radio" name="sante-ind" value="apl_infirmieres"> Infirmières</label>
+      <label><input type="radio" name="sante-ind" value="apl_sagefemmes"> Sages-femmes</label>
+      <label><input type="radio" name="sante-ind" value="apl_dentistes"> Dentistes</label>
+      <label><input type="radio" name="sante-ind" value="apl_kines"> Kinésithérapeutes</label>
     </div>
   </div>
 </div>

@@ -36,6 +36,7 @@ filo_path  <- here::here("data", "processed", "filosofi", "revenus_communes.parq
 dens_path  <- here::here("data", "processed", "insee_densite", "grille_densite.parquet")
 defm_path  <- here::here("data", "processed", "dares", "defm_commune.parquet")
 apl_path   <- here::here("data", "processed", "drees", "apl_medecins.parquet")
+baac_path  <- here::here("data", "processed", "baac", "accidents_commune.parquet")
 out_dir   <- here::here("data", "processed", "explorer")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -50,6 +51,7 @@ filo  <- if (file.exists(filo_path))  arrow::read_parquet(filo_path)  else NULL
 dens  <- if (file.exists(dens_path))  arrow::read_parquet(dens_path)  else NULL
 defm  <- if (file.exists(defm_path))  arrow::read_parquet(defm_path)  else NULL
 apl   <- if (file.exists(apl_path))   arrow::read_parquet(apl_path)   else NULL
+baac  <- if (file.exists(baac_path))  arrow::read_parquet(baac_path)  else NULL
 
 # ---- Préparer DVF : pivot 2024 App + Maison ----
 dvf_2024 <- dvf |>
@@ -167,11 +169,24 @@ if (!is.null(defm)) {
   merged <- merged |> dplyr::left_join(defm_clean, by = "code_commune")
 }
 
-# Bloc 5 — APL médecins (désert médical)
+# Bloc 5 — APL 5 professions de santé (désert médical)
 if (!is.null(apl)) {
   apl_clean <- apl |>
-    dplyr::select(code_commune, apl_medecins, apl_medecins_jeunes)
+    dplyr::select(code_commune,
+                  dplyr::any_of(c("apl_medecins", "apl_medecins_jeunes",
+                                  "apl_infirmieres", "apl_sagefemmes",
+                                  "apl_dentistes", "apl_kines")))
   merged <- merged |> dplyr::left_join(apl_clean, by = "code_commune")
+}
+
+# Bloc C/I — BAAC accidents corporels (taux pour 1000 hab)
+if (!is.null(baac)) {
+  merged <- merged |> dplyr::left_join(baac, by = "code_commune") |>
+    dplyr::mutate(
+      acc_taux_pop = ifelse(is.na(ctx_pop_latest) | ctx_pop_latest == 0,
+                            NA_real_,
+                            n_accidents_2024 / ctx_pop_latest * 1000)
+    )
 }
 
 # Normaliser DEFM par population (taux chômage approx)
@@ -228,10 +243,13 @@ NUMERIC_VARS <- c(
   # Revenus (Bloc 1 FiLoSoFi)
   "revenu_median", "revenu_d1", "revenu_d9", "gini",
   "pct_imposes", "part_prestations",
-  # Désert médical (Bloc 5 APL DREES)
+  # Désert médical (Bloc 5 APL DREES) — 5 professions
   "apl_medecins", "apl_medecins_jeunes",
+  "apl_infirmieres", "apl_sagefemmes", "apl_dentistes", "apl_kines",
   # Chômage (Bloc 3 DARES) — taux pour 1000 hab.
-  "defm_taux_pop"
+  "defm_taux_pop",
+  # Accidents corporels BAAC 2024 — taux pour 1000 hab.
+  "acc_taux_pop"
 )
 
 corr_long <- function(df, method, strate_label = "Toutes") {
