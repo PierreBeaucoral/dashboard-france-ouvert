@@ -88,6 +88,12 @@ if (elec_ready) {
   apl_ready <- file.exists(apl_path)
   if (apl_ready) apl_data <- arrow::read_parquet(apl_path)
 
+  # FiLoSoFi (Bloc 1 — revenus INSEE)
+  filo_path_d <- here::here("data", "processed", "filosofi",
+                           "revenus_communes.parquet")
+  filo_ready  <- file.exists(filo_path_d)
+  if (filo_ready) filo_data <- arrow::read_parquet(filo_path_d)
+
   # Paris / Lyon / Marseille : la data MI agrège au niveau "commune"
   # (codes 75056, 69123, 13055) mais le GeoJSON a les arrondissements
   # municipaux (75101-75120, 69381-69389, 13201-13216). On répercute le
@@ -682,6 +688,90 @@ if (ssmsi_ready) {
 ```
 
 ```{r}
+#| label: inject-rev-data
+#| results: asis
+#| echo: false
+if (filo_ready) {
+  rev_for_js <- filo_data |>
+    dplyr::transmute(
+      code = code_commune,
+      med  = round(revenu_median),
+      d1   = round(revenu_d1),
+      d9   = round(revenu_d9),
+      gini = round(gini, 3),
+      imp  = round(pct_imposes, 1),
+      pres = round(part_prestations, 1),
+      act  = round(part_activite, 1)
+    )
+  rev_json <- jsonlite::toJSON(rev_for_js, auto_unbox = TRUE, na = "null")
+  green_palette_js <- jsonlite::toJSON(c("#F5F2EC", "#C9D4B0", "#94B091",
+                                         "#5E876E", "#2F5145"))
+
+  cat('<script>\n',
+      'window.revRaw = ', as.character(rev_json), ';\n',
+      'window.revPalette = ', as.character(green_palette_js), ';\n',
+      'window.revData = {};\n',
+      'window.revRaw.forEach(function(r) { window.revData[r.code] = r; });\n',
+      'window.revFieldMap = { revenu_median:"med", revenu_d1:"d1", revenu_d9:"d9", gini:"gini", pct_imposes:"imp" };\n',
+      'window.revBreaks = {};\n',
+      'Object.keys(window.revFieldMap).forEach(function(field) {\n',
+      '  var key = window.revFieldMap[field];\n',
+      '  var vals = window.revRaw.map(function(r) { return r[key]; }).filter(function(v) { return v != null && isFinite(v); }).sort(function(a,b){return a-b;});\n',
+      '  var n = vals.length;\n',
+      '  window.revBreaks[field] = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return vals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
+      '});\n',
+      'window.revColorFor = function(v, field) {\n',
+      '  if (v == null) return "#E8E4DC";\n',
+      '  var br = window.revBreaks[field];\n',
+      '  for (var i = 1; i < 5; i++) { if (v < br[i]) return window.revPalette[i-1]; }\n',
+      '  return window.revPalette[4];\n',
+      '};\n',
+      'window.revRecolor = function(field) {\n',
+      '  if (!window.revMap) return;\n',
+      '  var key = window.revFieldMap[field];\n',
+      '  window.revMap.eachLayer(function(layer) {\n',
+      '    if (!layer.options || !layer.options.layerId) return;\n',
+      '    var ent = window.revData[layer.options.layerId];\n',
+      '    var v = ent ? ent[key] : null;\n',
+      '    layer.setStyle({ fillColor: window.revColorFor(v, field), fillOpacity: (v != null ? 0.85 : 0.25) });\n',
+      '  });\n',
+      '};\n',
+      'window.updateRevPanel = function(code) {\n',
+      '  var el = document.getElementById("rev-panel");\n',
+      '  if (!el) return;\n',
+      '  var d = window.revData[code];\n',
+      '  var elec = window.communeLookup && window.communeLookup[code];\n',
+      '  var nom = elec ? elec.nom_commune : code;\n',
+      '  var dept = elec ? (elec.libelle_dept + " (" + elec.code_dept + ")") : "";\n',
+      '  if (!d) {\n',
+      '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Pas de revenu publié (secret stat ou petite commune).</div>\';\n',
+      '    return;\n',
+      '  }\n',
+      '  function fmtE(x) { if (x == null) return "—"; return Number(x).toLocaleString("fr-FR") + " €"; }\n',
+      '  function fmtP(x) { if (x == null) return "—"; return Number(x).toFixed(1) + " %"; }\n',
+      '  function fmtG(x) { if (x == null) return "—"; return Number(x).toFixed(3); }\n',
+      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
+      '    \'<div class="cp-section"><h4>Revenu disponible annuel (FiLoSoFi 2021)</h4>\' +\n',
+      '    \'<div class="cp-kvs">\' +\n',
+      '    \'<div class="cp-kv"><span>Médiane</span><span class="cp-num">\' + fmtE(d.med) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>1ᵉʳ décile (D1)</span><span class="cp-num">\' + fmtE(d.d1) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>9ᵉ décile (D9)</span><span class="cp-num">\' + fmtE(d.d9) + \'</span></div>\' +\n',
+      '    \'</div></div>\' +\n',
+      '    \'<div class="cp-section"><h4>Inégalité &amp; structure</h4>\' +\n',
+      '    \'<div class="cp-kvs">\' +\n',
+      '    \'<div class="cp-kv"><span>Indice de Gini</span><span class="cp-num">\' + fmtG(d.gini) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Ménages imposés</span><span class="cp-num">\' + fmtP(d.imp) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Part prestations</span><span class="cp-num">\' + fmtP(d.pres) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Part activité</span><span class="cp-num">\' + fmtP(d.act) + \'</span></div>\' +\n',
+      '    \'</div></div>\';\n',
+      '};\n',
+      '</script>\n',
+      sep = ""
+  )
+}
+```
+
+```{r}
 #| label: inject-sante-data
 #| results: asis
 #| echo: false
@@ -890,6 +980,13 @@ if (elec_ready) {
   )
 }
 ```
+
+::: {.acronymes}
+**Source** : Ministère de l'Intérieur · data.gouv.fr.
+**Familles politiques** · NFP *Nouveau Front Populaire* (UG, FI *France Insoumise*, SOC *Socialiste*, COM *Communiste*, VEC *Verts/Écologistes*) · ENS *Ensemble* (Renaissance + MoDem) + HOR *Horizons* · LR *Les Républicains* (+ UDI *Union des Démocrates et Indépendants*) · RN *Rassemblement National* (+ UXD *Union de l'Extrême-Droite*) · Divers (DVD, DVG, DVC, REG, ECO).
+**T1/T2** : 1er / 2nd tour. ~6 000 communes ont été élues dès le T1 — pour celles-ci, le résultat affiché est celui du T1.
+**Opacité du polygone** : proportionnelle à la marge sur le second candidat.
+:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
@@ -1027,6 +1124,12 @@ if (dvf_ready) {
   )
 }
 ```
+
+::: {.acronymes}
+**DVF** *Demandes de Valeurs Foncières* · base Etalab des transactions immobilières géolocalisées, gérée par la DGFiP *Direction Générale des Finances Publiques* et publiée sur data.gouv.fr.
+**Filtres méthodologiques** : *Vente* uniquement ; appartements et maisons (pas locaux commerciaux) ; surface bâtie > 9 m² ; prix m² entre 200 et 30 000 € ; **mono-local** seulement (1 seul bien par mutation, pour éviter la répartition arbitraire du prix sur des lots multiples).
+**N < 5** ventes/an/commune : valeur non publiée pour fiabilité statistique.
+:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
@@ -1109,6 +1212,13 @@ if (atmo_ready) {
   )
 }
 ```
+
+::: {.acronymes}
+**Source** : Atmo France (fédération des AASQA *Associations Agréées de Surveillance de la Qualité de l'Air*), agrégation 30 jours glissants via WFS *Web Feature Service* GeoServer.
+**Indice ATMO** : indicateur synthétique 1 (Bon) à 6 (Extrêmement mauvais), calculé à partir de 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅, SO₂).
+**EPCI** *Établissement Public de Coopération Intercommunale* — pour les régions où l'AASQA publie au niveau EPCI (Bretagne, Occitanie, Pays de la Loire), la valeur est répercutée sur chaque commune membre.
+**Imputation dépt** : pour les communes sans mesure directe, moyenne du département (badge visible dans le panneau).
+:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
@@ -1192,6 +1302,13 @@ if (ssmsi_ready) {
   htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>SSMSI non chargé. Lancer <code>Rscript scripts/07_ssmsi_dgfip.R</code>.</p>")
 }
 ```
+
+::: {.acronymes}
+**SSMSI** *Service Statistique Ministériel de la Sécurité Intérieure* (Ministère de l'Intérieur). Base communale 2025 publiée sur data.gouv.fr.
+**Taux pour 1 000 habitants** : nombre de faits constatés par les services de police et de gendarmerie, divisé par la population INSEE × 1 000.
+**Secret statistique** : communes avec moins de 5 faits constatés sur 3 ans consécutifs ne sont pas publiées (diffusion = "ndiff" dans la source).
+**Catégories** : violences sexuelles, vols (avec/sans violence, véhicules, dans véhicules), cambriolages, dégradations volontaires, trafic et usage de stupéfiants.
+:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
@@ -1271,6 +1388,13 @@ if (dgfip_ready) {
   htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>DGFiP non chargé.</p>")
 }
 ```
+
+::: {.acronymes}
+**DGFiP** *Direction Générale des Finances Publiques* (Ministère de l'Économie). Fichier global des comptes individuels des communes 2024.
+**Tous les montants sont en €/habitant** pour permettre la comparaison entre communes de taille différente.
+**CAF** *Capacité d'Auto-Financement* — différence entre recettes courantes et charges courantes. Mesure la marge de manœuvre budgétaire de la commune (et non la Caisse d'Allocations Familiales).
+**Taxes locales** : taux votés par le conseil municipal. TH *Taxe d'Habitation* (résidences secondaires depuis la réforme) · TFB *Taxe Foncière sur le Bâti* · TFNB *Taxe Foncière sur le Non Bâti*.
+:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
@@ -1279,6 +1403,92 @@ if (dgfip_ready) {
   <div class="cp-placeholder">
     <p><strong>Cliquez sur une commune</strong> pour voir son budget communal.</p>
     <p class="cp-hint">Source : DGFiP, comptes individuels des communes 2024. Tous les montants en €/habitant. Taxes locales : taux votés par la commune.</p>
+  </div>
+</div>
+```
+:::
+
+# Revenus
+
+## Row {height="82%"}
+
+::: {.card title="Revenu disponible médian par commune · FiLoSoFi 2021" width="72%"}
+```{=html}
+<div class="dvf-controls">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Indicateur</span>
+    <div class="dvf-ctrl-radios" id="rev-radios">
+      <label><input type="radio" name="rev-ind" value="revenu_median" checked> Médiane (€)</label>
+      <label><input type="radio" name="rev-ind" value="revenu_d1"> 1ᵉʳ décile</label>
+      <label><input type="radio" name="rev-ind" value="revenu_d9"> 9ᵉ décile</label>
+      <label><input type="radio" name="rev-ind" value="gini"> Indice Gini</label>
+      <label><input type="radio" name="rev-ind" value="pct_imposes"> % ménages imposés</label>
+    </div>
+  </div>
+</div>
+```
+
+```{r}
+#| label: map-revenus
+if (filo_ready) {
+  vals0 <- filo_data |>
+    dplyr::transmute(code_commune, value = revenu_median)
+  # Palette verte séquentielle : revenu haut = vert sombre
+  m <- choropleth_socio(com_metro_only, dep_metro, vals0,
+                        palette = c("#F5F2EC", "#C9D4B0", "#94B091",
+                                    "#5E876E", "#2F5145"),
+                        legend_title = "Revenu médian · €/an",
+                        value_unit   = "€",
+                        value_fmt    = function(x) format(round(x), big.mark = " "))
+  m |>
+    htmlwidgets::onRender(
+      "function(el, x) {
+         window.revMap = this;
+         var self = this;
+         function attach() {
+           self.eachLayer(function(layer) {
+             if (layer.options && layer.options.layerId && !layer._revClickOn) {
+               layer._revClickOn = true;
+               layer.on('click', function(e) {
+                 if (window.updateRevPanel) window.updateRevPanel(e.target.options.layerId);
+               });
+             }
+           });
+         }
+         self._cpReattach = attach;
+         setTimeout(attach, 60);
+         setTimeout(attach, 500);
+         setTimeout(attach, 2000);
+         self.on('layeradd', function() { setTimeout(attach, 0); });
+         function onChange() {
+           var sel = document.querySelector('input[name=rev-ind]:checked');
+           if (sel && window.revRecolor) window.revRecolor(sel.value);
+         }
+         setTimeout(function() {
+           document.querySelectorAll('input[name=rev-ind]').forEach(function(r) {
+             r.addEventListener('change', onChange);
+           });
+         }, 300);
+       }"
+    )
+} else {
+  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>FiLoSoFi non chargé.</p>")
+}
+```
+
+::: {.acronymes}
+**Source** : INSEE *Institut national de la statistique et des études économiques* · FiLoSoFi *Fichier Localisé Social et Fiscal*, millésime 2021.
+**Indice de Gini** : 0 = égalité parfaite, 1 = inégalité maximale.
+**1ᵉʳ et 9ᵉ déciles** : 10% des ménages ont un revenu inférieur au D1 ; 10% l'ont supérieur au D9.
+:::
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
+<div id="rev-panel" class="commune-panel">
+  <div class="cp-placeholder">
+    <p><strong>Cliquez sur une commune</strong> pour voir ses indicateurs de revenu et inégalité.</p>
+    <p class="cp-hint">Revenu disponible = revenu fiscal après prestations et impôts. Médiane = revenu qui sépare la commune en deux moitiés égales.</p>
   </div>
 </div>
 ```
@@ -1348,6 +1558,13 @@ if (apl_ready) {
   htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>APL non chargé. Lancer <code>Rscript scripts/08_drees_apl.R</code>.</p>")
 }
 ```
+
+::: {.acronymes}
+**APL** *Accessibilité Potentielle Localisée* aux médecins généralistes (DREES *Direction de la Recherche, des Études, de l'Évaluation et des Statistiques*, Ministère de la Santé). Millésime 2023.
+**Lecture** : nombre de consultations de médecine générale accessibles par an et par habitant, pondéré par la distance aux médecins environnants et la structure d'âge de la population (les âgés consultent plus).
+**Seuil conventionnel de désert médical** : APL < 2,5 consultations/an/hab.
+**APL médecins ≤ 65 ans** : exclut les médecins proches de la retraite — mesure la **soutenabilité future** de l'offre médicale dans la commune.
+:::
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}

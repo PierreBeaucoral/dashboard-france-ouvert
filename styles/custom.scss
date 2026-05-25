@@ -177,6 +177,21 @@ pre.sourceCode {
 }
 
 // ============================================================
+// Zone "Acronymes & sources" sous chaque carte
+// ============================================================
+.acronymes {
+  font-size: 0.78rem;
+  color: $ink-muted;
+  padding: 8px 12px;
+  border-top: 1px solid $rule;
+  background: lighten($cream, 1%);
+  font-family: $font-family-sans-serif;
+  line-height: 1.5;
+  strong { color: $ink-soft; font-weight: 600; }
+  em { color: $ink-soft; font-style: italic; }
+}
+
+// ============================================================
 // Bandeau d'avertissement (lacunes de publication AASQA)
 // ============================================================
 .atmo-banner {

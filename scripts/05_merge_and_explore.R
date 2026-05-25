@@ -32,6 +32,10 @@ air_path  <- here::here("data", "processed", "air", "atmo_snapshot.parquet")
 pop_path  <- here::here("data", "processed", "insee", "populations.parquet")
 ssmsi_path <- here::here("data", "processed", "ssmsi", "delinquance_commune.parquet")
 dgfip_path <- here::here("data", "processed", "dgfip", "comptes_communes.parquet")
+filo_path  <- here::here("data", "processed", "filosofi", "revenus_communes.parquet")
+dens_path  <- here::here("data", "processed", "insee_densite", "grille_densite.parquet")
+defm_path  <- here::here("data", "processed", "dares", "defm_commune.parquet")
+apl_path   <- here::here("data", "processed", "drees", "apl_medecins.parquet")
 out_dir   <- here::here("data", "processed", "explorer")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -42,6 +46,10 @@ air  <- arrow::read_parquet(air_path)
 pop  <- if (file.exists(pop_path)) arrow::read_parquet(pop_path) else NULL
 ssmsi <- if (file.exists(ssmsi_path)) arrow::read_parquet(ssmsi_path) else NULL
 dgfip <- if (file.exists(dgfip_path)) arrow::read_parquet(dgfip_path) else NULL
+filo  <- if (file.exists(filo_path))  arrow::read_parquet(filo_path)  else NULL
+dens  <- if (file.exists(dens_path))  arrow::read_parquet(dens_path)  else NULL
+defm  <- if (file.exists(defm_path))  arrow::read_parquet(defm_path)  else NULL
+apl   <- if (file.exists(apl_path))   arrow::read_parquet(apl_path)   else NULL
 
 # ---- Préparer DVF : pivot 2024 App + Maison ----
 dvf_2024 <- dvf |>
@@ -137,6 +145,45 @@ if (!is.null(dgfip)) {
   merged <- merged |> dplyr::left_join(dgfip_clean, by = "code_commune")
 }
 
+# Bloc 1 complément — FiLoSoFi 2021 revenus
+if (!is.null(filo)) {
+  filo_clean <- filo |>
+    dplyr::select(code_commune, revenu_median, revenu_d1, revenu_d9, gini,
+                  pct_imposes, part_prestations)
+  merged <- merged |> dplyr::left_join(filo_clean, by = "code_commune")
+}
+
+# Bloc 1 complément — Grille densité INSEE 2024
+if (!is.null(dens)) {
+  dens_clean <- dens |>
+    dplyr::select(code_commune, densite_insee, densite_rang)
+  merged <- merged |> dplyr::left_join(dens_clean, by = "code_commune")
+}
+
+# Bloc 3 — DEFM DARES (chômage absolu, à normaliser par pop)
+if (!is.null(defm)) {
+  defm_clean <- defm |>
+    dplyr::select(code_commune, defm_abc)
+  merged <- merged |> dplyr::left_join(defm_clean, by = "code_commune")
+}
+
+# Bloc 5 — APL médecins (désert médical)
+if (!is.null(apl)) {
+  apl_clean <- apl |>
+    dplyr::select(code_commune, apl_medecins, apl_medecins_jeunes)
+  merged <- merged |> dplyr::left_join(apl_clean, by = "code_commune")
+}
+
+# Normaliser DEFM par population (taux chômage approx)
+if ("defm_abc" %in% names(merged) && "ctx_pop_latest" %in% names(merged)) {
+  merged <- merged |>
+    dplyr::mutate(
+      defm_taux_pop = ifelse(is.na(ctx_pop_latest) | ctx_pop_latest == 0,
+                             NA_real_,
+                             defm_abc / ctx_pop_latest * 1000)
+    )
+}
+
 # Strates : quartiles de log(inscrits) — proxy taille (legacy)
 # + strate_pop INSEE (réelle, depuis recensement)
 merged <- merged |>
@@ -177,7 +224,14 @@ NUMERIC_VARS <- c(
   "del_trafic_stup", "del_degradations", "del_vols_pers",
   # Finances communales (Bloc 8 DGFiP)
   "fin_recettes", "fin_charges", "fin_dette", "fin_caf",
-  "fin_taux_taxe_hab", "fin_taux_fonc_bati"
+  "fin_taux_taxe_hab", "fin_taux_fonc_bati",
+  # Revenus (Bloc 1 FiLoSoFi)
+  "revenu_median", "revenu_d1", "revenu_d9", "gini",
+  "pct_imposes", "part_prestations",
+  # Désert médical (Bloc 5 APL DREES)
+  "apl_medecins", "apl_medecins_jeunes",
+  # Chômage (Bloc 3 DARES) — taux pour 1000 hab.
+  "defm_taux_pop"
 )
 
 corr_long <- function(df, method, strate_label = "Toutes") {
