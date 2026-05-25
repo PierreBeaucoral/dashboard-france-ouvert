@@ -244,6 +244,26 @@ out <- dplyr::bind_rows(
   agg_t1 |> dplyr::anti_join(agg_t2, by = "code_insee")
 )
 
+# T1 universel : toutes les communes votent au 1er tour, on garde aussi
+# les % par famille au T1 (utile pour afficher T1 ET T2 côte à côte dans
+# le panneau Élections).
+agg_t1_extra <- agg_t1 |>
+  dplyr::transmute(
+    code_insee,
+    pct_NFP_t1        = pct_NFP,
+    pct_ENS_t1        = pct_ENS,
+    pct_RN_t1         = pct_RN,
+    pct_LR_t1         = pct_LR,
+    pct_Divers_t1     = pct_Divers,
+    pct_abstention_t1 = pct_abstention,
+    nuance_vainqueur_t1  = nuance_vainqueur,
+    famille_vainqueur_t1 = famille_vainqueur,
+    pct_vainqueur_t1     = pct_vainqueur
+  )
+
+out <- out |>
+  dplyr::left_join(agg_t1_extra, by = "code_insee")
+
 # ---- Écriture ----
 
 arrow::write_parquet(out, out_path)
