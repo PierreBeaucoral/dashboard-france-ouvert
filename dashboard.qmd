@@ -386,8 +386,14 @@ if (dvf_ready) {
       var io = new IntersectionObserver(function (entries) {
         entries.forEach(function (entry) {
           if (entry.isIntersecting) {
-            setTimeout(function () { m.invalidateSize(); }, 50);
-            setTimeout(function () { m.invalidateSize(); }, 250);
+            setTimeout(function () {
+              m.invalidateSize();
+              if (typeof m._cpReattach === "function") m._cpReattach();
+            }, 50);
+            setTimeout(function () {
+              m.invalidateSize();
+              if (typeof m._cpReattach === "function") m._cpReattach();
+            }, 300);
           }
         });
       }, { threshold: 0.01 });
@@ -524,15 +530,26 @@ if (elec_ready) {
     htmlwidgets::onRender(
       "function(el, x) {
          window.elecMap = this;
-         // Listener au niveau de la carte : leaflet hit-teste les polygones
-         // et fournit e.layer. Plus robuste que eachLayer (qui peut rater
-         // les polygones ajoutés après le timeout initial, surtout quand la
-         // carte démarre dans une tab cachée display:none).
-         this.on('click', function(e) {
-           if (e.layer && e.layer.options && e.layer.options.layerId) {
-             if (window.updateCommunePanel) window.updateCommunePanel(e.layer.options.layerId);
-           }
-         });
+         var self = this;
+         var attached = 0;
+         function attach() {
+           self.eachLayer(function(layer) {
+             if (layer.options && layer.options.layerId && !layer._cpClickOn) {
+               layer._cpClickOn = true;
+               attached++;
+               layer.on('click', function(e) {
+                 var code = (e.target && e.target.options) ? e.target.options.layerId : null;
+                 console.log('[ELEC click]', code, e.target);
+                 if (code && window.updateCommunePanel) window.updateCommunePanel(code);
+               });
+             }
+           });
+         }
+         self._cpReattach = function() { attach(); console.log('[ELEC] attached total=', attached); };
+         setTimeout(attach, 60);
+         setTimeout(self._cpReattach, 500);
+         setTimeout(self._cpReattach, 2000);
+         self.on('layeradd', function() { setTimeout(attach, 0); });
        }"
     )
 } else if (data_ready) {
@@ -632,12 +649,22 @@ if (dvf_ready) {
       "function(el, x) {
          window.dvfMap = this;
          var self = this;
-         // Click au niveau de la carte (robuste tab-cachée)
-         this.on('click', function(e) {
-           if (e.layer && e.layer.options && e.layer.options.layerId) {
-             if (window.updateDvfPanel) window.updateDvfPanel(e.layer.options.layerId);
-           }
-         });
+         function attach() {
+           self.eachLayer(function(layer) {
+             if (layer.options && layer.options.layerId && !layer._dvfClickOn) {
+               layer._dvfClickOn = true;
+               layer.on('click', function(e) {
+                 var code = e.target.options.layerId;
+                 if (window.updateDvfPanel) window.updateDvfPanel(code);
+               });
+             }
+           });
+         }
+         self._cpReattach = attach;
+         setTimeout(attach, 60);
+         setTimeout(attach, 500);
+         setTimeout(attach, 2000);
+         self.on('layeradd', function() { setTimeout(attach, 0); });
          // Bind radios → recolor
          function readSel() {
            var y = document.querySelector('input[name=dvf-year]:checked');
@@ -717,12 +744,22 @@ if (atmo_ready) {
         "function(el, x) {
            window.atmoMap = this;
            var self = this;
-           // Click au niveau de la carte (robuste tab-cachée)
-           this.on('click', function(e) {
-             if (e.layer && e.layer.options && e.layer.options.layerId) {
-               if (window.updateAirPanel) window.updateAirPanel(e.layer.options.layerId);
-             }
-           });
+           function attach() {
+             self.eachLayer(function(layer) {
+               if (layer.options && layer.options.layerId && !layer._atmoClickOn) {
+                 layer._atmoClickOn = true;
+                 layer.on('click', function(e) {
+                   var code = e.target.options.layerId;
+                   if (window.updateAirPanel) window.updateAirPanel(code);
+                 });
+               }
+             });
+           }
+           self._cpReattach = attach;
+           setTimeout(attach, 60);
+           setTimeout(attach, 500);
+           setTimeout(attach, 2000);
+           self.on('layeradd', function() { setTimeout(attach, 0); });
            function readSel() {
              var p = document.querySelector('input[name=atmo-pol]:checked');
              return p ? p.value : 'qual_indice';
