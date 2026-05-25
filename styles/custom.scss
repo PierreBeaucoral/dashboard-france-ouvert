@@ -177,6 +177,108 @@ pre.sourceCode {
 }
 
 // ============================================================
+// Contrôles DVF (radios année + type)
+// ============================================================
+.dvf-controls {
+  display: flex;
+  gap: 18px;
+  padding: 8px 12px;
+  background: $paper;
+  border-bottom: 1px solid $rule;
+  font-family: $font-family-sans-serif;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+.dvf-ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dvf-ctrl-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: $ink-soft;
+}
+.dvf-ctrl-radios {
+  display: flex;
+  gap: 6px;
+  label {
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 3px;
+    transition: background 0.15s;
+    input[type="radio"] { margin-right: 4px; }
+    &:has(input:checked) {
+      background: $accent;
+      color: $paper;
+    }
+    &:hover:not(:has(input:checked)) {
+      background: $cream;
+    }
+  }
+}
+
+// Panneau DVF : graphiques temporels
+.dvf-empty, .dvf-trend-empty {
+  color: $ink-muted;
+  font-style: italic;
+  font-size: 0.85rem;
+  padding: 8px 0;
+}
+.dvf-trend {
+  margin-bottom: 14px;
+  .dvf-trend-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: $ink-soft;
+    margin-bottom: 6px;
+  }
+}
+.dvf-bars {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  height: 100px;
+}
+.dvf-bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: $font-family-monospace;
+  font-size: 0.7rem;
+  color: $ink-soft;
+}
+.dvf-bar-vert {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  background: linear-gradient(to top, lighten($accent, 48%) 0%, lighten($accent, 48%) 100%);
+  border: 1px solid $rule;
+  border-radius: 2px 2px 0 0;
+  overflow: hidden;
+}
+.dvf-bar-fillv {
+  width: 100%;
+  background: $accent;
+  transition: height 200ms ease;
+}
+.dvf-bar-y {
+  margin-top: 3px;
+  font-size: 0.68rem;
+  color: $ink-muted;
+}
+.dvf-bar-val {
+  margin-top: 1px;
+  font-size: 0.72rem;
+  color: $ink;
+  font-weight: 500;
+}
+
+// ============================================================
 // Légende custom (leaflet addControl)
 // ============================================================
 .famille-legend, .leaflet-control.famille-legend {

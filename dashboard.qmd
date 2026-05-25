@@ -31,6 +31,7 @@ suppressPackageStartupMessages({
 
 source(here::here("R", "theme.R"))
 source(here::here("R", "map_helpers.R"))
+source(here::here("R", "dvf_helpers.R"))
 
 # ---- Chargement des contours (Étape 1) ----
 geo_dep_path <- here::here("data", "processed", "geo", "departements.geojson")
@@ -116,6 +117,39 @@ if (elec_ready) {
     ) |>
     dplyr::filter(!is.na(famille_vainqueur))
 }
+
+# ---- DVF (Étape 3) ----
+dvf_path  <- here::here("data", "processed", "dvf", "dvf_aggregated.parquet")
+dvf_ready <- file.exists(dvf_path) && elec_ready
+
+if (dvf_ready) {
+  dvf       <- arrow::read_parquet(dvf_path)
+  dvf_breaks <- compute_dvf_breaks(dvf)
+
+  YEAR_DEFAULT <- max(dvf$annee)
+  TYPE_DEFAULT <- "Appartement"
+
+  dvf_default_year <- dvf |>
+    dplyr::filter(annee == YEAR_DEFAULT, type_local == TYPE_DEFAULT,
+                  !estimation_insuffisante) |>
+    dplyr::select(code_commune, prix_m2_median, n_transactions)
+
+  com_metro_only <- com |>
+    dplyr::filter(!substr(code, 1, 3) %in% DROM_CODES)
+
+  # Lookup JS-friendly : code → type → annee → {pm, n}
+  # Construit côté R en agrégeant en liste imbriquée puis sérialisé en JSON.
+  dvf_nested <- dvf |>
+    dplyr::filter(!estimation_insuffisante) |>
+    dplyr::transmute(
+      code = code_commune,
+      type = type_local,
+      annee,
+      pm = round(prix_m2_median),
+      n  = n_transactions
+    ) |>
+    dplyr::arrange(code, type, annee)
+}
 ```
 
 ```{r}
@@ -163,6 +197,89 @@ if (elec_ready) {
       '    \'</div>\';\n',
       '  var el = document.getElementById("commune-panel");\n',
       '  if (el) el.innerHTML = html;\n',
+      '};\n',
+      '</script>\n',
+      sep = ""
+  )
+}
+```
+
+```{r}
+#| label: inject-dvf-data
+#| results: asis
+#| echo: false
+if (dvf_ready) {
+  # Sérialisation : tableau plat, indexé en JS pour minimiser la taille
+  dvf_json <- jsonlite::toJSON(dvf_nested, auto_unbox = TRUE, na = "null")
+  dvf_breaks_json <- jsonlite::toJSON(dvf_breaks, auto_unbox = FALSE)
+  dvf_palette_js  <- jsonlite::toJSON(.dvf_palette)
+  dvf_na_color_js <- jsonlite::toJSON(.dvf_na_color)
+
+  cat('<script>\n',
+      'window.dvfRaw = ', as.character(dvf_json), ';\n',
+      'window.dvfBreaks = ', as.character(dvf_breaks_json), ';\n',
+      'window.dvfPalette = ', as.character(dvf_palette_js), ';\n',
+      'window.dvfNAColor = ', as.character(dvf_na_color_js), ';\n',
+      '// Indexer : window.dvfData[code][type][annee] = {pm, n}\n',
+      'window.dvfData = {};\n',
+      'window.dvfRaw.forEach(function(r) {\n',
+      '  if (!window.dvfData[r.code]) window.dvfData[r.code] = {};\n',
+      '  if (!window.dvfData[r.code][r.type]) window.dvfData[r.code][r.type] = {};\n',
+      '  window.dvfData[r.code][r.type][r.annee] = { pm: r.pm, n: r.n };\n',
+      '});\n',
+      '// Color picker selon le type et le prix\n',
+      'window.dvfColorFor = function(prix, type) {\n',
+      '  if (prix == null || prix === undefined) return window.dvfNAColor;\n',
+      '  var breaks = window.dvfBreaks[type];\n',
+      '  for (var i = 1; i < 5; i++) { if (prix < breaks[i]) return window.dvfPalette[i-1]; }\n',
+      '  return window.dvfPalette[4];\n',
+      '};\n',
+      '// Re-couleur tous les polygones de la carte DVF\n',
+      'window.dvfRecolor = function(year, type) {\n',
+      '  var map = window.dvfMap;\n',
+      '  if (!map) return;\n',
+      '  map.eachLayer(function(layer) {\n',
+      '    if (!layer.options || !layer.options.layerId) return;\n',
+      '    var code = layer.options.layerId;\n',
+      '    var ent = window.dvfData[code] && window.dvfData[code][type] && window.dvfData[code][type][year];\n',
+      '    var color = window.dvfColorFor(ent && ent.pm, type);\n',
+      '    layer.setStyle({ fillColor: color, fillOpacity: (ent ? 0.85 : 0.30) });\n',
+      '  });\n',
+      '  // Mettre à jour la légende\n',
+      '  var legendTitle = document.querySelector(".dvf-legend .lgd-title");\n',
+      '  if (legendTitle) legendTitle.textContent = "Prix m² · " + type + " · " + year;\n',
+      '};\n',
+      '// Panneau DVF\n',
+      'window.updateDvfPanel = function(code) {\n',
+      '  var el = document.getElementById("dvf-panel");\n',
+      '  if (!el) return;\n',
+      '  var entries = window.dvfData[code];\n',
+      '  var elecInfo = window.communeLookup && window.communeLookup[code];\n',
+      '  var nom = elecInfo ? elecInfo.nom_commune : code;\n',
+      '  var dept = elecInfo ? (elecInfo.libelle_dept + " (" + elecInfo.code_dept + ")") : "";\n',
+      '  if (!entries) {\n',
+      '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Pas de transaction publiée (mono-local, App/Maison) sur 2021-2024.</div>\';\n',
+      '    return;\n',
+      '  }\n',
+      '  var years = [2021,2022,2023,2024];\n',
+      '  function trendBar(type) {\n',
+      '    var ent = entries[type];\n',
+      '    if (!ent) return "<div class=\\"dvf-trend-empty\\">Pas de " + type.toLowerCase() + "</div>";\n',
+      '    var vals = years.map(function(y){return ent[y] ? ent[y].pm : null;});\n',
+      '    var maxV = Math.max.apply(null, vals.filter(function(v){return v!=null;}));\n',
+      '    if (maxV <= 0 || !isFinite(maxV)) return "<div class=\\"dvf-trend-empty\\">Pas de " + type.toLowerCase() + "</div>";\n',
+      '    var bars = years.map(function(y,i){\n',
+      '      var v = vals[i];\n',
+      '      var h = v ? Math.round(v / maxV * 100) : 0;\n',
+      '      var lbl = v ? Math.round(v).toLocaleString("fr-FR") : "—";\n',
+      '      var nb = (ent[y] && ent[y].n) || 0;\n',
+      '      return "<div class=\\"dvf-bar-col\\"><div class=\\"dvf-bar-vert\\"><div class=\\"dvf-bar-fillv\\" style=\\"height:" + h + "%;\\" title=\\"" + lbl + " €/m² · " + nb + " ventes\\"></div></div><div class=\\"dvf-bar-y\\">" + y + "</div><div class=\\"dvf-bar-val\\">" + lbl + "</div></div>";\n',
+      '    }).join("");\n',
+      '    return "<div class=\\"dvf-trend\\"><div class=\\"dvf-trend-label\\">" + type + "</div><div class=\\"dvf-bars\\">" + bars + "</div></div>";\n',
+      '  }\n',
+      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
+      '    \'<div class="cp-section"><h4>Prix m² médian (€) par année</h4>\' +\n',
+      '    trendBar("Appartement") + trendBar("Maison") + \'</div>\';\n',
       '};\n',
       '</script>\n',
       sep = ""
@@ -242,9 +359,97 @@ if (elec_ready) choropleth_drom_inset(com_drom_results, "976") else if (data_rea
 
 # Immobilier
 
-::: {.card}
-**Étape 3 à venir** — agrégation DVF par commune × année (médiane prix m²,
-filtres mono-local, App/Maison, surface > 9 m², bornes prix).
+## Row {height="82%"}
+
+::: {.card title="Prix médian au m² · DVF 2021-2024" width="72%"}
+```{=html}
+<div class="dvf-controls">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Année</span>
+    <div class="dvf-ctrl-radios" id="dvf-year-radios">
+      <label><input type="radio" name="dvf-year" value="2021"> 2021</label>
+      <label><input type="radio" name="dvf-year" value="2022"> 2022</label>
+      <label><input type="radio" name="dvf-year" value="2023"> 2023</label>
+      <label><input type="radio" name="dvf-year" value="2024" checked> 2024</label>
+    </div>
+  </div>
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Bien</span>
+    <div class="dvf-ctrl-radios" id="dvf-type-radios">
+      <label><input type="radio" name="dvf-type" value="Appartement" checked> Appartement</label>
+      <label><input type="radio" name="dvf-type" value="Maison"> Maison</label>
+    </div>
+  </div>
+</div>
+```
+
+```{r}
+#| label: map-dvf
+if (dvf_ready) {
+  m <- choropleth_dvf(com_metro_only, dep_metro, dvf_default_year, dvf_breaks$Appartement)
+  m |>
+    htmlwidgets::onRender(
+      "function(el, x) {
+         window.dvfMap = this;
+         var self = this;
+         // Click sur commune → met à jour le panneau DVF
+         function attach() {
+           self.eachLayer(function(layer) {
+             if (layer.options && layer.options.layerId && !layer._dvfClickOn) {
+               layer._dvfClickOn = true;
+               layer.on('click', function(e) {
+                 if (window.updateDvfPanel) window.updateDvfPanel(e.target.options.layerId);
+               });
+             }
+           });
+         }
+         setTimeout(attach, 60);
+         self.on('layeradd', function() { setTimeout(attach, 0); });
+         // Bind radios → recolor
+         function readSel() {
+           var y = document.querySelector('input[name=dvf-year]:checked');
+           var t = document.querySelector('input[name=dvf-type]:checked');
+           return { year: y ? +y.value : 2024, type: t ? t.value : 'Appartement' };
+         }
+         function updateBreaks() {
+           // Met à jour les seuils dans la légende selon le type courant
+           var sel = readSel();
+           var breaks = window.dvfBreaks[sel.type];
+           var labels = document.querySelectorAll('.dvf-legend .lgd-row .lgd-label');
+           for (var i = 0; i < 5 && i < labels.length; i++) {
+             var lo = Math.round(breaks[i]).toLocaleString('fr-FR');
+             var hi = Math.round(breaks[i+1]).toLocaleString('fr-FR');
+             labels[i].textContent = lo + ' – ' + hi + ' €/m²';
+           }
+         }
+         function onChange() {
+           var sel = readSel();
+           if (window.dvfRecolor) window.dvfRecolor(sel.year, sel.type);
+           updateBreaks();
+         }
+         setTimeout(function() {
+           document.querySelectorAll('input[name=dvf-year], input[name=dvf-type]')
+             .forEach(function(r) { r.addEventListener('change', onChange); });
+         }, 300);
+       }"
+    )
+} else {
+  htmltools::HTML(
+    "<p style='padding:2rem;color:#7A7A7A;'>",
+    "DVF non chargé. Lancer<br><code>Rscript scripts/03_dvf_aggregate.R</code>",
+    "</p>"
+  )
+}
+```
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+<div id="dvf-panel" class="commune-panel">
+  <div class="cp-placeholder">
+    <p><strong>Cliquez sur une commune</strong> pour voir l'évolution de son prix médian au m² entre 2021 et 2024.</p>
+    <p class="cp-hint">Mono-local uniquement (appartements/maisons vendus seuls, sans dépendance). N &lt; 5 ventes/an : valeur non publiée.</p>
+  </div>
+</div>
 :::
 
 # Qualité de l'air
