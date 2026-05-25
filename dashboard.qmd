@@ -1574,18 +1574,19 @@ if (apl_ready) {
 
 ## Row {height="100%"}
 
-::: {.card title="Carte bivariée · 9 classes (terciles X × terciles Y)"}
+::: {.card title="Carte bivariée · choisissez 2 variables · terciles croisés (9 classes)"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
-    <span class="dvf-ctrl-label">Paire</span>
-    <div class="dvf-ctrl-radios" id="biv-pair-radios">
-      <label><input type="radio" name="biv-pair" value="elec_pct_rn × dvf_prix_app" checked> % RN × Prix App</label>
-      <label><input type="radio" name="biv-pair" value="elec_pct_nfp × dvf_prix_app"> % NFP × Prix App</label>
-      <label><input type="radio" name="biv-pair" value="elec_abstention × dvf_prix_app"> Abstention × Prix App</label>
-      <label><input type="radio" name="biv-pair" value="elec_pct_rn × air_pm25"> % RN × PM₂.₅</label>
-      <label><input type="radio" name="biv-pair" value="dvf_prix_app × air_qual"> Prix App × ATMO</label>
-    </div>
+    <span class="dvf-ctrl-label">Axe X</span>
+    <select id="biv-x" class="biv-select"></select>
+  </div>
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Axe Y</span>
+    <select id="biv-y" class="biv-select"></select>
+  </div>
+  <div class="dvf-ctrl-group">
+    <span id="biv-status" class="dvf-ctrl-label" style="font-weight:400;color:#7A7A7A;"></span>
   </div>
 </div>
 <div id="biv-legend" class="biv-legend-container"></div>
@@ -1594,17 +1595,6 @@ if (apl_ready) {
 ```{r}
 #| label: map-bivariate
 if (explorer_ready) {
-  # Carte par défaut : couleur cream uniforme (les couleurs sont injectées
-  # côté JS au chargement et au changement de sélecteur)
-  pretty_pair <- function(p) {
-    gsub("elec_pct_rn","% RN",
-      gsub("elec_pct_nfp","% NFP",
-        gsub("elec_abstention","Abstention",
-          gsub("dvf_prix_app","Prix App",
-            gsub("dvf_prix_mai","Prix Maison",
-              gsub("air_pm25","PM2.5",
-                gsub("air_qual","ATMO", p))))))) }
-
   m <- leaflet::leaflet(
     com_metro_only,
     options = leaflet::leafletOptions(
@@ -1638,18 +1628,10 @@ if (explorer_ready) {
     htmlwidgets::onRender(
       "function(el, x) {
          window.bivMap = this;
-         var self = this;
          setTimeout(function() {
-           if (window.bivApplyDefault) window.bivApplyDefault();
-         }, 60);
-         function onChange() {
-           var sel = document.querySelector('input[name=biv-pair]:checked');
-           if (sel && window.bivApplyPair) window.bivApplyPair(sel.value);
-         }
-         setTimeout(function() {
-           document.querySelectorAll('input[name=biv-pair]')
-             .forEach(function(r) { r.addEventListener('change', onChange); });
-         }, 300);
+           if (window.bivBuildSelectors) window.bivBuildSelectors();
+           if (window.bivRecompute)     window.bivRecompute();
+         }, 200);
        }"
     )
   m
@@ -1662,61 +1644,148 @@ if (explorer_ready) {
 #| results: asis
 #| echo: false
 if (explorer_ready) {
-  # Palette Stevens 3x3
+  # Palette Stevens 3x3 (croisement terciles X × Y)
   biv_palette <- c(
-    "#E8E8E8", "#B0D5DF", "#64ACBE",
-    "#E4ACAC", "#AD9EA5", "#627F8C",
-    "#C85A5A", "#985356", "#574249"
+    "#E8E8E8", "#B0D5DF", "#64ACBE",   # ligne Y1 (bas)
+    "#E4ACAC", "#AD9EA5", "#627F8C",   # ligne Y2
+    "#C85A5A", "#985356", "#574249"    # ligne Y3 (haut)
   )
 
-  # JSON : pour chaque commune, classe par paire
-  biv_lookup <- bivariate |>
-    dplyr::filter(!is.na(classe)) |>
-    dplyr::select(code_commune, pair, classe)
-  biv_json <- jsonlite::toJSON(biv_lookup, auto_unbox = TRUE, na = "null")
-  palette_js <- jsonlite::toJSON(biv_palette)
+  # Variables disponibles dans le merged + libellés humains + groupes
+  biv_vars <- tibble::tribble(
+    ~field,              ~label,                  ~group,
+    "elec_pct_nfp",      "% NFP",                 "Élections",
+    "elec_pct_ens",      "% Ensemble",            "Élections",
+    "elec_pct_rn",       "% RN",                  "Élections",
+    "elec_pct_lr",       "% LR",                  "Élections",
+    "elec_pct_divers",   "% Divers",              "Élections",
+    "elec_abstention",   "Abstention",            "Élections",
+    "elec_marge",        "Marge vainqueur",       "Élections",
+    "dvf_prix_app",      "Prix m² Appartement",   "Immobilier",
+    "dvf_prix_mai",      "Prix m² Maison",        "Immobilier",
+    "air_qual",          "Indice ATMO global",    "Qualité air",
+    "air_no2",           "NO₂",                   "Qualité air",
+    "air_o3",            "O₃",                    "Qualité air",
+    "air_pm10",          "PM₁₀",                  "Qualité air",
+    "air_pm25",          "PM₂.₅",                 "Qualité air",
+    "ctx_log_pop",       "log₁₀(population)",     "Démographie",
+    "ctx_log_inscrits",  "log₁₀(inscrits)",       "Démographie",
+    "revenu_median",     "Revenu médian €",       "Revenus",
+    "revenu_d1",         "1ᵉʳ décile revenu €",   "Revenus",
+    "revenu_d9",         "9ᵉ décile revenu €",    "Revenus",
+    "gini",              "Indice de Gini",        "Revenus",
+    "pct_imposes",       "% ménages imposés",     "Revenus",
+    "part_prestations",  "Part prestations (%)",  "Revenus",
+    "del_total_pour_mille","Délinq. totale ‰",    "Sécurité",
+    "del_cambriolages",  "Cambriolages ‰",        "Sécurité",
+    "del_violences_sex", "Violences sex. ‰",      "Sécurité",
+    "del_vols_pers",     "Vols personnes ‰",      "Sécurité",
+    "del_degradations",  "Dégradations ‰",        "Sécurité",
+    "del_trafic_stup",   "Trafic stup. ‰",        "Sécurité",
+    "fin_recettes",      "Recettes €/hab",        "Finances",
+    "fin_charges",       "Charges €/hab",         "Finances",
+    "fin_dette",         "Dette €/hab",           "Finances",
+    "fin_caf",           "CAF €/hab",             "Finances",
+    "fin_taux_taxe_hab", "Taxe habitation %",     "Finances",
+    "fin_taux_fonc_bati","Foncier bâti %",        "Finances",
+    "apl_medecins",      "APL médecins",          "Santé",
+    "apl_medecins_jeunes","APL médecins ≤65",     "Santé",
+    "defm_taux_pop",     "Chômage ‰",             "Chômage"
+  )
+  # Garde uniquement les colonnes effectivement dans merged
+  biv_vars <- biv_vars[biv_vars$field %in% names(merged), ]
+
+  # Slim data pour le JS : 1 ligne par commune avec valeurs arrondies
+  biv_payload <- merged |>
+    dplyr::select(code = code_commune,
+                  dplyr::any_of(biv_vars$field)) |>
+    dplyr::mutate(dplyr::across(-code,
+                                ~ ifelse(is.na(.) | !is.finite(.), NA_real_,
+                                         round(., 3))))
+
+  biv_data_json <- jsonlite::toJSON(biv_payload, auto_unbox = TRUE, na = "null",
+                                    digits = 3)
+  biv_vars_json <- jsonlite::toJSON(biv_vars, auto_unbox = TRUE)
+  palette_js    <- jsonlite::toJSON(biv_palette)
 
   cat('<script>\n',
-      'window.bivRaw = ', as.character(biv_json), ';\n',
       'window.bivPalette = ', as.character(palette_js), ';\n',
-      'window.bivData = {};\n',
-      'window.bivRaw.forEach(function(r) {\n',
-      '  if (!window.bivData[r.pair]) window.bivData[r.pair] = {};\n',
-      '  window.bivData[r.pair][r.code_commune] = r.classe;\n',
-      '});\n',
-      'window.bivApplyPair = function(pair) {\n',
-      '  var map = window.bivMap;\n',
-      '  if (!map) return;\n',
-      '  var entries = window.bivData[pair] || {};\n',
-      '  map.eachLayer(function(layer) {\n',
-      '    if (!layer.options || !layer.options.layerId) return;\n',
-      '    var code = layer.options.layerId;\n',
-      '    var cl = entries[code];\n',
-      '    if (cl) layer.setStyle({ fillColor: window.bivPalette[cl-1], fillOpacity: 0.85 });\n',
-      '    else layer.setStyle({ fillColor: "#E8E4DC", fillOpacity: 0.20 });\n',
+      'window.bivVarMeta = ', as.character(biv_vars_json), ';\n',
+      'window.bivData    = ', as.character(biv_data_json), ';\n',
+      '\n',
+      '// Construit les 2 dropdowns groupés par thématique\n',
+      'window.bivBuildSelectors = function() {\n',
+      '  var groups = {};\n',
+      '  window.bivVarMeta.forEach(function(v) {\n',
+      '    if (!groups[v.group]) groups[v.group] = [];\n',
+      '    groups[v.group].push(v);\n',
       '  });\n',
-      '  // Légende 3x3\n',
-      '  var legendEl = document.getElementById("biv-legend");\n',
-      '  if (legendEl) {\n',
-      '    var parts = pair.split(" × ");\n',
-      '    var xname = parts[0]; var yname = parts[1];\n',
-      '    var rename = { "elec_pct_rn":"% RN", "elec_pct_nfp":"% NFP", "elec_abstention":"Abstention", "dvf_prix_app":"Prix App", "dvf_prix_mai":"Prix Maison", "air_pm25":"PM₂.₅", "air_qual":"ATMO" };\n',
-      '    var xlbl = rename[xname] || xname;\n',
-      '    var ylbl = rename[yname] || yname;\n',
-      '    var html = "<div class=\\"biv-legend\\"><div class=\\"biv-legend-title\\">Terciles ×</div><div class=\\"biv-grid-wrap\\"><div class=\\"biv-yarrow\\">↑ " + ylbl + "</div><div class=\\"biv-grid\\">";\n',
-      '    for (var by = 3; by >= 1; by--) {\n',
-      '      for (var bx = 1; bx <= 3; bx++) {\n',
-      '        var cl = (by-1)*3 + bx;\n',
-      '        html += "<div class=\\"biv-cell\\" style=\\"background:" + window.bivPalette[cl-1] + "\\"></div>";\n',
-      '      }\n',
-      '    }\n',
-      '    html += "</div></div><div class=\\"biv-xarrow\\">" + xlbl + " →</div></div>";\n',
-      '    legendEl.innerHTML = html;\n',
+      '  function buildSelect(id, defaultField) {\n',
+      '    var sel = document.getElementById(id);\n',
+      '    if (!sel || sel._built) return;\n',
+      '    sel.innerHTML = "";\n',
+      '    Object.keys(groups).forEach(function(g) {\n',
+      '      var og = document.createElement("optgroup"); og.label = g;\n',
+      '      groups[g].forEach(function(v) {\n',
+      '        var o = document.createElement("option"); o.value = v.field; o.textContent = v.label;\n',
+      '        if (v.field === defaultField) o.selected = true;\n',
+      '        og.appendChild(o);\n',
+      '      });\n',
+      '      sel.appendChild(og);\n',
+      '    });\n',
+      '    sel.addEventListener("change", window.bivRecompute);\n',
+      '    sel._built = true;\n',
       '  }\n',
+      '  buildSelect("biv-x", "elec_pct_rn");\n',
+      '  buildSelect("biv-y", "dvf_prix_app");\n',
       '};\n',
-      'window.bivApplyDefault = function() {\n',
-      '  var sel = document.querySelector("input[name=biv-pair]:checked");\n',
-      '  if (sel) window.bivApplyPair(sel.value);\n',
+      '\n',
+      '// Calcule les terciles X et Y et recolore les polygones\n',
+      'window.bivRecompute = function() {\n',
+      '  var xSel = document.getElementById("biv-x");\n',
+      '  var ySel = document.getElementById("biv-y");\n',
+      '  if (!xSel || !ySel || !window.bivMap) return;\n',
+      '  var xVar = xSel.value, yVar = ySel.value;\n',
+      '  if (!xVar || !yVar) return;\n',
+      '  // Sous-ensemble des communes avec X et Y non-NA\n',
+      '  var valid = window.bivData.filter(function(r) { return r[xVar] != null && r[yVar] != null; });\n',
+      '  if (valid.length < 30) {\n',
+      '    document.getElementById("biv-status").textContent = "⚠ Pas assez de communes (" + valid.length + ") pour cette paire";\n',
+      '    return;\n',
+      '  }\n',
+      '  var xs = valid.map(function(r){return r[xVar];}).sort(function(a,b){return a-b;});\n',
+      '  var ys = valid.map(function(r){return r[yVar];}).sort(function(a,b){return a-b;});\n',
+      '  var n  = xs.length;\n',
+      '  var xT1 = xs[Math.floor(n/3)], xT2 = xs[Math.floor(2*n/3)];\n',
+      '  var yT1 = ys[Math.floor(n/3)], yT2 = ys[Math.floor(2*n/3)];\n',
+      '  // Classe par commune\n',
+      '  var classes = {};\n',
+      '  valid.forEach(function(r) {\n',
+      '    var xb = r[xVar] < xT1 ? 1 : (r[xVar] < xT2 ? 2 : 3);\n',
+      '    var yb = r[yVar] < yT1 ? 1 : (r[yVar] < yT2 ? 2 : 3);\n',
+      '    classes[r.code] = (yb - 1) * 3 + xb;\n',
+      '  });\n',
+      '  // Recolore la carte\n',
+      '  window.bivMap.eachLayer(function(layer) {\n',
+      '    if (!layer.options || !layer.options.layerId) return;\n',
+      '    var cl = classes[layer.options.layerId];\n',
+      '    if (cl) layer.setStyle({ fillColor: window.bivPalette[cl-1], fillOpacity: 0.85 });\n',
+      '    else   layer.setStyle({ fillColor: "#E8E4DC", fillOpacity: 0.20 });\n',
+      '  });\n',
+      '  // Status\n',
+      '  document.getElementById("biv-status").textContent = valid.length + " communes croisées sur " + window.bivData.length;\n',
+      '  // Légende\n',
+      '  var xlbl = window.bivVarMeta.find(function(v){return v.field===xVar;}).label;\n',
+      '  var ylbl = window.bivVarMeta.find(function(v){return v.field===yVar;}).label;\n',
+      '  var html = "<div class=\\"biv-legend\\"><div class=\\"biv-legend-title\\">Terciles croisés</div><div class=\\"biv-grid-wrap\\"><div class=\\"biv-yarrow\\">↑ " + ylbl + "</div><div class=\\"biv-grid\\">";\n',
+      '  for (var by = 3; by >= 1; by--) {\n',
+      '    for (var bx = 1; bx <= 3; bx++) {\n',
+      '      var cl = (by-1)*3 + bx;\n',
+      '      html += "<div class=\\"biv-cell\\" style=\\"background:" + window.bivPalette[cl-1] + "\\"></div>";\n',
+      '    }\n',
+      '  }\n',
+      '  html += "</div></div><div class=\\"biv-xarrow\\">" + xlbl + " →</div></div>";\n',
+      '  document.getElementById("biv-legend").innerHTML = html;\n',
       '};\n',
       '</script>\n',
       sep = ""

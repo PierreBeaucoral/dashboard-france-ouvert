@@ -362,6 +362,19 @@ pre.sourceCode {
 // ============================================================
 // Légende bivariate 3x3 (carte bivariée)
 // ============================================================
+.biv-select {
+  font-family: $font-family-sans-serif;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border: 1px solid $rule;
+  border-radius: 3px;
+  background: $paper;
+  color: $ink;
+  cursor: pointer;
+  min-width: 180px;
+  &:focus { outline: 2px solid $accent; outline-offset: -1px; }
+}
+
 .biv-legend-container {
   position: absolute;
   bottom: 16px;
