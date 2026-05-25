@@ -3,18 +3,6 @@
 # Helpers pour les cartes leaflet — carte principale + cartouches DROM
 # ============================================================
 
-# Centre & zoom France métropolitaine
-center_metropole <- list(lng = 2.5, lat = 46.5, zoom = 6)
-
-# Centres / zoom des cartouches DROM (clé = code département INSEE)
-centers_drom <- list(
-  "971" = list(lng = -61.55, lat =  16.25, zoom = 8),   # Guadeloupe
-  "972" = list(lng = -61.02, lat =  14.65, zoom = 9),   # Martinique
-  "973" = list(lng = -53.20, lat =   4.00, zoom = 6),   # Guyane
-  "974" = list(lng =  55.55, lat = -21.10, zoom = 9),   # La Réunion
-  "976" = list(lng =  45.16, lat = -12.83, zoom = 10)   # Mayotte
-)
-
 # Noms longs (utilisés dans les titres de cartes / tooltips)
 drom_long_names <- c(
   "971" = "Guadeloupe",
@@ -23,6 +11,17 @@ drom_long_names <- c(
   "974" = "La Réunion",
   "976" = "Mayotte"
 )
+
+# Helper interne : fit bounds depuis un objet sf, avec padding en pixels
+.fit_to_sf <- function(map, sf_obj, padding = c(10, 10)) {
+  bb <- sf::st_bbox(sf_obj)
+  leaflet::fitBounds(
+    map,
+    lng1 = unname(bb["xmin"]), lat1 = unname(bb["ymin"]),
+    lng2 = unname(bb["xmax"]), lat2 = unname(bb["ymax"]),
+    options = list(padding = padding)
+  )
+}
 
 # ---- Carte principale (métropole) ---------------------------
 
@@ -35,26 +34,21 @@ drom_long_names <- c(
 #' @param height  Hauteur CSS de la carte.
 #' @param style   Liste optionnelle de paramètres de style.
 base_map_metropole <- function(sf_data,
-                               height = "100%",
                                fill   = "#E8E4DC",
                                border = "#4A4A4A") {
+  # Pas de width/height : on laisse htmlwidgets + Quarto Dashboard
+  # remplir la card automatiquement.
   leaflet::leaflet(
     sf_data,
-    width  = "100%",
-    height = height,
     options = leaflet::leafletOptions(
       zoomControl        = TRUE,
       attributionControl = FALSE,
-      minZoom            = 5,
+      minZoom            = 4,
       maxZoom            = 11,
       worldCopyJump      = FALSE
     )
   ) |>
-    leaflet::setView(
-      lng  = center_metropole$lng,
-      lat  = center_metropole$lat,
-      zoom = center_metropole$zoom
-    ) |>
+    .fit_to_sf(sf_data, padding = c(20, 20)) |>
     leaflet::addPolygons(
       fillColor    = fill,
       fillOpacity  = 0.9,
@@ -96,16 +90,13 @@ base_map_metropole <- function(sf_data,
 #' @param sf_data    `sf` de TOUS les DROM (filtrage interne).
 #' @param drom_code  Code INSEE du DROM ("971", "972", "973", "974", "976").
 #' @param height     Hauteur CSS.
-drom_inset <- function(sf_data, drom_code, height = "100%") {
-  stopifnot(drom_code %in% names(centers_drom))
+drom_inset <- function(sf_data, drom_code) {
+  stopifnot(drom_code %in% names(drom_long_names))
 
   one_drom <- sf_data[sf_data$code == drom_code, ]
-  center   <- centers_drom[[drom_code]]
 
   leaflet::leaflet(
     one_drom,
-    width  = "100%",
-    height = height,
     options = leaflet::leafletOptions(
       zoomControl        = FALSE,
       attributionControl = FALSE,
@@ -117,11 +108,7 @@ drom_inset <- function(sf_data, drom_code, height = "100%") {
       keyboard           = FALSE
     )
   ) |>
-    leaflet::setView(
-      lng  = center$lng,
-      lat  = center$lat,
-      zoom = center$zoom
-    ) |>
+    .fit_to_sf(one_drom, padding = c(8, 8)) |>
     leaflet::addPolygons(
       fillColor    = "#E8E4DC",
       fillOpacity  = 0.9,

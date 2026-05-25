@@ -44,9 +44,9 @@ if (file.exists(geo_path)) {
 
 # Élections
 
-## Row {height="78%"}
+## Row {height="82%"}
 
-::: {.card title="Carte · France · Législatives 2024 · 2nd tour"}
+::: {.card title="France · Législatives 2024 · 2nd tour"}
 ```{r}
 #| label: map-metropole
 if (data_ready) {
@@ -60,14 +60,9 @@ if (data_ready) {
   )
 }
 ```
-
-::: {.callout-note appearance="minimal"}
-*Étape 1 — squelette carte.* Les contours départementaux sont en place.
-La couche communale et le choroplèthe Législatives 2024 arrivent en Étape 2.
-:::
 :::
 
-## Row {height="22%" .fill}
+## Row {height="18%" .fill}
 
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
