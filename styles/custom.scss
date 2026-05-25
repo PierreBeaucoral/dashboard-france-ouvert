@@ -177,6 +177,41 @@ pre.sourceCode {
 }
 
 // ============================================================
+// Légende custom (leaflet addControl)
+// ============================================================
+.famille-legend, .leaflet-control.famille-legend {
+  background: $paper;
+  border: 1px solid $rule;
+  border-radius: 4px;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  font-family: $font-family-sans-serif;
+  .lgd-box { padding: 10px 12px; }
+  .lgd-title {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: $ink-soft;
+    margin-bottom: 6px;
+  }
+  .lgd-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 3px 0;
+    font-size: 0.82rem;
+    color: $ink;
+  }
+  .lgd-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    flex: 0 0 auto;
+  }
+}
+
+// ============================================================
 // Méthodo / avertissement
 // ============================================================
 .callout-warning, .callout-note {

@@ -32,8 +32,30 @@ appliqué en amont (script `scripts/`).
 
 ## Contours administratifs — communes
 
-À documenter en Étape 2 — téléchargement effectif au moment où on a besoin du
-choroplèthe communal pour les Législatives.
+- **URL métropole** : `https://france-geojson.gregoiredavid.fr/repo/communes.geojson` (~23 MB)
+- **URLs DROM** : `https://france-geojson.gregoiredavid.fr/repo/departements/{code}-{name}/communes-{code}-{name}.geojson`
+- **Format** : GeoJSON, EPSG:4326
+- **Source upstream** : IGN / OpenStreetMap
+- **Snapshot** : 2026-05-25
+- **Traitement** : simplification Visvalingam-Whyatt `keep = 0.04` →
+  35 927 polygones, ~16 MB (vs 23 MB en entrée).
+- **Script** : `scripts/01_geo_boundaries.R` (partie 2)
+
+## Élections — Législatives 2024, 2nd tour, par commune
+
+- **Dataset** : *Elections législatives des 30 juin et 7 juillet 2024 - Résultats
+  définitifs du 2nd tour* — Ministère de l'Intérieur.
+- **Page dataset** : <https://www.data.gouv.fr/fr/datasets/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-provisoires-du-2nd-tour/>
+- **Ressource utilisée** : `resultats-definitifs-par-commune.csv` (11.6 MB)
+- **URL stable** : `https://static.data.gouv.fr/resources/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-definitifs-du-2nd-tour/20240710-170606/resultats-definitifs-par-commune.csv`
+- **Format** : CSV ; séparateur `;` ; décimales `,` ; encodage UTF-8.
+- **Structure** : *wide* — 1 ligne / commune, blocs de colonnes par candidat
+  (`Nuance candidat N`, `Nom candidat N`, `Voix N`, `% Voix/exprimés N`, `Elu N`,
+  pour `N = 1…25`).
+- **Couverture** : 31 392 communes au T2 (les ~4 500 communes manquantes
+  appartiennent à des circonscriptions où un candidat a été élu au 1er tour).
+- **Snapshot** : 2026-05-25 ; dernière maj data.gouv : 2024-07-10.
+- **Script** : `scripts/02_elections.R`
 
 ## Élections — Législatives 2024, 2nd tour
 

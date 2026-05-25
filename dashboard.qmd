@@ -22,23 +22,47 @@ suppressPackageStartupMessages({
   library(leaflet)
   library(sf)
   library(dplyr)
+  library(arrow)
   library(htmltools)
+  library(here)
 })
 
 source(here::here("R", "theme.R"))
 source(here::here("R", "map_helpers.R"))
 
 # ---- Chargement des contours (Étape 1) ----
-geo_path <- here::here("data", "processed", "geo", "departements.geojson")
+geo_dep_path <- here::here("data", "processed", "geo", "departements.geojson")
+geo_com_path <- here::here("data", "processed", "geo", "communes.geojson")
+elec_path    <- here::here("data", "processed", "elections",
+                           "legislatives_2024_t2.parquet")
 
-if (file.exists(geo_path)) {
-  dep <- sf::read_sf(geo_path, quiet = TRUE) |>
-    mutate(is_drom = code %in% c("971", "972", "973", "974", "976"))
+DROM_CODES <- c("971", "972", "973", "974", "976")
+
+data_ready <- file.exists(geo_dep_path)
+
+if (data_ready) {
+  dep <- sf::read_sf(geo_dep_path, quiet = TRUE) |>
+    mutate(is_drom = code %in% DROM_CODES)
   dep_metro <- dep |> filter(!is_drom)
   dep_drom  <- dep |> filter( is_drom)
-  data_ready <- TRUE
-} else {
-  data_ready <- FALSE
+}
+
+# ---- Chargement résultats Législatives (Étape 2) ----
+elec_ready <- file.exists(geo_com_path) && file.exists(elec_path)
+
+if (elec_ready) {
+  com  <- sf::read_sf(geo_com_path, quiet = TRUE)
+  elec <- arrow::read_parquet(elec_path)
+
+  # Join communes (sf) × résultats (df) sur code INSEE
+  com_results <- com |>
+    left_join(elec, by = c("code" = "code_insee"))
+
+  com_metro_results <- com_results |>
+    filter(!substr(code, 1, 3) %in% DROM_CODES)
+
+  com_drom_results <- com_results |>
+    filter( substr(code, 1, 3) %in% DROM_CODES)
 }
 ```
 
@@ -46,16 +70,19 @@ if (file.exists(geo_path)) {
 
 ## Row {height="82%"}
 
-::: {.card title="France · Législatives 2024 · 2nd tour"}
+::: {.card title="France · Législatives 2024 · 2nd tour · famille gagnante par commune"}
 ```{r}
 #| label: map-metropole
-if (data_ready) {
+if (elec_ready) {
+  choropleth_metropole(com_metro_results, dep_metro)
+} else if (data_ready) {
   base_map_metropole(dep_metro)
 } else {
   htmltools::HTML(
     "<p style='padding:2rem;color:#7A7A7A;'>",
-    "Données géographiques manquantes. ",
-    "Lancer <code>Rscript scripts/01_geo_boundaries.R</code>.",
+    "Données manquantes. Lancer<br>",
+    "<code>Rscript scripts/01_geo_boundaries.R</code><br>",
+    "<code>Rscript scripts/02_elections.R</code>",
     "</p>"
   )
 }
@@ -67,35 +94,35 @@ if (data_ready) {
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
 #| label: drom-971
-if (data_ready) drom_inset(dep_drom, "971")
+if (elec_ready) choropleth_drom_inset(com_drom_results, "971") else if (data_ready) drom_inset(dep_drom, "971")
 ```
 :::
 
 ::: {.card title="Martinique (972)"}
 ```{r}
 #| label: drom-972
-if (data_ready) drom_inset(dep_drom, "972")
+if (elec_ready) choropleth_drom_inset(com_drom_results, "972") else if (data_ready) drom_inset(dep_drom, "972")
 ```
 :::
 
 ::: {.card title="Guyane (973)"}
 ```{r}
 #| label: drom-973
-if (data_ready) drom_inset(dep_drom, "973")
+if (elec_ready) choropleth_drom_inset(com_drom_results, "973") else if (data_ready) drom_inset(dep_drom, "973")
 ```
 :::
 
 ::: {.card title="La Réunion (974)"}
 ```{r}
 #| label: drom-974
-if (data_ready) drom_inset(dep_drom, "974")
+if (elec_ready) choropleth_drom_inset(com_drom_results, "974") else if (data_ready) drom_inset(dep_drom, "974")
 ```
 :::
 
 ::: {.card title="Mayotte (976)"}
 ```{r}
 #| label: drom-976
-if (data_ready) drom_inset(dep_drom, "976")
+if (elec_ready) choropleth_drom_inset(com_drom_results, "976") else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::
 

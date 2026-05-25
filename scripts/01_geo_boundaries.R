@@ -22,7 +22,8 @@ suppressPackageStartupMessages({
 DROM_CODES <- c("971", "972", "973", "974", "976")
 
 # Compromis poids/qualité pour la simplification (Visvalingam-Whyatt)
-KEEP_DEPARTEMENTS <- 0.20   # ~96 polygones, simplification douce
+KEEP_DEPARTEMENTS <- 0.20   # ~101 polygones, simplification douce
+KEEP_COMMUNES     <- 0.04   # ~35 000 polygones, simplification agressive
 
 # ---- Chemins ----
 
@@ -165,8 +166,81 @@ cat(glue::glue("
 
 "))
 
-# ---- Note : communes ----
-# Les contours communaux (~35 000 polygones) seront téléchargés en Étape 2,
-# juste avant qu'on en ait besoin pour le choroplèthe Législatives.
-# Source pressentie : geo.api.gouv.fr/communes (avec fields=contour) ou
-# IGN ADMIN-EXPRESS (Shapefile, plus lourd). À trancher après inspection.
+# ============================================================
+# Partie 2 — Contours communaux (pour le choroplèthe Étape 2)
+#
+# Source : même dépôt gregoiredavid (métropole en un fichier, DROM en
+# 5 fichiers séparés à fusionner). Simplification agressive
+# (keep = 0.04) parce qu'on embarque 35 000 polygones dans la page.
+# ============================================================
+
+# 1) Métropole
+url_com_metro <- file.path(base_url, "communes.geojson")
+metro_com_path <- file.path(raw_dir, "communes_metropole.geojson")
+message("\n→ Téléchargement communes métropole (~23 MB)")
+download_if_missing(url_com_metro, metro_com_path, min_bytes = 1e7)
+
+# 2) DROM : pour chaque département, un fichier `communes-<code>-<name>.geojson`
+message("→ Téléchargement communes DROM")
+drom_com_paths <- character()
+for (code in names(drom_files)) {
+  slug <- drom_files[[code]]$slug
+  url  <- file.path(base_url, "departements", slug,
+                    sprintf("communes-%s.geojson", slug))
+  dest <- file.path(raw_dir, sprintf("communes_%s.geojson", code))
+  download_if_missing(url, dest, min_bytes = 5000L)
+  drom_com_paths[code] <- dest
+}
+
+# 3) Lecture
+message("  Lecture métropole…")
+com_metro <- sf::read_sf(metro_com_path)
+
+message("  Lecture DROM…")
+com_drom_list <- lapply(names(drom_com_paths), function(code) {
+  sf::read_sf(drom_com_paths[[code]])
+})
+
+# Harmoniser les colonnes (chaque fichier expose au minimum nom + code)
+keep_cols <- function(x) {
+  cols <- intersect(c("nom", "code"), names(x))
+  x[, cols, drop = FALSE]
+}
+com_metro <- keep_cols(com_metro)
+com_drom_list <- lapply(com_drom_list, keep_cols)
+com_drom <- do.call(rbind, com_drom_list)
+
+# Fusion
+com_raw <- rbind(com_metro, com_drom) |>
+  mutate(
+    is_drom = substr(code, 1, 3) %in% DROM_CODES,
+    nom     = as.character(nom),
+    code    = as.character(code)
+  )
+
+# Reprojection WGS84 si besoin
+if (sf::st_crs(com_raw)$epsg != 4326L) {
+  com_raw <- sf::st_transform(com_raw, 4326L)
+}
+
+message(glue::glue("Communes totales : {nrow(com_raw)} (dont {sum(com_raw$is_drom)} DROM)"))
+
+# 4) Simplification agressive (le poids final compte pour l'embed leaflet)
+message(glue::glue("Simplification communes (keep = {KEEP_COMMUNES})…"))
+com_simpl <- rmapshaper::ms_simplify(
+  com_raw,
+  keep        = KEEP_COMMUNES,
+  keep_shapes = TRUE,
+  method      = "vis"
+)
+
+# 5) Écriture
+com_out <- file.path(out_dir, "communes.geojson")
+sf::write_sf(com_simpl, com_out, delete_dsn = TRUE, quiet = TRUE)
+
+cat(glue::glue("
+
+  ✔ Communes : {nrow(com_simpl)} entités → {com_out} ({size_kb(com_out)} KB)
+    (dont {sum(com_simpl$is_drom)} DROM)
+
+"))

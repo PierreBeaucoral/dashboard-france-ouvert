@@ -40,6 +40,20 @@ gagnante** (couleur) avec **opacité proportionnelle à la marge**.
 multipartisme (NFP, ENS, RN, LR+UDR, divers) se rend bien par couleur catégorielle.
 L'opacité ajoute une information continue (force de la victoire) sans surcharger.
 
+### Mapping nuance MI → famille politique
+
+Nuances officielles du Ministère de l'Intérieur regroupées en 5 familles :
+
+| Famille | Nuances MI incluses | Justification |
+|---|---|---|
+| **NFP** | UG, FI, SOC, COM, VEC | UG = "Union de la Gauche" = étiquette NFP officielle au T2. Les dissidents FI/SOC/COM/VEC (rares, < 20 cas) restent dans la même famille politique. |
+| **ENS** | ENS, HOR | Ensemble = Renaissance+MoDem ; Horizons (É. Philippe) est allié officiel d'Ensemble. |
+| **LR** | LR, UDI, UDR | LR + UDI (centre-droit allié) + UDR (Union des Droites Républicaines). |
+| **RN** | RN, UXD, EXD | RN + UXD (alliance Ciotti-RN au T1) + EXD (extrême-droite hors RN, ex-Reconquête). |
+| **Divers** | DVD, DVG, DVC, DSV, REG, ECO, EXG, DIV | Étiquettes locales / régionales / dissidents non clairement affiliés. |
+
+Réf : codes nuances du Ministère, snapshot 2026-05-25.
+
 ## 2026-05-25 — Filtres DVF
 
 **Règle.** Pour le calcul du prix médian au m² par commune et par année :

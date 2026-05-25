@@ -90,6 +90,166 @@ base_map_metropole <- function(sf_data,
 #' @param sf_data    `sf` de TOUS les DROM (filtrage interne).
 #' @param drom_code  Code INSEE du DROM ("971", "972", "973", "974", "976").
 #' @param height     Hauteur CSS.
+# ---- Palette politique (familles) --------------------------
+
+# Palette nommée pour les 5 familles + NA.
+# Synchronisée avec R/theme.R::palette_pol.
+.famille_colors <- c(
+  "NFP"    = "#C73659",
+  "ENS"    = "#E6B800",
+  "RN"     = "#1B3A57",
+  "LR"     = "#4A90D9",
+  "Divers" = "#8A8A8A"
+)
+
+#' Mappeur famille → couleur (factor → color via leaflet::colorFactor).
+famille_palette <- leaflet::colorFactor(
+  palette  = unname(.famille_colors),
+  levels   = names(.famille_colors),
+  na.color = "#E8E4DC"
+)
+
+# ---- Choroplèthe (commune × famille politique) -------------
+
+#' Choroplèthe principal métropole — communes colorées par famille gagnante,
+#' contours départementaux en sur-couche pour la lisibilité.
+#'
+#' @param com_sf `sf` des communes (métropole), avec colonnes `code`, `nom`,
+#'   `famille_vainqueur`, `nuance_vainqueur`, `pct_vainqueur`, `marge_vainqueur`.
+#' @param dep_sf `sf` des départements (métropole) — sur-couche fine.
+choropleth_metropole <- function(com_sf, dep_sf) {
+  # Tooltip HTML par commune
+  tooltips <- sprintf(
+    "<div style='font-family:Inter,sans-serif;'>
+       <strong>%s</strong> <span style='color:#7A7A7A;'>(%s)</span><br>
+       <span style='font-family:IBM Plex Mono,monospace;'>%s</span> — %s%%<br>
+       <span style='color:#7A7A7A;font-size:0.85em;'>Abstention : %s%%</span>
+     </div>",
+    htmltools::htmlEscape(com_sf$nom),
+    com_sf$code,
+    ifelse(is.na(com_sf$nuance_vainqueur), "—", com_sf$nuance_vainqueur),
+    ifelse(is.na(com_sf$pct_vainqueur), "—",
+           format(round(com_sf$pct_vainqueur, 1), nsmall = 1)),
+    ifelse(is.na(com_sf$pct_abstention), "—",
+           format(round(com_sf$pct_abstention, 1), nsmall = 1))
+  ) |> lapply(htmltools::HTML)
+
+  # Opacité graduée par marge (faible marge = couleur plus pâle)
+  opacity <- ifelse(
+    is.na(com_sf$marge_vainqueur),
+    0.30,
+    pmin(0.92, 0.45 + (com_sf$marge_vainqueur / 100) * 1.1)
+  )
+
+  leaflet::leaflet(
+    com_sf,
+    options = leaflet::leafletOptions(
+      preferCanvas       = TRUE,   # canvas = perfs avec ~30k polygones
+      zoomControl        = TRUE,
+      attributionControl = FALSE,
+      minZoom            = 4,
+      maxZoom            = 12,
+      worldCopyJump      = FALSE
+    )
+  ) |>
+    .fit_to_sf(com_sf, padding = c(20, 20)) |>
+    # Couche communes (choroplèthe)
+    leaflet::addPolygons(
+      data         = com_sf,
+      fillColor    = ~famille_palette(famille_vainqueur),
+      fillOpacity  = opacity,
+      color        = "#FFFFFF",
+      weight       = 0.1,
+      opacity      = 0.4,
+      smoothFactor = 0.4,
+      label        = tooltips,
+      labelOptions = leaflet::labelOptions(
+        style = list(
+          "padding"    = "6px 10px",
+          "background" = "#FFFFFF",
+          "border"     = "1px solid #DCD8CF",
+          "box-shadow" = "0 2px 6px rgba(0,0,0,0.06)"
+        ),
+        direction = "auto",
+        offset    = c(8, 0)
+      ),
+      highlightOptions = leaflet::highlightOptions(
+        weight       = 1.6,
+        color        = "#1A1A1A",
+        bringToFront = TRUE
+      )
+    ) |>
+    # Couche départements (sur-couche pour structure visuelle)
+    leaflet::addPolygons(
+      data         = dep_sf,
+      fill         = FALSE,
+      color        = "#1A1A1A",
+      weight       = 0.6,
+      opacity      = 0.55,
+      smoothFactor = 0.4,
+      options      = leaflet::pathOptions(interactive = FALSE)
+    ) |>
+    # Légende custom (addControl, mieux stylable que addLegend)
+    leaflet::addControl(
+      html     = .famille_legend_html(),
+      position = "bottomright",
+      className = "famille-legend"
+    )
+}
+
+#' Légende HTML des familles politiques (utilisée par addControl).
+.famille_legend_html <- function() {
+  labels <- c(
+    "NFP" = "NFP (UG, FI, SOC)",
+    "ENS" = "Ensemble (ENS + HOR)",
+    "RN"  = "RN / UXD / EXD",
+    "LR"  = "LR / UDI",
+    "Divers" = "Divers (DV*, REG, ECO)"
+  )
+  rows <- paste0(
+    "<div class='lgd-row'>",
+    "<span class='lgd-swatch' style='background:", .famille_colors, ";'></span>",
+    "<span class='lgd-label'>", labels[names(.famille_colors)], "</span>",
+    "</div>",
+    collapse = ""
+  )
+  htmltools::HTML(paste0(
+    "<div class='lgd-box'>",
+    "<div class='lgd-title'>Famille gagnante · T2</div>",
+    rows,
+    "</div>"
+  ))
+}
+
+#' Cartouche DROM avec choroplèthe communal.
+choropleth_drom_inset <- function(com_drom_sf, drom_code) {
+  stopifnot(drom_code %in% names(drom_long_names))
+  one <- com_drom_sf[substr(com_drom_sf$code, 1, 3) == drom_code, ]
+
+  leaflet::leaflet(
+    one,
+    options = leaflet::leafletOptions(
+      preferCanvas       = TRUE,
+      zoomControl        = FALSE,
+      attributionControl = FALSE,
+      dragging           = FALSE,
+      scrollWheelZoom    = FALSE,
+      doubleClickZoom    = FALSE,
+      boxZoom            = FALSE,
+      touchZoom          = FALSE,
+      keyboard           = FALSE
+    )
+  ) |>
+    .fit_to_sf(one, padding = c(6, 6)) |>
+    leaflet::addPolygons(
+      fillColor    = ~famille_palette(famille_vainqueur),
+      fillOpacity  = 0.75,
+      color        = "#FFFFFF",
+      weight       = 0.3,
+      smoothFactor = 0.3
+    )
+}
+
 drom_inset <- function(sf_data, drom_code) {
   stopifnot(drom_code %in% names(drom_long_names))
 

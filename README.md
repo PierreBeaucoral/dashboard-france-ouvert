@@ -38,7 +38,7 @@ Le site rendu est dans `_site/`.
 
 - [x] **Étape 0 — Setup** : structure projet, thème, scaffolding
 - [x] **Étape 1 — Squelette carte** : contours départements (101 entités, simplifiés à 299 KB), 5 cartouches DROM, navigation cliquable
-- [ ] **Étape 2 — Législatives 2024** : choroplèthe + panneau bout-en-bout
+- [x] **Étape 2 — Législatives 2024** : choroplèthe communal par famille gagnante (NFP/ENS/LR/RN/Divers) sur 31 392 communes T2, tooltip riche, légende, rendu canvas pour les perfs
 - [ ] **Étape 3 — DVF** : agrégation + slider temporel
 - [ ] **Étape 4 — Qualité de l'air** : stations + rattachement commune
 - [ ] **Étape 5 — Mode bivarié** : choroplèthe 3×3 sur la carte principale
