@@ -121,7 +121,7 @@ base_map_metropole <- function(sf_data,
         ),
         direction = "auto"
       ),
-      layerId = ~code
+      layerId = sf_data$code     # vecteur explicite (cf. choropleth_metropole)
     ) |>
     .add_resize_handler()
 }
@@ -222,7 +222,10 @@ choropleth_metropole <- function(com_sf, dep_sf) {
         weight       = 1.6,
         color        = "#1A1A1A",
         bringToFront = TRUE
-      )
+      ),
+      layerId = com_sf$code      # vecteur explicite (la formule ~code
+                                  # ne se résout pas correctement après
+                                  # left_join sur un objet sf)
     ) |>
     # Couche départements (sur-couche pour structure visuelle)
     leaflet::addPolygons(

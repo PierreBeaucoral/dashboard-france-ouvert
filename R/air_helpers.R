@@ -84,7 +84,7 @@ choropleth_atmo <- function(com_sf, dep_sf, atmo_df, indice_col = "qual_indice",
         color        = "#1A1A1A",
         bringToFront = TRUE
       ),
-      layerId = ~code
+      layerId = joined$code      # vecteur explicite (cf. choropleth_metropole)
     ) |>
     leaflet::addPolygons(
       data         = dep_sf,

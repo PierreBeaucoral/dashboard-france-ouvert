@@ -531,24 +531,20 @@ if (elec_ready) {
       "function(el, x) {
          window.elecMap = this;
          var self = this;
-         var attached = 0;
          function attach() {
            self.eachLayer(function(layer) {
              if (layer.options && layer.options.layerId && !layer._cpClickOn) {
                layer._cpClickOn = true;
-               attached++;
                layer.on('click', function(e) {
-                 var code = (e.target && e.target.options) ? e.target.options.layerId : null;
-                 console.log('[ELEC click]', code, e.target);
-                 if (code && window.updateCommunePanel) window.updateCommunePanel(code);
+                 if (window.updateCommunePanel) window.updateCommunePanel(e.target.options.layerId);
                });
              }
            });
          }
-         self._cpReattach = function() { attach(); console.log('[ELEC] attached total=', attached); };
+         self._cpReattach = attach;
          setTimeout(attach, 60);
-         setTimeout(self._cpReattach, 500);
-         setTimeout(self._cpReattach, 2000);
+         setTimeout(attach, 500);
+         setTimeout(attach, 2000);
          self.on('layeradd', function() { setTimeout(attach, 0); });
        }"
     )
@@ -849,7 +845,7 @@ if (explorer_ready) {
       weight       = 0.1,
       opacity      = 0.4,
       smoothFactor = 0.4,
-      layerId      = ~code
+      layerId      = com_metro_only$code
     ) |>
     leaflet::addPolygons(
       data         = dep_metro,
