@@ -83,6 +83,34 @@ if (apl_ready) {
       '    layer.setStyle({ fillColor: window.santeColorFor(v, field), fillOpacity: (v != null ? 0.85 : 0.25) });\n',
       '  });\n',
       '};\n',
+      '// Légende dynamique : titre, format, unité changent selon l\\u0027indicateur.\n',
+      'window.santeLegendMeta = {\n',
+      "  apl_medecins:        { title: 'APL médecins · seuil désert 2,5', unit: '', fmt: function(x){return Number(x).toFixed(2).replace('.', ',');} },\n",
+      "  apl_medecins_jeunes: { title: 'APL méd. ≤65 ans · seuil 2,5',     unit: '', fmt: function(x){return Number(x).toFixed(2).replace('.', ',');} },\n",
+      "  apl_infirmieres:     { title: 'APL infirmières · ETP/100k hab',   unit: '', fmt: function(x){return Number(x).toFixed(0);} },\n",
+      "  apl_sagefemmes:      { title: 'APL sages-femmes · ETP/100k hab',  unit: '', fmt: function(x){return Number(x).toFixed(0);} },\n",
+      "  apl_dentistes:       { title: 'APL dentistes · ETP/100k hab',     unit: '', fmt: function(x){return Number(x).toFixed(0);} },\n",
+      "  apl_kines:           { title: 'APL kinés · ETP/100k hab',         unit: '', fmt: function(x){return Number(x).toFixed(0);} },\n",
+      "  esperance_vie:       { title: 'Espérance de vie · années',        unit: ' ans', fmt: function(x){return Number(x).toFixed(1).replace('.', ',');} }\n",
+      '};\n',
+      'window.santeBuildLegend = function(field) {\n',
+      '  var meta = window.santeLegendMeta[field];\n',
+      '  var br = window.santeBreaks[field];\n',
+      '  if (!meta || !br) return;\n',
+      "  var rows = '';\n",
+      '  for (var i = 0; i < 5; i++) {\n',
+      "    var lab = meta.fmt(br[i]) + ' – ' + meta.fmt(br[i+1]) + meta.unit;\n",
+      "    rows += '<div class=\"lgd-row\"><span class=\"lgd-swatch\" style=\"background:' + window.santePalette[i] + ';\"></span><span class=\"lgd-label\">' + lab + '</span><span class=\"lgd-hex\">' + window.santePalette[i].toUpperCase() + '</span></div>';\n",
+      '  }\n',
+      "  rows += '<div class=\"lgd-row\" style=\"margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;\"><span class=\"lgd-swatch\" style=\"background:#E8E4DC;\"></span><span class=\"lgd-label\" style=\"color:#7A7A7A;\">Non publié</span><span class=\"lgd-hex\">#E8E4DC</span></div>';\n",
+      "  return '<div class=\"lgd-box\"><div class=\"lgd-title\">' + meta.title + '</div>' + rows + '</div>';\n",
+      '};\n',
+      'window.santeSwapLegend = function(field) {\n',
+      "  var ctrl = document.querySelector('.socio-legend');\n",
+      '  if (!ctrl) return;\n',
+      '  var html = window.santeBuildLegend(field);\n',
+      '  if (html) ctrl.innerHTML = html;\n',
+      '};\n',
       'window.updateSantePanel = function(code) {\n',
       '  var el = document.getElementById("sante-content");\n',
       '  if (!el) return;\n',
@@ -183,6 +211,7 @@ if (apl_ready) {
          function onChange() {
            var sel = document.querySelector('input[name=sante-ind]:checked');
            if (sel && window.santeRecolor) window.santeRecolor(sel.value);
+           if (sel && window.santeSwapLegend) window.santeSwapLegend(sel.value);
          }
          setTimeout(function() {
            document.querySelectorAll('input[name=sante-ind]').forEach(function(r) {
@@ -211,6 +240,49 @@ if (apl_ready) {
     APL médecins en c/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab. EV en années, médiane nationale ~83.
   </div>
 </div>
+```
+:::
+
+## Row {height="18%" .fill}
+
+```{r}
+#| label: drom-sante-prep
+#| include: false
+if (apl_ready) {
+  sante_drom_vals <- apl_data |>
+    dplyr::transmute(code_commune, value = apl_medecins)
+  # Palette divergente APL : seuil désert médical à 2.5.
+  .sante_drom_palette <- c("#7A2424", "#D49687", "#F5F2EC", "#94B091", "#2F5145")
+}
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (apl_ready) choropleth_drom_socio_inset(com_drom_only, "971", sante_drom_vals, palette = .sante_drom_palette, breaks = c(0, 1.5, 2.5, 3.5, 5, 50)) else if (data_ready) drom_inset(dep_drom, "971")
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (apl_ready) choropleth_drom_socio_inset(com_drom_only, "972", sante_drom_vals, palette = .sante_drom_palette, breaks = c(0, 1.5, 2.5, 3.5, 5, 50)) else if (data_ready) drom_inset(dep_drom, "972")
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (apl_ready) choropleth_drom_socio_inset(com_drom_only, "973", sante_drom_vals, palette = .sante_drom_palette, breaks = c(0, 1.5, 2.5, 3.5, 5, 50)) else if (data_ready) drom_inset(dep_drom, "973")
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (apl_ready) choropleth_drom_socio_inset(com_drom_only, "974", sante_drom_vals, palette = .sante_drom_palette, breaks = c(0, 1.5, 2.5, 3.5, 5, 50)) else if (data_ready) drom_inset(dep_drom, "974")
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (apl_ready) choropleth_drom_socio_inset(com_drom_only, "976", sante_drom_vals, palette = .sante_drom_palette, breaks = c(0, 1.5, 2.5, 3.5, 5, 50)) else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::
 

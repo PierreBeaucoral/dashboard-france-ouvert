@@ -33,12 +33,24 @@ website:
             text: Santé
           - href: pages/revenus.qmd
             text: Revenus
+          - href: pages/demographie.qmd
+            text: Démographie & social
+          - href: pages/energie.qmd
+            text: Énergie · carbone
+          - href: pages/mobilite.qmd
+            text: Mobilité
+          - href: pages/agriculture.qmd
+            text: Agriculture bio
       - text: Analyse
         menu:
           - href: pages/bivariate.qmd
             text: Carte bivariée
           - href: pages/explorer.qmd
             text: Explorer · corrélations
+          - href: pages/profil.qmd
+            text: Profil commune · radar 8D
+          - href: pages/departements.qmd
+            text: Départements · small multiples
       - text: Méthodologie
         menu:
           - href: docs/data-sources.qmd

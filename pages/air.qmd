@@ -179,9 +179,53 @@ if (atmo_ready) {
   </div>
   <div class="cp-source">
     <strong>Source</strong> · Atmo France · agrégation 30 jours.<br>
-    Indice ATMO 1 (Bon) → 6 (Extrême mauvais), 5 polluants. EPCI expandés (Bretagne, Occitanie, PdL).
+    Indice ATMO 1 (Bon) → 6 (Extrême mauvais), 5 polluants. EPCI expandés (Bretagne, Occitanie, PdL). DROM partiellement couverts (Atmo Guadeloupe + Madininair en Martinique).
   </div>
 </div>
+```
+:::
+
+## Row {height="18%" .fill}
+
+```{r}
+#| label: drom-air-prep
+#| include: false
+if (atmo_ready) {
+  air_drom_vals <- atmo |>
+    dplyr::transmute(code_commune, value = qual_mean)
+  # Palette ATMO officielle (1=Bon → 6=Extrême mauvais)
+  .air_drom_palette <- c("#50CCAA", "#50F0E6", "#F0E641", "#FF5050", "#960032")
+  .air_drom_breaks  <- c(1, 2, 3, 4, 5, 6)
+}
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "971", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "971")
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "972", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "972")
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "973", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "973")
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "974", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "974")
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "976", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::
 

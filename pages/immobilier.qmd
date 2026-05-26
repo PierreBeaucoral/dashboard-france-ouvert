@@ -199,9 +199,78 @@ if (dvf_ready) {
   </div>
   <div class="cp-source">
     <strong>Source</strong> · DVF Etalab · DGFiP · 2021-2024.<br>
-    Mono-local, App/Maison, surf > 9 m². N < 5 ventes/an : non publié.
+    Mono-local, App/Maison, surf > 9 m². N < 5 ventes/an : non publié. Mayotte non couverte par DVF.
   </div>
 </div>
+```
+:::
+
+## Row {height="18%" .fill}
+
+```{r}
+#| label: drom-dvf-prep
+#| include: false
+if (dvf_ready) {
+  dvf_drom_vals <- dvf |>
+    dplyr::filter(annee == YEAR_DEFAULT, type_local == TYPE_DEFAULT,
+                  !estimation_insuffisante) |>
+    dplyr::transmute(code_commune, value = prix_m2_median)
+  .dvf_drom_palette <- c("#F5F2EC", "#D9C896", "#C0A05A", "#92722A", "#5E4615")
+}
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+#| label: drom-imm-971
+if (dvf_ready) {
+  choropleth_drom_socio_inset(com_drom_only, "971", dvf_drom_vals,
+                              palette = .dvf_drom_palette,
+                              scale   = "log_quantile")
+} else if (data_ready) drom_inset(dep_drom, "971")
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+#| label: drom-imm-972
+if (dvf_ready) {
+  choropleth_drom_socio_inset(com_drom_only, "972", dvf_drom_vals,
+                              palette = .dvf_drom_palette,
+                              scale   = "log_quantile")
+} else if (data_ready) drom_inset(dep_drom, "972")
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+#| label: drom-imm-973
+if (dvf_ready) {
+  choropleth_drom_socio_inset(com_drom_only, "973", dvf_drom_vals,
+                              palette = .dvf_drom_palette,
+                              scale   = "log_quantile")
+} else if (data_ready) drom_inset(dep_drom, "973")
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+#| label: drom-imm-974
+if (dvf_ready) {
+  choropleth_drom_socio_inset(com_drom_only, "974", dvf_drom_vals,
+                              palette = .dvf_drom_palette,
+                              scale   = "log_quantile")
+} else if (data_ready) drom_inset(dep_drom, "974")
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+#| label: drom-imm-976
+if (dvf_ready) {
+  choropleth_drom_socio_inset(com_drom_only, "976", dvf_drom_vals,
+                              palette = .dvf_drom_palette,
+                              scale   = "log_quantile")
+} else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::
 

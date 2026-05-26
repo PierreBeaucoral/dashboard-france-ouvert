@@ -1,22 +1,19 @@
 # ============================================================
 # scripts/12_municipales_2026.R
 #
-# Élections municipales 2026, 2nd tour, par commune.
+# Élections municipales 2026, T1 + T2 par commune.
 #
-# Source : data.gouv.fr Ministère de l'Intérieur,
-#   dataset 69c17fed9f18c7781fd11a14
-#   Ressource "Municipales 2026 - Résultats - Communes_2026-03-23.csv"
+# Sources : data.gouv.fr Min. Intérieur
+#   T1 commune : 4feeef01-24f7-4d5a-914f-8aa806f31ec2 (13.8 MB)
+#   T2 commune : 6ff67a28-01bf-459e-beca-dd7aa8132dc1 (873 KB)
 #
-# Format wide identique aux Législatives (1 ligne / commune, blocs candidat).
-# Nuances "liste" (LCOM, DVG, DVD, UG, ENS, LR, RN, etc.).
+# Stratégie comme Législatives :
+#   - T1 : toutes les communes (~35k) — vainqueur si élu au T1
+#   - T2 : 1 526 communes ayant nécessité un 2nd tour
+#   - Combine : T2 prioritaire, T1 comble (élections décidées au T1)
+#   - Colonne `tour` trace le tour décisif par commune
 #
-# ⚠ Limite : ce fichier ne contient QUE les communes ayant eu un 2nd tour
-# (1 527 communes). Les ~32k communes élues au 1er tour (la grande
-# majorité, surtout petites communes) ne sont pas dans cette source.
-# Pour avoir la couverture complète, il faudrait combiner avec le 1er tour
-# (sa propre ressource, à venir).
-#
-# Sortie : data/processed/municipales_2026/resultats_t2.parquet
+# Sortie : data/processed/municipales_2026/resultats.parquet
 # ============================================================
 
 suppressPackageStartupMessages({
@@ -26,33 +23,28 @@ suppressPackageStartupMessages({
   library(stringr)
   library(arrow)
   library(here)
+  library(curl)
   library(glue)
 })
 
-URL_T2_COMMUNES <- paste0(
-  "https://static.data.gouv.fr/resources/",
-  "elections-municipales-2026-resultats-du-scond-tour/",
-  "20260323-180124/",
-  "municipales-2026-resultats-communes-2026-03-23-16h14.csv"
-)
+URL_T1 <- paste0("https://static.data.gouv.fr/resources/",
+                 "elections-municipales-2026-resultats-du-premier-tour/",
+                 "20260320-164339/",
+                 "municipales-2026-resultats-communes-2026-03-20.csv")
+URL_T2 <- paste0("https://static.data.gouv.fr/resources/",
+                 "elections-municipales-2026-resultats-du-scond-tour/",
+                 "20260323-180124/",
+                 "municipales-2026-resultats-communes-2026-03-23-16h14.csv")
 
-raw_path <- here::here("data", "raw", "municipales_2026",
-                       "resultats_t2_communes.csv")
+raw_dir  <- here::here("data", "raw", "municipales_2026")
 out_dir  <- here::here("data", "processed", "municipales_2026")
-out_path <- file.path(out_dir, "resultats_t2.parquet")
-dir.create(dirname(raw_path), recursive = TRUE, showWarnings = FALSE)
+t1_path  <- file.path(raw_dir, "resultats_t1_communes.csv")
+t2_path  <- file.path(raw_dir, "resultats_t2_communes.csv")
+out_path <- file.path(out_dir, "resultats.parquet")
+dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-if (!file.exists(raw_path) || file.size(raw_path) < 1e5) {
-  message(glue::glue("Téléchargement {URL_T2_COMMUNES}"))
-  curl::curl_download(URL_T2_COMMUNES, raw_path, quiet = FALSE)
-}
-
-# Mapping nuance liste municipales → famille politique
-# (les nuances Mun 2026 incluent : LCOM local, DVG/DVD/DVC divers,
-# UG union gauche, ENS, LR, UDI, RN, UXD, EXG, EXD, DSV, REG, ECO, …)
-# Les nuances Municipales 2026 sont préfixées "L" (= Liste).
-# Mapping vers les 5 familles utilisées partout dans le dashboard.
+# Mapping nuance liste municipales 2026 (préfixe "L") → familles politiques
 nuance_to_famille_mun <- c(
   # NFP (gauche unie + listes membres)
   "LUG"  = "NFP", "LFI" = "NFP", "LSOC" = "NFP",
@@ -78,85 +70,110 @@ clean_int <- function(x) {
   suppressWarnings(as.integer(x))
 }
 
-df_wide <- readr::read_delim(
-  raw_path, delim = ";",
-  locale = readr::locale(decimal_mark = ",", grouping_mark = " ",
-                         encoding = "UTF-8"),
-  col_types = readr::cols(.default = readr::col_character()),
-  na = c("", "NA"), trim_ws = TRUE, show_col_types = FALSE
-)
-message(glue::glue("Lu : {nrow(df_wide)} communes, {ncol(df_wide)} colonnes"))
+# Téléchargements
+if (!file.exists(t1_path) || file.size(t1_path) < 5e6) {
+  message(glue::glue("Téléchargement T1 ({URL_T1})"))
+  curl::curl_download(URL_T1, t1_path, quiet = FALSE)
+}
+if (!file.exists(t2_path) || file.size(t2_path) < 1e5) {
+  message(glue::glue("Téléchargement T2 ({URL_T2})"))
+  curl::curl_download(URL_T2, t2_path, quiet = FALSE)
+}
 
-all_cols <- names(df_wide)
-candidate_cols <- all_cols[stringr::str_detect(all_cols, "\\s\\d+$")]
-max_cand <- max(as.integer(stringr::str_extract(candidate_cols, "\\d+$")), na.rm = TRUE)
-message(glue::glue("Max candidats : {max_cand}"))
-
-# Pivot long candidat
-df_long <- df_wide |>
-  tidyr::pivot_longer(
-    cols          = tidyselect::all_of(candidate_cols),
-    names_to      = c(".value", "candidate_num"),
-    names_pattern = "^(.*) (\\d+)$"
-  ) |>
-  dplyr::filter(!is.na(`Nuance liste`) & `Nuance liste` != "")
-
-df_long <- df_long |>
-  dplyr::transmute(
-    code_insee     = `Code commune`,
-    nom_commune    = `Libellé commune`,
-    code_dept      = `Code département`,
-    libelle_dept   = `Libellé département`,
-    inscrits       = clean_int(Inscrits),
-    votants        = clean_int(Votants),
-    exprimes       = clean_int(`Exprimés`),
-    abstentions    = clean_int(Abstentions),
-    pct_abstention = clean_pct(`% Abstentions`),
-    candidate_num  = as.integer(candidate_num),
-    nuance         = `Nuance liste`,
-    libelle_liste  = `Libellé abrégé de liste`,
-    voix           = clean_int(Voix),
-    pct_voix_exprimes = clean_pct(`% Voix/exprimés`),
-    elu            = !is.na(Elu) & stringr::str_detect(tolower(Elu), "lu")
-  ) |>
-  dplyr::mutate(
-    famille = dplyr::coalesce(unname(nuance_to_famille_mun[nuance]), "Divers")
+# ---- Parser commun T1/T2 ----
+parse_tour <- function(csv_path, tour_label) {
+  message(glue::glue("→ Parsing {basename(csv_path)} (tour = {tour_label})"))
+  df_wide <- readr::read_delim(
+    csv_path, delim = ";",
+    locale = readr::locale(decimal_mark = ",", grouping_mark = " ",
+                           encoding = "UTF-8"),
+    col_types = readr::cols(.default = readr::col_character()),
+    na = c("", "NA"), trim_ws = TRUE, show_col_types = FALSE
   )
+  all_cols <- names(df_wide)
+  candidate_cols <- all_cols[stringr::str_detect(all_cols, "\\s\\d+$")]
+  max_cand <- max(as.integer(stringr::str_extract(candidate_cols, "\\d+$")),
+                  na.rm = TRUE)
+  message(glue::glue("  {nrow(df_wide)} communes, candidats max = {max_cand}"))
 
-# Vainqueur par commune
-ranked <- df_long |>
-  dplyr::group_by(code_insee) |>
-  dplyr::arrange(dplyr::desc(voix), .by_group = TRUE) |>
-  dplyr::mutate(rang = dplyr::row_number()) |>
-  dplyr::ungroup()
+  df_long <- df_wide |>
+    tidyr::pivot_longer(
+      cols          = tidyselect::all_of(candidate_cols),
+      names_to      = c(".value", "candidate_num"),
+      names_pattern = "^(.*) (\\d+)$"
+    ) |>
+    dplyr::filter(!is.na(`Nuance liste`) & `Nuance liste` != "")
 
-vainqueur <- ranked |> dplyr::filter(rang == 1) |>
-  dplyr::transmute(code_insee,
-                   nuance_vainqueur  = nuance,
-                   famille_vainqueur = famille,
-                   libelle_vainqueur = libelle_liste,
-                   voix_vainqueur    = voix,
-                   pct_vainqueur     = pct_voix_exprimes)
-second <- ranked |> dplyr::filter(rang == 2) |>
-  dplyr::transmute(code_insee,
-                   voix_second = voix,
-                   pct_second  = pct_voix_exprimes)
-fixes <- df_long |>
-  dplyr::distinct(code_insee, nom_commune, code_dept, libelle_dept,
-                  inscrits, votants, exprimes, abstentions, pct_abstention)
+  df_long |>
+    dplyr::transmute(
+      code_insee     = `Code commune`,
+      nom_commune    = `Libellé commune`,
+      code_dept      = `Code département`,
+      libelle_dept   = `Libellé département`,
+      inscrits       = clean_int(Inscrits),
+      votants        = clean_int(Votants),
+      exprimes       = clean_int(`Exprimés`),
+      abstentions    = clean_int(Abstentions),
+      pct_abstention = clean_pct(`% Abstentions`),
+      candidate_num  = as.integer(candidate_num),
+      nuance         = `Nuance liste`,
+      libelle_liste  = `Libellé abrégé de liste`,
+      voix           = clean_int(Voix),
+      pct_voix_exprimes = clean_pct(`% Voix/exprimés`),
+      elu            = !is.na(Elu) & stringr::str_detect(tolower(Elu), "lu"),
+      tour           = tour_label
+    ) |>
+    dplyr::mutate(
+      famille = dplyr::coalesce(unname(nuance_to_famille_mun[nuance]), "Divers")
+    )
+}
 
-out <- fixes |>
-  dplyr::left_join(vainqueur, by = "code_insee") |>
-  dplyr::left_join(second,    by = "code_insee") |>
-  dplyr::mutate(marge_vainqueur = pct_vainqueur - dplyr::coalesce(pct_second, 0))
+aggregate_commune <- function(df_long) {
+  ranked <- df_long |>
+    dplyr::group_by(code_insee) |>
+    dplyr::arrange(dplyr::desc(voix), .by_group = TRUE) |>
+    dplyr::mutate(rang = dplyr::row_number()) |>
+    dplyr::ungroup()
+  vainqueur <- ranked |> dplyr::filter(rang == 1L) |>
+    dplyr::transmute(code_insee, tour,
+                     nuance_vainqueur  = nuance,
+                     famille_vainqueur = famille,
+                     libelle_vainqueur = libelle_liste,
+                     voix_vainqueur    = voix,
+                     pct_vainqueur     = pct_voix_exprimes)
+  second <- ranked |> dplyr::filter(rang == 2L) |>
+    dplyr::transmute(code_insee, voix_second = voix,
+                     pct_second  = pct_voix_exprimes)
+  fixes <- df_long |>
+    dplyr::distinct(code_insee, nom_commune, code_dept, libelle_dept,
+                    inscrits, votants, exprimes, abstentions, pct_abstention)
+  fixes |>
+    dplyr::left_join(vainqueur, by = "code_insee") |>
+    dplyr::left_join(second,    by = "code_insee") |>
+    dplyr::mutate(marge_vainqueur = pct_vainqueur - dplyr::coalesce(pct_second, 0))
+}
+
+# ---- Pipeline ----
+agg_t1 <- parse_tour(t1_path, "T1") |> aggregate_commune()
+agg_t2 <- parse_tour(t2_path, "T2") |> aggregate_commune()
+
+# Combine : T2 prioritaire, T1 comble (élections décidées au T1)
+out <- dplyr::bind_rows(
+  agg_t2,
+  agg_t1 |> dplyr::anti_join(agg_t2, by = "code_insee")
+)
 
 arrow::write_parquet(out, out_path)
 
 cat(glue::glue("
 
-  ✔ Municipales 2026 T2 · {nrow(out)} communes → {out_path}
+  ✔ {nrow(out)} communes → {out_path}
     ({round(file.size(out_path)/1024)} KB)
 
-  Famille gagnante (T2 seulement) :
+  Couverture par tour :
 "))
-print(out |> dplyr::count(famille_vainqueur, sort = TRUE))
+print(out |> dplyr::count(tour))
+
+cat("\n  Famille gagnante × tour :\n")
+print(out |> dplyr::count(tour, famille_vainqueur) |>
+        tidyr::pivot_wider(names_from = tour, values_from = n, values_fill = 0L))

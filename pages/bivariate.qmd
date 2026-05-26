@@ -68,7 +68,21 @@ if (explorer_ready) {
     "fin_taux_fonc_bati","Foncier bâti %",        "Finances",
     "apl_medecins",      "APL médecins",          "Santé",
     "apl_medecins_jeunes","APL médecins ≤65",     "Santé",
-    "defm_taux_pop",     "Chômage ‰",             "Chômage"
+    "apl_infirmieres",   "APL infirmières",       "Santé",
+    "apl_sagefemmes",    "APL sages-femmes",      "Santé",
+    "apl_dentistes",     "APL dentistes",         "Santé",
+    "apl_kines",         "APL kinésithérapeutes", "Santé",
+    "defm_taux_pop",     "Chômage ‰",             "Chômage",
+    "acc_taux_pop",      "Accidents BAAC ‰",      "Sécurité",
+    "densite_rang",      "Densité INSEE (1=rural→6=urbain)", "Démographie",
+    "carb_hab_total",    "Empreinte CO₂ (t/hab)", "Énergie",
+    "mob_pct_emploi_local", "% emploi local",     "Mobilité",
+    "mob_pct_voiture",   "% voiture",             "Mobilité",
+    "mob_pct_tc",        "% TC",                  "Mobilité",
+    "mob_pct_velo",      "% vélo",                "Mobilité",
+    "bio_surface_ha",    "Surface bio (ha)",      "Agriculture",
+    "bio_n_exploit",     "Nb exploitations bio",  "Agriculture",
+    "bio_n_operateurs",  "Nb opérateurs bio",     "Agriculture"
   )
   # Garde uniquement les colonnes effectivement dans merged
   biv_vars <- biv_vars[biv_vars$field %in% names(merged), ]

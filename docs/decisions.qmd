@@ -1,134 +1,484 @@
 ---
 title: "Décisions méthodologiques"
+subtitle: "Toutes les règles structurantes du dashboard, classées par catégorie."
 ---
 
-Journal des décisions structurantes. Chaque entrée donne **la règle**, **la
-raison**, et les **alternatives écartées**.
+```{=html}
+<style>
+.cat-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 16px 0 28px 0;
+}
+.cat-bar a {
+  display: block;
+  padding: 12px 14px;
+  background: #FAFAF8;
+  border: 1px solid #E8E4DC;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #1A1A1A;
+  transition: all 0.15s;
+}
+.cat-bar a:hover { border-color: #2A6F97; background: #F0EDE6; }
+.cat-bar .ico { font-size: 1.2rem; margin-right: 6px; }
+.cat-bar .lbl { font-size: 0.85rem; font-weight: 600; display: inline-block; vertical-align: middle; }
+.cat-bar .cnt { display: block; font-size: 0.72rem; color: #7A7A7A; margin-top: 4px; font-family: monospace; }
 
-## 2026-05-25 — Format & stack
+.decision {
+  border: 1px solid #DCD8CF;
+  border-left: 4px solid #2A6F97;
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 14px 0;
+  background: #FFFFFF;
+}
+.decision h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.02rem;
+  color: #1A1A1A;
+}
+.decision .meta {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: #7A7A7A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: monospace;
+  margin-bottom: 6px;
+}
+.decision .rule {
+  margin: 6px 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #2A2A2A;
+}
+.decision .why {
+  margin: 6px 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #4A4A4A;
+  padding-left: 14px;
+  border-left: 2px solid #E8E4DC;
+}
+.decision .why::before {
+  content: "↳ Pourquoi";
+  display: block;
+  font-size: 0.7rem;
+  color: #7A7A7A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.decision .alt {
+  margin: 6px 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #7A7A7A;
+  padding-left: 14px;
+  border-left: 2px dashed #E8E4DC;
+}
+.decision .alt::before {
+  content: "✗ Alternatives écartées";
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.decision ul { margin: 4px 0 4px 18px; padding: 0; }
+.decision ul li { margin: 2px 0; font-size: 0.88rem; line-height: 1.45; }
+.decision code { font-size: 0.85em; background: #F5F2EC; padding: 1px 4px; border-radius: 3px; }
+.decision table { font-size: 0.85rem; margin: 6px 0; }
+.decision table th, .decision table td { padding: 4px 8px; }
 
-**Règle.** Quarto Dashboard en R, déploiement statique (GitHub Pages / Netlify),
-interactivité via `crosstalk` + `leaflet` + `plotly`/`ggiraph`.
-Pipeline data en R (`duckdb` + `sf` + `arrow`).
+/* Couleur de bordure par catégorie */
+.decision.cat-arch { border-left-color: #5C8B7D; }
+.decision.cat-carto { border-left-color: #A4243B; }
+.decision.cat-data { border-left-color: #C0A05A; }
+.decision.cat-ana { border-left-color: #2A6F97; }
+.decision.cat-viz { border-left-color: #6D5634; }
 
-**Pourquoi.** L'utilisateur veut un format notebook lisible et modifiable cellule
-par cellule, pas un HTML/JS opaque. Quarto fournit le literate computing ; R reste
-le langage primaire (cf. `CLAUDE.md` global) ; crosstalk évite le besoin d'un
-serveur Shiny.
+.cat-section-title {
+  font-size: 1.4rem;
+  margin-top: 36px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #E8E4DC;
+}
+.cat-section-sub {
+  color: #7A7A7A;
+  font-size: 0.92rem;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+</style>
 
-**Alternatives écartées.**
+<div class="cat-bar">
+  <a href="#architecture"><span class="ico">🏗️</span><span class="lbl">Architecture</span><span class="cnt">stack, hébergement, layout</span></a>
+  <a href="#cartographie"><span class="ico">🗺️</span><span class="lbl">Cartographie</span><span class="cnt">palettes, DROM, PLM, légendes</span></a>
+  <a href="#donnees"><span class="ico">📊</span><span class="lbl">Données par source</span><span class="cnt">13 sources, filtres métier</span></a>
+  <a href="#analyse"><span class="ico">🔬</span><span class="lbl">Analyse</span><span class="cnt">stratification, métriques</span></a>
+  <a href="#visualisations"><span class="ico">📈</span><span class="lbl">Visualisations</span><span class="cnt">radar, Sankey, multiples</span></a>
+</div>
+```
 
-- HTML/JS pur (Vite + TypeScript + MapLibre) — rejeté : pas un notebook.
-- Shiny serveur — rejeté : hébergement non statique.
-- Shinylive (WebR) — gardé en option si crosstalk devient limitant.
+Chaque décision donne **la règle**, **la raison** (↳), et les **alternatives écartées** (✗) quand pertinentes.
 
-## 2026-05-25 — Périmètre géographique
+---
 
-**Règle.** France métropolitaine + DROM en cartouches (convention IGN).
-DROM = Guadeloupe, Martinique, Guyane, Réunion, Mayotte.
+## 🏗️ Architecture {#architecture .cat-section-title}
 
-**Pourquoi.** Inclusivité sans dégrader la lisibilité de la carte principale.
+::: {.cat-section-sub}
+Choix de stack, hébergement, contraintes structurantes du site.
+:::
 
-**Alternative écartée.** Carte unique étirée sur Atlantique/Indien (illisible).
+```{=html}
+<div class="decision cat-arch">
+  <h3>Quarto Dashboard en R, déploiement statique</h3>
+  <div class="rule">Cartes via <code>leaflet</code>, viz via <code>ggplot2 + ggiraph</code> ou SVG natif, Sankey via <code>networkD3</code>. Pipeline data en R (<code>duckdb + arrow + sf</code>).</div>
+  <div class="why">Document lisible cellule par cellule, pas un HTML/JS opaque. Quarto = literate computing. Pas de serveur Shiny → hébergeable sur GitHub Pages statique.</div>
+  <div class="alt">HTML/JS pur (pas un notebook) · Shiny serveur (pas statique) · Shinylive WebR (gardé en option).</div>
+</div>
 
-## 2026-05-25 — Couche élections
+<div class="decision cat-arch">
+  <h3>Multi-page sous 100 MB par fichier</h3>
+  <div class="rule">Une page Quarto par thématique. Plafond cible : 45 MB HTML par page.</div>
+  <div class="why">GitHub Pages plafonne à <strong>100 MB par fichier</strong>. Un dashboard mono-page atteindrait 200+ MB.</div>
+  <div class="rule"><strong>Implémentation</strong> : <code>R/setup_dashboard.R</code> est sourcé par chaque page, charge les données conditionnellement (<code>if (carb_ready) …</code>). htmlwidgets n'embarque que les objets passés aux widgets de la page.</div>
+</div>
 
-**Règle.** Législatives 2024, second tour. Variable cartographiée : **nuance
-gagnante** (couleur) avec **opacité proportionnelle à la marge**.
+<div class="decision cat-arch">
+  <h3>Périmètre géographique : Métropole + 5 DROM en cartouches</h3>
+  <div class="rule">DROM = <code>971</code> Guadeloupe, <code>972</code> Martinique, <code>973</code> Guyane, <code>974</code> La Réunion, <code>976</code> Mayotte. Convention IGN.</div>
+  <div class="why">Inclusivité sans dégrader la lisibilité de la carte principale.</div>
+  <div class="alt">Carte unique étirée sur Atlantique/Indien (illisible).</div>
+</div>
+```
 
-**Pourquoi.** Législatives 2024 = scrutin le plus récent à enjeu national. Le
-multipartisme (NFP, ENS, RN, LR+UDR, divers) se rend bien par couleur catégorielle.
-L'opacité ajoute une information continue (force de la victoire) sans surcharger.
 
-### T1 en fallback des communes sans T2
+## 🗺️ Cartographie {#cartographie .cat-section-title}
 
-Les ~4 500 communes dont la circonscription a été décidée au 1er tour
-(majorité absolue + seuil d'inscrits) n'apparaissent pas dans le fichier T2.
-Pour avoir une carte complète, on parse aussi `resultats-definitifs-par-communes.csv`
-du 1er tour (~77 MB) et on **bascule au résultat T1 pour ces communes**.
+::: {.cat-section-sub}
+Palettes, encodages, gestion des cas particuliers (PLM, DROM, légendes dynamiques).
+:::
 
-La colonne `tour` du parquet de sortie trace si le résultat affiché vient de
-T1 ou T2 — c'est nécessaire pour l'honnêteté analytique (un résultat T1 n'a
-pas la même nature qu'un résultat T2). Dans le dashboard, les deux sont
-représentés avec la même palette : ce qui compte pour la lecture est *la
-famille gagnante en voix dans la commune au tour décisif*.
+```{=html}
+<div class="decision cat-carto">
+  <h3>Législatives : famille gagnante + opacité par marge</h3>
+  <div class="rule">Variable cartographiée : <strong>famille gagnante au tour décisif</strong> (NFP/ENS/RN/LR/Divers). Opacité proportionnelle à la marge (faible marge → couleur pâle).</div>
+  <div class="why">Le multipartisme se rend bien par couleur catégorielle. L'opacité ajoute la force de la victoire sans surcharger.</div>
+</div>
 
-Couverture : 31 392 T2 + 6 026 T1-only = **37 418 communes** (vs ~36 000 réelles ;
-les ~1 400 entrées en excès correspondent à des communes déléguées, à
-Saint-Pierre-et-Miquelon ou à la Polynésie française, hors de notre périmètre
-cartographique).
+<div class="decision cat-carto">
+  <h3>Municipales : helper dédié <code>choropleth_municipales()</code></h3>
+  <div class="rule">Différences vs Législatives :
+    <ul>
+      <li><strong>Palette "Divers" boostée</strong> : olive <code>#A18047</code> au lieu du gris national. Justification : 88% T1 + 81% T2 gagnés par "Divers" (LDIV/LDVG/LDVD/LREG) — invisibles sinon.</li>
+      <li><strong>Stroke différencié</strong> : T1 → orange <code>#F0A500</code> (0,6 px), T2 → blanc (0,3 px). L'œil distingue immédiatement le tour décisif.</li>
+      <li><strong>Opacité fixe 0,85</strong> pour toutes les communes avec famille, pas de fade par marge.</li>
+    </ul>
+  </div>
+  <div class="why">La marge moyenne T1 (47%) écraserait T2 (12%) ; un fade serait illisible.</div>
+</div>
 
-### Paris / Lyon / Marseille
+<div class="decision cat-carto">
+  <h3>Paris / Lyon / Marseille : règle par viz</h3>
+  <div class="rule">Données MI agrègent au niveau commune (<code>75056</code>, <code>69123</code>, <code>13055</code>), GeoJSON expose par arrondissement (<code>75101-75120</code>, etc.).
+    <ul>
+      <li><strong>Élections</strong> : résultat ville mère répercuté sur tous les arrondissements.</li>
+      <li><strong>Mobilité Sankey</strong> : consolidation <code>751xx</code> → <code>75056</code> avant agrégation (sinon 20 "Paris arrondissements" pollueraient le Sankey).</li>
+      <li><strong>Profil radar</strong> : filtre les communes avec &lt; 5/8 axes renseignés (exclut les codes PLM consolidés peu renseignés).</li>
+    </ul>
+  </div>
+  <div class="alt">Sommer pop + revenus + APL des arrondissements vers la commune mère — demanderait un script PLM dédié (à faire ultérieurement).</div>
+</div>
 
-La data MI agrège ces trois villes au niveau **commune** (75056, 69123, 13055)
-alors que le GeoJSON `france-geojson` les expose par **arrondissement
-municipal** (75101–75120, 69381–69389, 13201–13216). Côté join, on répercute
-le résultat de la ville sur chacun de ses arrondissements (tous reçoivent la
-même couleur). Limitation : on perd le détail intra-PLM. Pour le récupérer,
-il faudrait utiliser la ressource MI *par bureau de vote*, plus lourde (16 MB),
-agréger par arrondissement, ce qui peut être fait en Étape 5 si l'analyse
-intra-grandes-villes devient pertinente.
+<div class="decision cat-carto">
+  <h3>Légendes dynamiques (page Démographie)</h3>
+  <div class="rule">Quand l'utilisateur toggle entre "Population", "Densité INSEE", "Chômage", la légende swap entre format continu (5 breaks log-quantile) et format catégoriel (6 niveaux ordinaux).</div>
+  <div class="why">Un même barème continu n'a aucun sens pour une variable catégorielle.</div>
+</div>
 
-### Mapping nuance MI → famille politique
+<div class="decision cat-carto">
+  <h3>DROM cartouches : re-fit bounds à l'expansion</h3>
+  <div class="rule"><code>R/map_helpers.R::.add_resize_handler()</code> capture les bounds initiaux puis ré-applique <code>fitBounds()</code> après chaque <code>invalidateSize()</code>. Observe aussi le parent <code>.card</code> (Quarto fullscreen).</div>
+  <div class="why">Sans re-fit, leaflet garde l'échelle calculée pour 150×150 px. Un DROM agrandi en fullscreen restait minuscule au centre.</div>
+</div>
+```
 
-Nuances officielles du Ministère de l'Intérieur regroupées en 5 familles :
 
-| Famille | Nuances MI incluses | Justification |
-|---|---|---|
-| **NFP** | UG, FI, SOC, COM, VEC | UG = "Union de la Gauche" = étiquette NFP officielle au T2. Les dissidents FI/SOC/COM/VEC (rares, < 20 cas) restent dans la même famille politique. |
-| **ENS** | ENS, HOR | Ensemble = Renaissance+MoDem ; Horizons (É. Philippe) est allié officiel d'Ensemble. |
-| **LR** | LR, UDI, UDR | LR + UDI (centre-droit allié) + UDR (Union des Droites Républicaines). |
-| **RN** | RN, UXD, EXD | RN + UXD (alliance Ciotti-RN au T1) + EXD (extrême-droite hors RN, ex-Reconquête). |
-| **Divers** | DVD, DVG, DVC, DSV, REG, ECO, EXG, DIV | Étiquettes locales / régionales / dissidents non clairement affiliés. |
+## 📊 Données par source {#donnees .cat-section-title}
 
-Réf : codes nuances du Ministère, snapshot 2026-05-25.
+::: {.cat-section-sub}
+Une décision par source : règles métier, filtres, snapshots. 13 sources au total.
+:::
 
-## 2026-05-25 — Filtres DVF
+```{=html}
+<div class="decision cat-data">
+  <h3>📥 Élections Législatives 2024 — T1 fallback</h3>
+  <div class="meta">Min. Intérieur · 35 000 communes</div>
+  <div class="rule">Variable cartographiée = famille gagnante au tour décisif. Pour les ~6 000 communes décidées au 1er tour (majorité absolue + seuil d'inscrits), on bascule au résultat T1 ; colonne <code>tour</code> trace la nature du résultat affiché.</div>
+  <div class="rule"><strong>Mapping nuance MI → 5 familles</strong> :
+    <ul>
+      <li><strong>NFP</strong> : UG, FI, SOC, COM, VEC, ECO</li>
+      <li><strong>ENS</strong> : ENS, HOR</li>
+      <li><strong>LR</strong> : LR, UDI, UDR</li>
+      <li><strong>RN</strong> : RN, UXD, EXD</li>
+      <li><strong>Divers</strong> : DVD, DVG, DVC, DSV, REG, EXG, DIV</li>
+    </ul>
+  </div>
+</div>
 
-**Règle.** Pour le calcul du prix médian au m² par commune et par année :
+<div class="decision cat-data">
+  <h3>📥 Municipales 2026 — T1 + T2 combinés</h3>
+  <div class="meta">Min. Intérieur · ~3 300 communes</div>
+  <div class="rule">T2 prioritaire (1 526 communes) + T1 fallback (1 779 communes décidées au 1er tour) = ~3 300 communes ≥ 1 000 hab. Les ~32 000 communes &lt; 1 000 hab. utilisent le scrutin majoritaire individuel → absentes du fichier source, affichées en beige neutre.</div>
+  <div class="rule">Mapping nuance liste (préfixe <code>L</code>) → famille : <code>LUG</code>/<code>LFI</code>/<code>LSOC</code>/<code>LCOM</code>/<code>LVEC</code>/<code>LECO</code> = NFP ; <code>LUC</code> = ENS ; <code>LLR</code>/<code>LUDI</code>/<code>LUDR</code>/<code>LUD</code> = LR ; <code>LRN</code>/<code>LUXD</code>/<code>LEXD</code> = RN ; <code>LDIV</code>/<code>LDVG</code>/<code>LDVD</code>/<code>LDVC</code>/<code>LREG</code> = Divers.</div>
+</div>
 
-- `nature_mutation = "Vente"`
-- `type_local ∈ {"Appartement", "Maison"}`
-- `surface_reelle_bati > 9 m²`
-- Bornes prix/m² : `200 €/m² < x < 30 000 €/m²`
-- **Mutations mono-local uniquement** (un seul bien par `id_mutation`)
-- **Médiane** comme statistique d'agrégation (robuste aux outliers)
-- Communes avec `N < 5` transactions/an : valeur marquée "insuffisant" et
-  grisée sur la carte
+<div class="decision cat-data">
+  <h3>📥 DVF Immobilier — filtres standards</h3>
+  <div class="meta">DGFiP · 655 000 ventes 2021-2024</div>
+  <div class="rule"><strong>Filtres</strong> :
+    <ul>
+      <li><code>nature_mutation = "Vente"</code></li>
+      <li><code>type_local ∈ {"Appartement", "Maison"}</code></li>
+      <li><code>surface_reelle_bati &gt; 9 m²</code></li>
+      <li>Bornes : <code>200 €/m² &lt; x &lt; 30 000 €/m²</code></li>
+      <li>Mutations mono-local uniquement</li>
+      <li>Médiane comme stat d'agrégation (robuste outliers)</li>
+      <li>N &lt; 5 ventes/an → <code>estimation_insuffisante</code>, grisée</li>
+    </ul>
+  </div>
+  <div class="why">Convention DVF standard. Mono-local évite la répartition prix sur lots. Médiane robuste.</div>
+  <div class="alt">Moyenne (sensible outliers) · Répartition proportionnelle (bruit non traçable).</div>
+</div>
 
-**Pourquoi.** Convention DVF standard. Mono-local évite le casse-tête de la
-répartition du prix sur les lots. Bornes éliminent les saisies aberrantes
-et les ventes symboliques (1 €).
+<div class="decision cat-data">
+  <h3>📥 Atmo Air — agrégation 30 jours glissants</h3>
+  <div class="meta">Atmo France · WFS · ~700 stations</div>
+  <div class="rule">Snapshot agrégé sur <strong>30 jours glissants</strong> au lieu du jour J. EPCI expansion pour Bretagne (Air Breizh), Occitanie (Atmo Occitanie), Pays de la Loire (Air PdL) qui publient par EPCI.</div>
+  <div class="why">L'indice journalier varie fortement (pollens, canicule). 30 j lisse les NA et reflète l'exposition chronique.</div>
+  <div class="rule">DROM couverts partiellement : Guadeloupe + Martinique seulement.</div>
+</div>
 
-**Alternatives écartées.** Moyenne (sensible aux outliers). Répartition
-proportionnelle des lots (introduit du bruit difficile à tracer).
+<div class="decision cat-data">
+  <h3>📥 SSMSI Délinquance — secret statistique</h3>
+  <div class="meta">SSMSI 2025 · ~18 000 communes après secret</div>
+  <div class="rule">8 indicateurs ‰ habitants : cambriolages, vols personnes, vols véhicules, violences sexuelles, dégradations, trafic stup, usage stup, total.</div>
+  <div class="rule">Secret stat : taux non publié si &lt; 5 faits cumulés sur 3 ans → ~17 000 communes (les plus petites) sont en gris "non publié". Échelle log_quantile sur la carte (distribution très skewée).</div>
+</div>
 
-## 2026-05-25 — Rattachement commune ↔ station de mesure (air)
+<div class="decision cat-data">
+  <h3>📥 BAAC Accidents — taux ‰ habitants</h3>
+  <div class="meta">Min. Intérieur · 11 099 communes · 2024</div>
+  <div class="rule">Compte d'accidents corporels par commune, normalisé en ‰ habitants (joint avec <code>pop_latest</code>).</div>
+</div>
 
-**Règle.** Chaque commune reçoit la mesure de la **station la plus proche** dans
-un **rayon de 15 km**. Au-delà : NA, commune exclue des analyses incluant l'air.
+<div class="decision cat-data">
+  <h3>📥 DGFiP Finances communales</h3>
+  <div class="meta">DGFiP · ~35 000 communes · 2024</div>
+  <div class="rule">Recettes, charges, dette, CAF en €/habitant. Taux de 3 taxes locales : habitation, foncier bâti, foncier non bâti.</div>
+</div>
 
-**Pourquoi.** Au-delà de 15 km, la mesure n'est plus représentative (gradient
-spatial de la pollution). NA explicite > extrapolation silencieuse.
+<div class="decision cat-data">
+  <h3>📥 APL DREES — seuil désert médical</h3>
+  <div class="meta">DREES · ~35 000 communes · 2023</div>
+  <div class="rule">5 professions : médecins (+ ≤65 ans), infirmières, sages-femmes, dentistes, kinés.</div>
+  <div class="rule"><strong>APL médecins généralistes</strong> : palette divergente avec seuil <strong>2,5 consultations/an/hab = désert médical</strong> (DREES). Couleur change de rouge à vert au passage du seuil.</div>
+</div>
 
-**Trace.** Variable `distance_station_km` conservée comme covariable de qualité.
+<div class="decision cat-data">
+  <h3>📥 Espérance de vie INSEE — join par nom</h3>
+  <div class="meta">INSEE · ~28 000 communes · 2024</div>
+  <div class="rule">INSEE-EV ne publie pas le code commune. Join par nom commune + département normalisé → 81,6% taux de match. Ajouté à la page Santé.</div>
+</div>
 
-## 2026-05-25 — Métrique de corrélation par défaut
+<div class="decision cat-data">
+  <h3>📥 FiLoSoFi Revenus INSEE</h3>
+  <div class="meta">INSEE · ~30 000 communes · 2021</div>
+  <div class="rule">Revenu médian disponible, déciles D1/D9, indice de Gini, % ménages imposés, part prestations vs activité.</div>
+  <div class="rule">CSV séparateur point-virgule (français), filtrage des très petites communes par INSEE (secret stat).</div>
+</div>
 
-**Règle.** **Spearman** par défaut, Pearson en alternative (toggle).
+<div class="decision cat-data">
+  <h3>📥 INSEE Populations + Strates de taille</h3>
+  <div class="meta">INSEE · ~35 000 communes · 2017-2021</div>
+  <div class="rule">5 strates de taille INSEE :
+    <ul>
+      <li>Très petite (&lt; 500 hab.)</li>
+      <li>Rurale (500 - 2 000)</li>
+      <li>Bourg / périurbain (2 000 - 10 000)</li>
+      <li>Ville moyenne (10 000 - 50 000)</li>
+      <li>Grande ville (≥ 50 000)</li>
+    </ul>
+  </div>
+  <div class="why">La densité urbaine est le principal confondant. Stratifier permet d'isoler les corrélations intra-strate.</div>
+  <div class="rule"><strong>Fallback proxy</strong> pour communes sans pop publiée : quartiles d'inscrits sur listes électorales.</div>
+</div>
 
-**Pourquoi.** Les distributions de prix m² et de pollution ont des queues
-lourdes. Spearman (monotone, non paramétrique) est robuste. Pearson disponible
-pour comparaison.
+<div class="decision cat-data">
+  <h3>📥 INSEE Grille de densité (typologie 6 niveaux)</h3>
+  <div class="meta">INSEE · ~35 000 communes · 2024</div>
+  <div class="rule">Variable catégorielle ordinale rural → urbain :
+    <ol>
+      <li>Rural non périurbain</li>
+      <li>Rural périurbain</li>
+      <li>Petites villes</li>
+      <li>Centres urbains intermédiaires</li>
+      <li>Ceintures urbaines</li>
+      <li>Grands centres urbains</li>
+    </ol>
+  </div>
+  <div class="rule">Mappée en palette catégorielle (page Démographie). Sert aussi de variable continue <code>densite_rang</code> (1-6) dans Explorer + Bivariée.</div>
+</div>
 
-## 2026-05-25 — Stratification
+<div class="decision cat-data">
+  <h3>📥 DARES Chômage DEFM A+B+C</h3>
+  <div class="meta">DARES · ~7 400 communes · 1 trimestre</div>
+  <div class="rule">Demandeurs d'Emploi en Fin de Mois cat. A+B+C. Normalisé en taux ‰ habitants via <code>defm_abc / pop_latest * 1000</code>.</div>
+  <div class="rule">Couverture limitée : ~7 400 communes seulement (DARES ne publie pas pour toutes les petites).</div>
+</div>
 
-**Règle.** Quatre strates issues de la **grille de densité INSEE** :
+<div class="decision cat-data">
+  <h3>📥 RARE/CITEPA Empreinte carbone — approche conso</h3>
+  <div class="meta">RARE · ~34 800 communes · base 2018</div>
+  <div class="rule">Empreinte carbone <strong>par habitant en approche consommation</strong> (EXIOBASE × CITEPA). Médiane FR ≈ 7,9 tCO₂eq/hab/an.</div>
+  <div class="why">Reflète le mode de vie (logement, transport, alimentation, biens), indépendamment de la localisation des usines. Une grande ville pollue <em>là où sont ses usines</em> (souvent banlieue) ; l'empreinte conso lui attribue son vrai poids.</div>
+  <div class="alt">Empreinte territoriale (émissions sur le sol) — biaise les communes industrielles.</div>
+</div>
 
-- Commune densément peuplée
-- Commune de densité intermédiaire
-- Commune peu dense
-- Commune très peu dense
+<div class="decision cat-data">
+  <h3>📥 INSEE MOBPRO — codes TRANS RP 2019</h3>
+  <div class="meta">INSEE · ~34 800 communes · RP 2019</div>
+  <div class="rule">⚠️ <strong>INSEE a révisé le codage TRANS au RP 2017+</strong>. Codes actuels :
+    <ul>
+      <li><code>1</code> Pas de transport</li>
+      <li><code>2</code> Marche à pied</li>
+      <li><code>3</code> Vélo (y compris VAE)</li>
+      <li><code>4</code> 2-roues motorisés</li>
+      <li><code>5</code> <strong>Voiture / camion / fourgonnette</strong></li>
+      <li><code>6</code> <strong>Transports en commun</strong></li>
+    </ul>
+  </div>
+  <div class="why">Un bug initial a confondu TRANS=5 avec TC → médiane voiture à 0% sur la carte. Fix appliqué et codes documentés ici pour éviter la récidive.</div>
+  <div class="rule">Indicateurs dérivés : % emploi local, % voiture/TC/vélo/marche, top destination + flux.</div>
+</div>
 
-**Pourquoi.** La densité urbaine est le principal confondant entre les trois
-sujets. Stratifier permet d'isoler des corrélations intra-strate.
+<div class="decision cat-data">
+  <h3>📥 Agence Bio Agriculture</h3>
+  <div class="meta">Agence Bio · 23 100 communes · 2024</div>
+  <div class="rule">Surface bio totale = AB certifiée + en conversion (C1 + C2 + C3). Nombre d'opérateurs = exploitations + transformateurs + distributeurs.</div>
+  <div class="rule">Fichier opérateurs en long (1 ligne par production × activité) → agrégé par <code>sum(nboperateur)</code> par commune × année.</div>
+  <div class="rule">Couverture : 23 100 communes (les ~12 000 sans aucune exploitation bio n'apparaissent pas dans le fichier source). Échelle log-quantile sur la carte (distribution skewée, médiane 47 ha, max 16 817).</div>
+</div>
+```
+
+
+## 🔬 Analyse {#analyse .cat-section-title}
+
+::: {.cat-section-sub}
+Stratification, métriques de corrélation, filtres de tautologies.
+:::
+
+```{=html}
+<div class="decision cat-ana">
+  <h3>Spearman par défaut, Pearson alternatif</h3>
+  <div class="rule">Toutes les corrélations calculées en <strong>Spearman</strong> (rang) par défaut. Pearson disponible en toggle pour comparaison.</div>
+  <div class="why">Distributions prix m², chômage, délinquance, bio ont des queues lourdes. Spearman est monotone et robuste aux outliers.</div>
+</div>
+
+<div class="decision cat-ana">
+  <h3>Top 25 corrélations — filtrage des tautologies</h3>
+  <div class="rule">Le top affiché à droite de la heatmap Explorer <strong>exclut les paires intra-thématique</strong>. 12 groupes thématiques servent de filtre.</div>
+  <div class="why">Sans filtre, le top serait saturé par des tautologies :
+    <ul>
+      <li><code>del_total × del_vols_pers</code> (ρ = 0,98) — total inclut les vols</li>
+      <li><code>fin_charges × fin_recettes</code> (ρ = 0,99) — budget équilibré</li>
+      <li><code>ctx_log_inscrits × ctx_log_pop</code> (ρ = 0,99) — inscrits ≈ pop adulte</li>
+      <li><code>revenu_median × revenu_d9</code> (ρ = 0,95) — bougent ensemble</li>
+    </ul>
+    Les corrélations vraiment intéressantes traversent les sujets : revenu × vote, densité × prix, CO₂ × mobilité.
+  </div>
+</div>
+
+<div class="decision cat-ana">
+  <h3>Bivariate choropleth — palette Stevens 3×3</h3>
+  <div class="rule">Encodage 2 variables en terciles × terciles → 9 classes (palette Stevens 2015). Les coins donnent les associations extrêmes ; le centre rassemble les "moyennes".</div>
+  <div class="rule">16 paires pré-calculées côté R (<code>scripts/05_merge_and_explore.R</code>). 1 176 combinaisons disponibles côté JS via selectors X/Y.</div>
+</div>
+
+<div class="decision cat-ana">
+  <h3>Stratification : 5 strates × variable continue densite_rang</h3>
+  <div class="rule">Les corrélations sont pré-calculées par <strong>paire × méthode × strate</strong> (Spearman/Pearson × 5 strates pop + Toutes) → 15 912 lignes dans <code>correlations.parquet</code>.</div>
+  <div class="rule">Variable alternative <code>densite_rang</code> (1-6, INSEE typologie 6 niveaux) disponible dans heatmap et Bivariée mais pas (encore) en strate Explorer.</div>
+</div>
+```
+
+
+## 📈 Visualisations {#visualisations .cat-section-title}
+
+::: {.cat-section-sub}
+Choix d'encodage pour les 4 viz dérivées (radar, Sankey, small multiples, scatter Explorer).
+:::
+
+```{=html}
+<div class="decision cat-viz">
+  <h3>Profil radar — 8 dimensions en rang centile</h3>
+  <div class="rule">8 axes retenus, critère couverture ≥ 30 000 communes ET diversité thématique :
+    <ol>
+      <li>Population (log)</li>
+      <li>Revenu médian</li>
+      <li>APL médecins</li>
+      <li>Recettes communales €/hab</li>
+      <li>Délinquance totale ‰</li>
+      <li>Empreinte CO₂/hab</li>
+      <li>% voiture mobilité</li>
+      <li>Densité INSEE (rang 1-6)</li>
+    </ol>
+  </div>
+  <div class="rule">Encodage en <strong>rang centile national</strong> (0-100) plutôt que valeur brute → lecture "rond ou écrasé" indépendante des unités. 50 = médiane FR.</div>
+  <div class="rule">Filtre : communes avec &lt; 5/8 axes renseignés sont exclues du lookup (cas PLM consolidés).</div>
+</div>
+
+<div class="decision cat-viz">
+  <h3>Sankey mobilité — Top 100 flux + PLM consolidé</h3>
+  <div class="rule">Préfixage des nœuds : "R · Lyon" pour résidence, "T · Lyon" pour destination. Sinon networkD3 collapse les deux côtés et perd l'orientation.</div>
+  <div class="rule">Pipeline (<code>scripts/16_mobilite_flows.R</code>) :
+    <ol>
+      <li>Consolidation PLM (<code>751xx</code>→<code>75056</code>, <code>6938x</code>→<code>69123</code>, <code>132xx</code>→<code>13055</code>)</li>
+      <li>Top 50 destinations par poids entrant total</li>
+      <li>Filtre <code>COMMUNE != DCLT</code> (exclut flux intra-commune)</li>
+      <li>Top 200 flux ≥ 100 actifs, puis top 100 pour le rendu</li>
+    </ol>
+  </div>
+</div>
+
+<div class="decision cat-viz">
+  <h3>Small multiples départements — 96 tuiles métropole</h3>
+  <div class="rule">Régex strict <code>^(0[1-9]|[1-8][0-9]|9[0-5]|2[AB])$</code> pour le filtre — exclut ZX (Saint-Martin), ZZ (Français hors de France) et 97x/98x (DROM, séparés).</div>
+  <div class="rule">Indicateur continu : médiane communale du département. Famille dominante : plurality (pas majorité absolue) des communes du département.</div>
+  <div class="rule">9 indicateurs sélectionnables, 8 palettes différentes selon le sens de l'indicateur (séquentielle, divergente, catégorielle).</div>
+</div>
+
+<div class="decision cat-viz">
+  <h3>Explorer scatter — LOESS approx + ρ live</h3>
+  <div class="rule">Échantillon stratifié (max 8 000 communes) pour ne pas saturer le SVG. ρ Spearman recalculé en JS sur l'échantillon courant.</div>
+  <div class="rule">Courbe "LOESS-like" : moyenne mobile sur 30 quantiles de X. Pas un vrai LOESS (trop coûteux côté JS) mais suffisant pour donner la tendance.</div>
+</div>
+```
+
+
+## Historique des règles {.cat-section-title}
+
+```{=html}
+<ul style="font-size:0.88rem;line-height:1.55;color:#4A4A4A;">
+  <li><strong>2026-05-25</strong> — Décisions initiales : Quarto + leaflet, périmètre métropole+DROM, élections 2024 T2 + T1 fallback, DVF filtres standard, Atmo WFS + EPCI expansion, stratification 4 strates pop INSEE.</li>
+  <li><strong>2026-05-26 matin</strong> — Multi-page split GitHub Pages, ajout SSMSI + BAAC, DGFiP, APL 5 pros + EV INSEE, FiLoSoFi, grille densité INSEE 6 levels, DEFM, Municipales 2026 T1+T2. Passage 4 → 5 strates pop INSEE.</li>
+  <li><strong>2026-05-26 après-midi</strong> — Blocs G (carbone RARE/CITEPA), I (mobilité MOBPRO 2019), K (Agence Bio). Helper municipales dédié. Fix démographie click+legend, fix DROM resize fitBounds. Viz radar profil, Sankey mobilité, small multiples départements. Codes TRANS RP 2019 documentés post-bug.</li>
+</ul>
+```

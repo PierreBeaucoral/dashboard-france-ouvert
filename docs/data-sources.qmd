@@ -1,119 +1,503 @@
 ---
 title: "Sources de données"
+subtitle: "13 jeux publics agrégés. Pour chaque source : organisme, URL canonique, format, snapshot, couverture, script de prep."
 ---
 
-Toutes les sources sont publiques et stables. Pour chaque jeu, on documente
-l'URL canonique, le format, la date du snapshot téléchargé et l'éventuel filtre
-appliqué en amont (script `scripts/`).
+```{=html}
+<style>
+.src-summary {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: Inter, sans-serif;
+  font-size: 0.85rem;
+  margin: 16px 0 32px 0;
+}
+.src-summary thead th {
+  background: #F5F2EC;
+  border-bottom: 2px solid #DCD8CF;
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #4A4A4A;
+  font-weight: 600;
+}
+.src-summary tbody td {
+  padding: 7px 10px;
+  border-bottom: 1px solid #F0EDE6;
+  vertical-align: top;
+}
+.src-summary tbody tr:hover { background: #FAFAF8; }
+.src-summary .ico { font-size: 1.1rem; }
+.src-summary .cov { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: #4A4A4A; }
+.src-summary .date { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: #7A7A7A; }
+.src-summary .script { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; color: #2A6F97; }
+.src-summary a { color: #2A6F97; text-decoration: none; }
 
-## Contours administratifs — départements
+.src-card {
+  border: 1px solid #DCD8CF;
+  border-left: 4px solid #2A6F97;
+  border-radius: 4px;
+  padding: 16px 20px;
+  margin: 14px 0;
+  background: #FFFFFF;
+}
+.src-card h3 {
+  margin: 0 0 4px 0;
+  font-size: 1.05rem;
+  color: #1A1A1A;
+}
+.src-card .org {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: #7A7A7A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: "IBM Plex Mono", monospace;
+  margin-bottom: 10px;
+}
+.src-card .field {
+  margin: 6px 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: #2A2A2A;
+}
+.src-card .field-label {
+  display: inline-block;
+  min-width: 110px;
+  font-size: 0.72rem;
+  color: #7A7A7A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  vertical-align: top;
+}
+.src-card .field-value { display: inline-block; vertical-align: top; max-width: calc(100% - 120px); }
+.src-card code { font-size: 0.85em; background: #F5F2EC; padding: 1px 4px; border-radius: 3px; word-break: break-all; }
+.src-card a { color: #2A6F97; text-decoration: none; word-break: break-all; }
+.src-card a:hover { text-decoration: underline; }
+.src-card ul { margin: 4px 0 4px 16px; padding: 0; }
+.src-card ul li { margin: 2px 0; font-size: 0.86rem; line-height: 1.45; }
+.src-card .caveat {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: #FAF6E8;
+  border-left: 3px solid #C0A05A;
+  border-radius: 3px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #4A4A4A;
+}
+.src-card .caveat::before {
+  content: "⚠ ";
+  color: #C0A05A;
+  font-weight: 600;
+}
 
-- **URL métropole** : `https://france-geojson.gregoiredavid.fr/repo/departements.geojson`
-- **URLs DROM** (un fichier par département) :
-  - `https://france-geojson.gregoiredavid.fr/repo/departements/971-guadeloupe/departement-971-guadeloupe.geojson`
-  - `https://france-geojson.gregoiredavid.fr/repo/departements/972-martinique/departement-972-martinique.geojson`
-  - `https://france-geojson.gregoiredavid.fr/repo/departements/973-guyane/departement-973-guyane.geojson`
-  - `https://france-geojson.gregoiredavid.fr/repo/departements/974-la-reunion/departement-974-la-reunion.geojson`
-  - `https://france-geojson.gregoiredavid.fr/repo/departements/976-mayotte/departement-976-mayotte.geojson`
-- **Format** : GeoJSON, EPSG:4326 (WGS84)
-- **Source upstream** : IGN / OpenStreetMap (dépôt gregoiredavid largement utilisé en
-  data science francophone)
-- **Snapshot** : 2026-05-25
-- **Pourquoi pas l'API officielle `geo.api.gouv.fr`** : l'endpoint
-  `/departements?geometry=contour&format=geojson` ignore le paramètre `geometry`
-  et renvoie les attributs sans géométries. Le dépôt gregoiredavid fournit
-  directement les contours, version stable.
-- **Particularité** : le fichier global `departements.geojson` du dépôt couvre
-  uniquement la métropole. Les DROM sont récupérés séparément puis fusionnés
-  dans le pipeline.
-- **Traitement** : simplification Visvalingam-Whyatt via `rmapshaper::ms_simplify`
-  avec `keep = 0.20` → 96 + 5 = 101 polygones, ~299 KB.
-- **Script** : `scripts/01_geo_boundaries.R`
+/* Couleur de bordure par catégorie */
+.src-card.cat-geo   { border-left-color: #4A4A4A; }
+.src-card.cat-pol   { border-left-color: #A4243B; }
+.src-card.cat-eco   { border-left-color: #2A6F97; }
+.src-card.cat-env   { border-left-color: #5C8B7D; }
+.src-card.cat-soc   { border-left-color: #C0A05A; }
+.src-card.cat-sec   { border-left-color: #B85F5E; }
+.src-card.cat-sante { border-left-color: #94B091; }
+.src-card.cat-agri  { border-left-color: #7A8740; }
+.src-card.cat-deriv { border-left-color: #6D5634; }
 
-## Contours administratifs — communes
+.cat-section-title {
+  font-size: 1.35rem;
+  margin-top: 36px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #E8E4DC;
+}
+.cat-section-sub {
+  color: #7A7A7A;
+  font-size: 0.9rem;
+  margin: 0 0 14px 0;
+  line-height: 1.5;
+}
+.kpi-strip {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  background: #FAFAF8;
+  border: 1px solid #E8E4DC;
+  border-radius: 6px;
+  margin: 12px 0 22px 0;
+}
+.kpi-strip .kpi { text-align: left; }
+.kpi-strip .v { font-family: "IBM Plex Mono", monospace; font-size: 1.3rem; font-weight: 600; color: #1A1A1A; }
+.kpi-strip .l { font-size: 0.75rem; color: #7A7A7A; text-transform: uppercase; letter-spacing: 0.04em; }
+</style>
+```
 
-- **URL métropole** : `https://france-geojson.gregoiredavid.fr/repo/communes.geojson` (~23 MB)
-- **URLs DROM** : `https://france-geojson.gregoiredavid.fr/repo/departements/{code}-{name}/communes-{code}-{name}.geojson`
-- **Format** : GeoJSON, EPSG:4326
-- **Source upstream** : IGN / OpenStreetMap
-- **Snapshot** : 2026-05-25
-- **Traitement** : simplification Visvalingam-Whyatt `keep = 0.04` →
-  35 927 polygones, ~16 MB (vs 23 MB en entrée).
-- **Script** : `scripts/01_geo_boundaries.R` (partie 2)
+Toutes les sources sont publiques, ouvertes (data.gouv.fr ou portails open data
+des opérateurs publics), et téléchargeables sans authentification. Aucune
+donnée individuelle.
 
-## Élections — Législatives 2024, 2nd tour, par commune
+```{=html}
+<div class="kpi-strip">
+  <div class="kpi"><div class="v">13</div><div class="l">sources data.gouv</div></div>
+  <div class="kpi"><div class="v">~1,4 GB</div><div class="l">de raw downloaded</div></div>
+  <div class="kpi"><div class="v">15</div><div class="l">scripts R de prep</div></div>
+  <div class="kpi"><div class="v">35 798</div><div class="l">communes couvertes</div></div>
+  <div class="kpi"><div class="v">2018-2026</div><div class="l">amplitude snapshots</div></div>
+</div>
+```
 
-- **Dataset** : *Elections législatives des 30 juin et 7 juillet 2024 - Résultats
-  définitifs du 2nd tour* — Ministère de l'Intérieur.
-- **Page dataset** : <https://www.data.gouv.fr/fr/datasets/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-provisoires-du-2nd-tour/>
-- **Ressource utilisée** : `resultats-definitifs-par-commune.csv` (11.6 MB)
-- **URL stable** : `https://static.data.gouv.fr/resources/elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-definitifs-du-2nd-tour/20240710-170606/resultats-definitifs-par-commune.csv`
-- **Format** : CSV ; séparateur `;` ; décimales `,` ; encodage UTF-8.
-- **Structure** : *wide* — 1 ligne / commune, blocs de colonnes par candidat
-  (`Nuance candidat N`, `Nom candidat N`, `Voix N`, `% Voix/exprimés N`, `Elu N`,
-  pour `N = 1…25`).
-- **Couverture** : 31 392 communes au T2 (les ~4 500 communes manquantes
-  appartiennent à des circonscriptions où un candidat a été élu au 1er tour).
-- **Snapshot** : 2026-05-25 ; dernière maj data.gouv : 2024-07-10.
-- **Script** : `scripts/02_elections.R`
 
-## Élections — Législatives 2024, 2nd tour
+## Récapitulatif des 13 sources
 
-À documenter en Étape 2.
+```{=html}
+<table class="src-summary">
+  <thead>
+    <tr>
+      <th></th>
+      <th>Source</th>
+      <th>Organisme</th>
+      <th>Couverture</th>
+      <th>Snapshot</th>
+      <th>Script</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="ico">🗳️</td><td>Législatives 2024 (T2 + T1 fallback)</td><td>Min. Intérieur</td><td class="cov">~35 000 communes</td><td class="date">2024-07-10</td><td class="script">02_elections.R</td></tr>
+    <tr><td class="ico">🏛️</td><td>Municipales 2026 (T1 + T2)</td><td>Min. Intérieur</td><td class="cov">~3 300 communes</td><td class="date">2026-03-23</td><td class="script">12_municipales_2026.R</td></tr>
+    <tr><td class="ico">🏠</td><td>DVF Demandes de Valeurs Foncières</td><td>DGFiP / Etalab</td><td class="cov">655 495 ventes</td><td class="date">2021-2024</td><td class="script">03_dvf_aggregate.R</td></tr>
+    <tr><td class="ico">🌬️</td><td>Indice ATMO qualité de l'air</td><td>Atmo France</td><td class="cov">~25 000 communes</td><td class="date">30 j glissants</td><td class="script">04_air_atmo.R</td></tr>
+    <tr><td class="ico">🚨</td><td>SSMSI Délinquance + BAAC Accidents</td><td>Min. Intérieur (SSMSI) + ONISR</td><td class="cov">~18 000 + 11 099 communes</td><td class="date">2025 / 2024</td><td class="script">07_ssmsi_dgfip.R, 11_baac.R</td></tr>
+    <tr><td class="ico">💶</td><td>Comptes communaux DGFiP</td><td>DGFiP</td><td class="cov">~35 000 communes</td><td class="date">2024</td><td class="script">07_ssmsi_dgfip.R</td></tr>
+    <tr><td class="ico">⚕️</td><td>APL 5 professions DREES</td><td>DREES</td><td class="cov">~35 000 communes</td><td class="date">2023</td><td class="script">08_drees_apl.R</td></tr>
+    <tr><td class="ico">⚕️</td><td>Espérance de vie INSEE</td><td>INSEE</td><td class="cov">~28 000 communes</td><td class="date">2024</td><td class="script">09_esperance_vie.R</td></tr>
+    <tr><td class="ico">📊</td><td>FiLoSoFi Revenus disponibles</td><td>INSEE</td><td class="cov">~30 000 communes</td><td class="date">2021</td><td class="script">10_filosofi_densite_defm.R</td></tr>
+    <tr><td class="ico">👥</td><td>Populations + Grille densité INSEE</td><td>INSEE</td><td class="cov">~35 000 communes</td><td class="date">2017-2024</td><td class="script">06_insee_populations.R, 10_…</td></tr>
+    <tr><td class="ico">🏭</td><td>DEFM Chômage cat. A+B+C</td><td>DARES</td><td class="cov">~7 400 communes</td><td class="date">1 trimestre</td><td class="script">10_filosofi_densite_defm.R</td></tr>
+    <tr><td class="ico">🔥</td><td>Empreinte carbone par habitant</td><td>RARE / CITEPA</td><td class="cov">~34 800 communes</td><td class="date">2018 (base)</td><td class="script">13_energie_carbone.R</td></tr>
+    <tr><td class="ico">🚗</td><td>MOBPRO mobilité domicile-travail</td><td>INSEE (RP 2019)</td><td class="cov">~34 800 communes</td><td class="date">2019 (publié 2023)</td><td class="script">14_mobilite.R, 16_mobilite_flows.R</td></tr>
+    <tr><td class="ico">🌱</td><td>Agence Bio surfaces + opérateurs</td><td>Agence Bio</td><td class="cov">23 100 communes</td><td class="date">2024</td><td class="script">15_agriculture_bio.R</td></tr>
+  </tbody>
+</table>
+```
 
-- URL : *à compléter — Ministère de l'Intérieur via data.gouv.fr*
-- Format : *à compléter après inspection*
-- Snapshot : *à compléter*
-- Script : `scripts/02_elections.R`
 
-## Immobilier — DVF (Demandes de Valeurs Foncières)
+## 🗺️ Contours géographiques {.cat-section-title}
 
-- **URL** : `https://files.data.gouv.fr/geo-dvf/latest/csv/{YYYY}/full.csv.gz`
-- **Source** : DVF géolocalisé Etalab
-- **Format** : CSV gz, ~50-120 MB par année compressé
-- **Années retenues** : 2021-2024 (le service "latest" ne conserve que les 4
-  dernières années ; les snapshots datés (`/{YYYY-MM}/`) seraient nécessaires
-  pour les années plus anciennes)
-- **Filtres méthodo** :
-  - `nature_mutation = "Vente"`
-  - `type_local ∈ {"Appartement", "Maison"}`
-  - `surface_reelle_bati > 9 m²`
-  - `valeur_fonciere / surface_reelle_bati ∈ [200, 30000] €/m²`
-  - Mono-local : `COUNT(*) PARTITION BY id_mutation = 1`
-- **Snapshot** : 2026-05-25
-- **Script** : `scripts/03_dvf_aggregate.R` (duckdb stream + agrégation)
-- **Sortie** : 148 019 lignes (commune × année × type) sur 655 495 ventes filtrées
+::: {.cat-section-sub}
+Polygones IGN/OSM simplifiés pour les cartes leaflet.
+:::
 
-## Qualité de l'air — Indice ATMO par commune (Atmo France)
+```{=html}
+<div class="src-card cat-geo">
+  <h3>Contours départements</h3>
+  <div class="org">IGN / OpenStreetMap (dépôt gregoiredavid)</div>
+  <div class="field"><span class="field-label">URL</span><span class="field-value"><a href="https://france-geojson.gregoiredavid.fr/repo/departements.geojson">france-geojson.gregoiredavid.fr/repo/departements.geojson</a> (métropole) + 5 fichiers DROM séparés</span></div>
+  <div class="field"><span class="field-label">Format</span><span class="field-value">GeoJSON, EPSG:4326 (WGS84)</span></div>
+  <div class="field"><span class="field-label">Traitement</span><span class="field-value">Simplification Visvalingam-Whyatt via <code>rmapshaper::ms_simplify(keep = 0.20)</code> → 96 + 5 = 101 polygones, ~299 KB.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/01_geo_boundaries.R</code></span></div>
+  <div class="caveat">L'endpoint officiel <code>geo.api.gouv.fr/departements?geometry=contour&format=geojson</code> ignore <code>geometry</code> et renvoie les attributs sans géométries. D'où l'usage du dépôt gregoiredavid (standard dans la communauté data science francophone).</div>
+</div>
 
-- **Dataset** : *Indice de la qualité de l'air quotidien par commune - indice ATMO*
-- **Organisation** : Atmo France
-- **Page** : <https://www.data.gouv.fr/datasets/indice-de-la-qualite-de-lair-quotidien-par-commune-indice-atmo>
-- **Ressource CSV** : `https://www.data.gouv.fr/api/1/datasets/r/d2b9e8e6-8b0b-4bb6-9851-b4fa2efc8201`
-- **Format** : CSV virgule, UTF-8, ~16 MB
-- **Limite** : snapshot, contient seulement les 2-3 dates les plus récentes
-  (jour J + prévisions J+1, J+2). Pour de l'historique annuel, il faudrait
-  scraper le flux quotidien sur plusieurs mois ou utiliser le WFS avec
-  filtre date.
-- **Variables retenues** : `code_qual` (ATMO global), `code_no2`, `code_o3`,
-  `code_pm10`, `code_pm25` (sous-indices), `source` (AASQA), `x_wgs84`/`y_wgs84` (coords).
-- **Couverture** : ~25 000 communes (métropole + DROM partiel ; absence
-  Réunion + Nouvelle-Calédonie selon doc Atmo)
-- **Snapshot** : 2026-05-25
-- **Script** : `scripts/04_air_atmo.R`
+<div class="src-card cat-geo">
+  <h3>Contours communes</h3>
+  <div class="org">IGN / OpenStreetMap (dépôt gregoiredavid)</div>
+  <div class="field"><span class="field-label">URL</span><span class="field-value"><a href="https://france-geojson.gregoiredavid.fr/repo/communes.geojson">france-geojson.gregoiredavid.fr/repo/communes.geojson</a> (~23 MB) + DROM séparés</span></div>
+  <div class="field"><span class="field-label">Format</span><span class="field-value">GeoJSON, EPSG:4326</span></div>
+  <div class="field"><span class="field-label">Traitement</span><span class="field-value"><code>rmapshaper::ms_simplify(keep = 0.04)</code> → 35 927 polygones, ~16 MB (vs 23 MB en entrée).</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/01_geo_boundaries.R</code></span></div>
+</div>
+```
 
-## Données agrégées (Explorer)
 
-- **Source amont** : merge interne des trois sources ci-dessus
-- **Stratification** : quartiles d'inscrits (proxy taille de commune,
-  faute d'avoir téléchargé la grille de densité INSEE). Catégories :
-  Très petite (< 200), Petite (200-1 000), Moyenne (1 000-5 000),
-  Grande (> 5 000).
-- **Métriques de corrélation** : Spearman (défaut) + Pearson
-- **Paires bivariate pré-calculées** :
-  - `% RN × Prix m² App 2024`
-  - `% NFP × Prix m² App 2024`
-  - `Abstention × Prix m² App 2024`
-  - `% RN × PM2.5`
-  - `Prix m² App × ATMO`
-- **Script** : `scripts/05_merge_and_explore.R`
+## 🏛️ Politique {.cat-section-title}
+
+::: {.cat-section-sub}
+Élections nationales et locales par commune, codes nuances Ministère de l'Intérieur.
+:::
+
+```{=html}
+<div class="src-card cat-pol">
+  <h3>Législatives 2024 — 2nd tour par commune</h3>
+  <div class="org">Ministère de l'Intérieur · data.gouv.fr</div>
+  <div class="field"><span class="field-label">Dataset</span><span class="field-value"><em>Elections législatives des 30 juin et 7 juillet 2024 - Résultats définitifs du 2nd tour</em></span></div>
+  <div class="field"><span class="field-label">URL stable</span><span class="field-value"><code>static.data.gouv.fr/resources/elections-legislatives-…/resultats-definitifs-par-commune.csv</code> (11.6 MB)</span></div>
+  <div class="field"><span class="field-label">Format</span><span class="field-value">CSV ; séparateur <code>;</code> ; décimales <code>,</code> ; UTF-8 ; structure <em>wide</em> (1 ligne / commune, blocs de colonnes par candidat 1…25)</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">31 392 communes au T2 + 6 026 T1-only via fallback = ~37 400 entrées</span></div>
+  <div class="field"><span class="field-label">Snapshot</span><span class="field-value">2024-07-10 (publication MI)</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/02_elections.R</code></span></div>
+  <div class="caveat">Les ~6 000 communes décidées au 1er tour sont récupérées via le fichier T1 (~77 MB) et basculées sur le résultat T1. La colonne <code>tour</code> trace la nature du résultat affiché.</div>
+</div>
+
+<div class="src-card cat-pol">
+  <h3>Municipales 2026 — T1 + T2</h3>
+  <div class="org">Ministère de l'Intérieur · data.gouv.fr</div>
+  <div class="field"><span class="field-label">Dataset ID T1</span><span class="field-value"><code>4feeef01-24f7-4d5a-914f-8aa806f31ec2</code> (13.8 MB CSV)</span></div>
+  <div class="field"><span class="field-label">Dataset ID T2</span><span class="field-value"><code>6ff67a28-01bf-459e-beca-dd7aa8132dc1</code> (873 KB CSV)</span></div>
+  <div class="field"><span class="field-label">Stratégie</span><span class="field-value">T2 prioritaire (1 526 communes) + T1 fallback (1 779 décidées au 1er tour) = 3 305 communes ≥ 1 000 hab. Colonne <code>tour</code> trace le tour décisif.</span></div>
+  <div class="field"><span class="field-label">Snapshot</span><span class="field-value">2026-03-23</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/12_municipales_2026.R</code></span></div>
+  <div class="caveat">Les ~32 000 communes &lt; 1 000 hab. utilisent le scrutin majoritaire individuel et n'apparaissent pas dans le fichier source. Affichées en beige neutre sur la carte.</div>
+</div>
+```
+
+
+## 💶 Économie {.cat-section-title}
+
+::: {.cat-section-sub}
+Immobilier (DVF), finances communales (DGFiP), revenus des ménages (FiLoSoFi INSEE).
+:::
+
+```{=html}
+<div class="src-card cat-eco">
+  <h3>DVF — Demandes de Valeurs Foncières géolocalisées</h3>
+  <div class="org">DGFiP · Etalab · 4 années 2021-2024</div>
+  <div class="field"><span class="field-label">URL</span><span class="field-value"><code>files.data.gouv.fr/geo-dvf/latest/csv/{YYYY}/full.csv.gz</code> (50-120 MB par année compressé)</span></div>
+  <div class="field"><span class="field-label">Filtres</span><span class="field-value">
+    <ul>
+      <li><code>nature_mutation = "Vente"</code></li>
+      <li><code>type_local ∈ {"Appartement", "Maison"}</code></li>
+      <li><code>surface_reelle_bati &gt; 9 m²</code></li>
+      <li>Bornes prix/m² : <code>[200, 30 000]</code> €/m²</li>
+      <li>Mutations mono-local uniquement</li>
+    </ul>
+  </span></div>
+  <div class="field"><span class="field-label">Agrégation</span><span class="field-value">Médiane par commune × année × type → 148 019 lignes sur 655 495 ventes filtrées. N &lt; 5 ventes/an → <code>estimation_insuffisante</code>.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/03_dvf_aggregate.R</code> (duckdb stream)</span></div>
+  <div class="caveat">DVF ne couvre pas Mayotte (régime fiscal spécifique). Alsace-Moselle a un régime de publicité foncière distinct → couverture imparfaite en Bas-Rhin et Haut-Rhin.</div>
+</div>
+
+<div class="src-card cat-eco">
+  <h3>DGFiP — Comptes individuels des collectivités</h3>
+  <div class="org">DGFiP · Direction Générale des Finances Publiques · 2024</div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value">Recettes, charges, dette, CAF (capacité auto-financement) en €/habitant. Taux de 3 taxes locales : habitation, foncier bâti, foncier non bâti.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~35 000 communes</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/07_ssmsi_dgfip.R</code></span></div>
+</div>
+
+<div class="src-card cat-eco">
+  <h3>FiLoSoFi — Fichier Localisé Social et Fiscal</h3>
+  <div class="org">INSEE · revenu fiscal des ménages · 2021</div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value">Revenu disponible médian, déciles D1 et D9, indice de Gini, % ménages imposés, part des prestations sociales, part de l'activité dans le revenu.</span></div>
+  <div class="field"><span class="field-label">Format</span><span class="field-value">CSV séparateur <code>;</code> (français), UTF-8</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~30 000 communes (secret stat pour les très petites)</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/10_filosofi_densite_defm.R</code></span></div>
+</div>
+```
+
+
+## 🌍 Environnement {.cat-section-title}
+
+::: {.cat-section-sub}
+Qualité de l'air (Atmo France) et empreinte carbone consommation (RARE/CITEPA).
+:::
+
+```{=html}
+<div class="src-card cat-env">
+  <h3>Indice ATMO — qualité de l'air quotidien</h3>
+  <div class="org">Atmo France · data.gouv.fr</div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value"><code>code_qual</code> (ATMO global 1-6), sous-indices NO₂, O₃, PM₁₀, PM₂.₅, source AASQA, coordonnées station.</span></div>
+  <div class="field"><span class="field-label">Snapshot</span><span class="field-value">Agrégé sur <strong>30 jours glissants</strong> (vs jour J brut, trop volatil)</span></div>
+  <div class="field"><span class="field-label">EPCI expansion</span><span class="field-value">Bretagne (Air Breizh), Occitanie (Atmo Occitanie), Pays de la Loire (Air PdL) publient par EPCI → on étend la valeur sur les communes membres.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~25 000 communes (métropole + Guadeloupe + Martinique seulement pour DROM)</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/04_air_atmo.R</code></span></div>
+  <div class="caveat">Guyane, Réunion, Mayotte non couvertes par les AASQA → absentes des cartes air.</div>
+</div>
+
+<div class="src-card cat-env">
+  <h3>Empreinte carbone territorialisée — approche conso</h3>
+  <div class="org">RARE (Réseau Agences Régionales Énergie/Environnement) · CITEPA · 2026</div>
+  <div class="field"><span class="field-label">Dataset ID</span><span class="field-value"><code>698324c8e8ca100aa8807fd2</code></span></div>
+  <div class="field"><span class="field-label">Resource CSV</span><span class="field-value"><code>404b1641-8ad7-4eb1-b70b-51b48a8829eb</code> (27 MB)</span></div>
+  <div class="field"><span class="field-label">Méthode</span><span class="field-value">EXIOBASE 2018 (input-output multi-régional) × inventaire CITEPA, alloué par commune via structures de revenu/dépense locales.</span></div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value"><code>carb_hab_total</code> (tCO₂eq/hab/an, empreinte consommation). Médiane FR ≈ 7,9. Cible Accord de Paris : 2 t/hab d'ici 2050.</span></div>
+  <div class="field"><span class="field-label">Format</span><span class="field-value">CSV long (CODGEO, NOM_INDIC, VALEUR_INDIC, UNITE_INDIC), pivoté en wide à l'import.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">34 816 communes (DROM partiel)</span></div>
+  <div class="field"><span class="field-label">Snapshot</span><span class="field-value">2026-02-04 (publication), base 2018</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/13_energie_carbone.R</code></span></div>
+  <div class="caveat">Empreinte conso ≠ émissions territoriales. Reflète le mode de vie des habitants (logement, transport, alimentation), pas la localisation des usines. Outliers &gt; 50 tCO₂eq/hab = très petites communes au profil de consommation atypique.</div>
+</div>
+```
+
+
+## 🚨 Sécurité {.cat-section-title}
+
+::: {.cat-section-sub}
+Délinquance enregistrée et accidents corporels, deux sources Min. Intérieur.
+:::
+
+```{=html}
+<div class="src-card cat-sec">
+  <h3>SSMSI — Délinquance enregistrée par commune</h3>
+  <div class="org">Service Statistique Ministériel de la Sécurité Intérieure · 2025</div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value">8 indicateurs ‰ habitants : cambriolages, vols personnes, vols véhicules, violences sexuelles, dégradations, trafic stupéfiants, usage stupéfiants, total.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~18 000 communes (après secret stat)</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/07_ssmsi_dgfip.R</code></span></div>
+  <div class="caveat">Secret statistique : taux non publié si moins de 5 faits cumulés sur 3 ans. Les ~17 000 communes les plus petites sont en "non publié" (gris sur la carte).</div>
+</div>
+
+<div class="src-card cat-sec">
+  <h3>BAAC — Bulletin d'analyse des accidents corporels</h3>
+  <div class="org">ONISR / Min. Intérieur · 2024</div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value">Compte d'accidents corporels par commune, normalisé en ‰ habitants (joint avec <code>pop_latest</code>).</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">11 099 communes ayant ≥ 1 accident en 2024</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/11_baac.R</code></span></div>
+</div>
+```
+
+
+## ⚕️ Santé {.cat-section-title}
+
+::: {.cat-section-sub}
+Accès aux soins (DREES) et espérance de vie (INSEE).
+:::
+
+```{=html}
+<div class="src-card cat-sante">
+  <h3>APL — Accessibilité Potentielle Localisée (5 professions)</h3>
+  <div class="org">DREES · Direction Recherche, Études, Évaluation, Statistiques · 2023</div>
+  <div class="field"><span class="field-label">Professions</span><span class="field-value">
+    <ul>
+      <li>Médecins généralistes (tous + ≤65 ans pour soutenabilité future)</li>
+      <li>Infirmières</li>
+      <li>Sages-femmes</li>
+      <li>Dentistes</li>
+      <li>Kinésithérapeutes</li>
+    </ul>
+  </span></div>
+  <div class="field"><span class="field-label">Unité</span><span class="field-value">Médecins : consultations/an/habitant. <strong>Seuil désert médical &lt; 2,5</strong> (DREES). Autres pros : ETP/100k habitants.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~35 000 communes</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/08_drees_apl.R</code></span></div>
+</div>
+
+<div class="src-card cat-sante">
+  <h3>Espérance de vie INSEE par commune</h3>
+  <div class="org">INSEE · 2024</div>
+  <div class="field"><span class="field-label">Variable</span><span class="field-value">Espérance de vie à la naissance, années, par commune. Médiane nationale ~83 ans.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~28 000 communes (81,6% match)</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/09_esperance_vie.R</code></span></div>
+  <div class="caveat">INSEE ne publie pas le code commune INSEE dans ce fichier. Join par <em>nom commune + département normalisé</em> → 81,6% de taux de match. Les 18,4% non-match sont les communes au nom homonyme ou avec un nom INSEE différent du nom usuel.</div>
+</div>
+```
+
+
+## 👥 Population & social {.cat-section-title}
+
+::: {.cat-section-sub}
+Démographie INSEE (recensement + grille densité) et chômage DARES.
+:::
+
+```{=html}
+<div class="src-card cat-soc">
+  <h3>Populations INSEE — recensement</h3>
+  <div class="org">INSEE · recensement 2017-2021</div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value"><code>pop_latest</code> (recensement le plus récent disponible), strate de taille (5 niveaux : Très petite &lt; 500, Rurale 500-2 000, Bourg / périurbain 2 000-10 000, Ville moyenne 10 000-50 000, Grande ville ≥ 50 000).</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~35 000 communes</span></div>
+  <div class="field"><span class="field-label">Usage</span><span class="field-value">Base de stratification dans l'Explorer (corrélations × 5 strates). Variable population fournit le dénominateur pour tous les taux ‰.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/06_insee_populations.R</code></span></div>
+</div>
+
+<div class="src-card cat-soc">
+  <h3>Grille de densité INSEE — typologie 6 niveaux</h3>
+  <div class="org">INSEE · 2024</div>
+  <div class="field"><span class="field-label">Niveaux</span><span class="field-value">
+    <ol>
+      <li>Rural non périurbain</li>
+      <li>Rural périurbain</li>
+      <li>Petites villes</li>
+      <li>Centres urbains intermédiaires</li>
+      <li>Ceintures urbaines</li>
+      <li>Grands centres urbains</li>
+    </ol>
+  </span></div>
+  <div class="field"><span class="field-label">Usage</span><span class="field-value">Palette catégorielle sur la page Démographie + variable continue <code>densite_rang</code> (1-6) dans Explorer et Bivariée.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/10_filosofi_densite_defm.R</code></span></div>
+</div>
+
+<div class="src-card cat-soc">
+  <h3>DEFM — Chômage cat. A+B+C par commune</h3>
+  <div class="org">DARES · Direction Animation Recherche Études Statistiques</div>
+  <div class="field"><span class="field-label">Variable</span><span class="field-value">Demandeurs d'Emploi en Fin de Mois, catégories A (sans activité) + B (réduite courte) + C (réduite longue). Normalisé en taux ‰ habitants.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~7 400 communes seulement (DARES ne publie pas pour les plus petites)</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/10_filosofi_densite_defm.R</code></span></div>
+</div>
+
+<div class="src-card cat-soc">
+  <h3>MOBPRO — Mobilité domicile-travail (RP 2019)</h3>
+  <div class="org">INSEE · Recensement de la population · 2019 (publié 2023)</div>
+  <div class="field"><span class="field-label">Dataset ID</span><span class="field-value"><code>63db95ccf8de145951fa5fa3</code></span></div>
+  <div class="field"><span class="field-label">Resource ZIP</span><span class="field-value"><code>f3f22487-22d0-45f4-b250-af36fc56ccd0</code> (82 MB ZIP → ~500 MB CSV)</span></div>
+  <div class="field"><span class="field-label">Format source</span><span class="field-value">Fichier détail : ~5 M lignes, 1 ligne = 1 actif occupé pondéré (IPONDI).</span></div>
+  <div class="field"><span class="field-label">Variables clés</span><span class="field-value">
+    <ul>
+      <li><code>COMMUNE</code> = commune de résidence</li>
+      <li><code>DCLT</code> = commune lieu de travail</li>
+      <li><code>IPONDI</code> = pondération individuelle</li>
+      <li><code>TRANS</code> = mode (RP 2019 : 1=pas, 2=marche, 3=vélo, 4=2RM, <strong>5=voiture</strong>, <strong>6=TC</strong>)</li>
+    </ul>
+  </span></div>
+  <div class="field"><span class="field-label">Agrégation</span><span class="field-value">Via duckdb : <code>mob_pct_emploi_local</code>, <code>mob_pct_voiture/tc/velo/pied</code>, <code>mob_top_dest_code/flux</code>. Pour le Sankey, consolidation PLM (script <code>16_mobilite_flows.R</code>).</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">34 850 communes de résidence</span></div>
+  <div class="field"><span class="field-label">Scripts</span><span class="field-value"><code>scripts/14_mobilite.R</code> + <code>scripts/16_mobilite_flows.R</code></span></div>
+  <div class="caveat">⚠ INSEE a révisé le codage TRANS au RP 2017+ : le mode 5 = voiture (pas TC comme dans les anciens RP). Bug initial a confondu, fix documenté dans <a href="decisions.html#donnees">decisions.html</a>.</div>
+</div>
+```
+
+
+## 🌱 Agriculture {.cat-section-title}
+
+::: {.cat-section-sub}
+Agriculture biologique certifiée (Agence Bio).
+:::
+
+```{=html}
+<div class="src-card cat-agri">
+  <h3>Agence Bio — Surfaces, opérateurs, cheptels</h3>
+  <div class="org">Agence Bio · données communales certifiées 2008-2024</div>
+  <div class="field"><span class="field-label">Dataset ID</span><span class="field-value"><code>61a6250d8660681353681fa8</code></span></div>
+  <div class="field"><span class="field-label">Resources</span><span class="field-value">
+    <ul>
+      <li>SAU bio (33 MB CSV séparateur virgule) : <code>b7ce51bf-5675-4843-b618-247ef209416d</code></li>
+      <li>Opérateurs (89 MB CSV séparateur point-virgule) : <code>130c2031-0b6a-45b2-aa42-23114f21a730</code></li>
+    </ul>
+  </span></div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value">
+    <ul>
+      <li><code>bio_surface_ha</code> : AB certifiée + en conversion (C1+C2+C3), ha</li>
+      <li><code>bio_surface_ab</code> : certifiée AB seule</li>
+      <li><code>bio_n_exploit</code> : nombre d'exploitations bio</li>
+      <li><code>bio_n_operateurs</code> : exploitations + transformateurs + distributeurs</li>
+    </ul>
+  </span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">23 100 communes en 2024 (les ~12 000 sans aucune exploitation bio n'apparaissent pas dans le fichier source).</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/15_agriculture_bio.R</code></span></div>
+  <div class="caveat">Fichier opérateurs en long (1 ligne par production × activité) → on agrège par <code>sum(nboperateur)</code> par commune × année avant l'analyse. Distribution skewée : médiane 47 ha, max 16 817 ha → échelle log_quantile sur la carte.</div>
+</div>
+```
+
+
+## 🔬 Données dérivées (Explorer + Bivariée) {.cat-section-title}
+
+::: {.cat-section-sub}
+Artefacts construits à partir des 13 sources brutes pour les pages d'analyse.
+:::
+
+```{=html}
+<div class="src-card cat-deriv">
+  <h3>Commune merged + corrélations + bivariate bins</h3>
+  <div class="org">Pipeline interne · merge de toutes les sources</div>
+  <div class="field"><span class="field-label">Source amont</span><span class="field-value">Toutes les sources ci-dessus, jointes sur <code>code_commune</code> (PLM répercuté via <code>plm_map</code>).</span></div>
+  <div class="field"><span class="field-label">Artefacts</span><span class="field-value">
+    <ul>
+      <li><code>commune_merged.parquet</code> — 1 ligne / commune × 49 variables</li>
+      <li><code>correlations.parquet</code> — paires × méthode × strate (15 912 lignes : 49×49/2 × {Spearman, Pearson} × 6 niveaux)</li>
+      <li><code>bivariate_bins.parquet</code> — terciles × terciles pour 16 paires (571 712 lignes)</li>
+    </ul>
+  </span></div>
+  <div class="field"><span class="field-label">Stratification</span><span class="field-value">5 strates INSEE pop (Très petite → Grande ville) + fallback proxy inscrits.</span></div>
+  <div class="field"><span class="field-label">Filtre tautologies</span><span class="field-value">Top 25 Explorer exclut les paires intra-thématique (ex. <code>del_X × del_Y</code>, <code>fin_X × fin_Y</code>). 12 groupes thématiques servent de filtre.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/05_merge_and_explore.R</code></span></div>
+</div>
+```

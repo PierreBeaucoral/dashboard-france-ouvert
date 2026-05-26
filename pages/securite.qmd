@@ -199,3 +199,44 @@ if (ssmsi_ready) {
 ```
 :::
 
+## Row {height="18%" .fill}
+
+```{r}
+#| label: drom-sec-prep
+#| include: false
+if (ssmsi_ready) {
+  sec_drom_vals <- ssmsi_data |>
+    dplyr::transmute(code_commune, value = del_total_pour_mille)
+}
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (ssmsi_ready) choropleth_drom_socio_inset(com_drom_only, "971", sec_drom_vals, palette = .palette_red, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "971")
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (ssmsi_ready) choropleth_drom_socio_inset(com_drom_only, "972", sec_drom_vals, palette = .palette_red, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "972")
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (ssmsi_ready) choropleth_drom_socio_inset(com_drom_only, "973", sec_drom_vals, palette = .palette_red, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "973")
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (ssmsi_ready) choropleth_drom_socio_inset(com_drom_only, "974", sec_drom_vals, palette = .palette_red, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "974")
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (ssmsi_ready) choropleth_drom_socio_inset(com_drom_only, "976", sec_drom_vals, palette = .palette_red, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "976")
+```
+:::
+

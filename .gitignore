@@ -40,3 +40,24 @@ session_logs/*.md
 
 /.quarto/
 **/*.quarto_ipynb
+
+# ====== Agents / IDE assistants — ne pas déployer ======
+# Claude Code, Cursor, Aider, Copilot — tout ce qui est généré par un agent
+# IA reste local et n'a rien à faire sur un repo public.
+.claude/
+**/CLAUDE.md
+**/SKILL.md
+**/*.skill.md
+MEMORY.md
+quality_reports/
+.cursor/
+.cursorrules
+.aider*
+.codeium/
+.continue/
+.github/copilot/
+
+# Plans / notes d'agent
+**/plans/
+agent_outputs/
+

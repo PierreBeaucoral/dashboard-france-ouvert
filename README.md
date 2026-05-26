@@ -1,110 +1,150 @@
-# Tableau de bord · Données ouvertes France
+# 🇫🇷 Dashboard France · Données ouvertes
 
-Dashboard exploratoire croisant trois sources publiques (data.gouv.fr) à la
-maille communale :
+> Tableau de bord exploratoire — **35 000 communes**, **13 sources data.gouv.fr** publiques croisées, **49 indicateurs** disponibles.
 
-- **Élections** — Législatives 2024, second tour, par commune
-- **Immobilier** — Prix médian au m² par commune (DVF, 2019-2024)
-- **Qualité de l'air** — Indicateurs par station (Geod'air / LCSQA)
+[![Built with Quarto](https://img.shields.io/badge/built%20with-Quarto-2A6F97)](https://quarto.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-A4243B)](LICENSE)
+[![Data: open](https://img.shields.io/badge/data-data.gouv.fr-5C8B7D)](https://www.data.gouv.fr)
 
-Le dashboard permet l'exploration de chaque sujet **et** l'analyse des
-**corrélations** inter-sujets, avec stratification par densité urbaine.
+## 🌐 Site live
 
-## Stack
+**https://pierrebeaucoral.github.io/dashboard-france-ouvert/**
 
-- **Quarto Dashboard** en R (`.qmd`, rendu HTML statique)
-- **Interactivité** : `crosstalk` + `leaflet` + `plotly`/`ggiraph`
-- **Pipeline data** : R + `duckdb` + `sf` + `arrow`
-- **Déploiement** : GitHub Pages / Netlify (100% statique)
+## ✨ Contenu
 
-## Démarrage rapide
+**12 pages thématiques** (chacune avec carte cliquable + panel commune + 5 cartouches DROM) :
+
+🗳️ Législatives 2024 · 🏛️ Municipales 2026 · 🏠 Immobilier DVF · 🌬️ Qualité air ATMO · 🚨 Sécurité SSMSI+BAAC · 💶 Finances DGFiP · ⚕️ Désert médical DREES + EV INSEE · 📊 Revenus FiLoSoFi · 👥 Démographie INSEE+DARES · 🔥 Carbone RARE/CITEPA · 🚗 Mobilité MOBPRO · 🌱 Agriculture bio Agence Bio
+
+**4 pages analyse croisée** :
+
+🔀 Carte bivariée (palette Stevens 3×3, 1 176 combinaisons) · 📈 Explorer (heatmap 49×49 + top 25 corrélations + scatter LOESS) · 🕸️ Profil commune (radar 8D rang centile) · 🗂️ Small multiples départements (96 tuiles, 9 indicateurs)
+
+## 🚀 Quickstart
+
+### Pré-requis
+
+- R ≥ 4.3 (+ packages : `tidyverse`, `arrow`, `duckdb`, `leaflet`, `sf`, `networkD3`, `ggiraph`, `here`)
+- Quarto ≥ 1.5
+- ~2 GB d'espace disque (raw downloads) + ~500 MB pour le rendu HTML
+
+### Build complet depuis zéro
 
 ```bash
-# 1. Installer l'environnement R
-Rscript scripts/00_setup_env.R
+git clone https://github.com/PierreBeaucoral/dashboard-france-ouvert.git
+cd dashboard-france-ouvert
 
-# 2. Construire les artefacts data dans l'ordre
-Rscript scripts/01_geo_boundaries.R       # contours géo
-Rscript scripts/02_elections.R            # Législatives 2024
-Rscript scripts/03_dvf_aggregate.R        # DVF (immobilier)
-Rscript scripts/04_air_atmo.R             # Atmo France (air)
-Rscript scripts/06_insee_populations.R    # INSEE populations + COG
-Rscript scripts/07_ssmsi_dgfip.R          # SSMSI + DGFiP
-Rscript scripts/08_drees_apl.R            # APL santé (5 pros)
-Rscript scripts/09_esperance_vie.R        # INSEE espérance vie
-Rscript scripts/10_filosofi_densite_defm.R # FiLoSoFi + densité + DARES
-Rscript scripts/11_baac.R                 # accidents BAAC
-Rscript scripts/12_municipales_2026.R     # Municipales 2026 T2
-Rscript scripts/05_merge_and_explore.R    # merge final pour Explorer
+# Installer les packages R (1 commande)
+Rscript -e 'install.packages(c("tidyverse","arrow","duckdb","leaflet","sf",
+                                "networkD3","ggiraph","here","jsonlite",
+                                "readr","curl","htmlwidgets","htmltools",
+                                "tibble","rlang","stringr","tidyr","glue",
+                                "rmapshaper"))'
 
-# 3. Rendre le site
+# Pipeline data — chaque script télécharge ses sources brutes la 1ère fois,
+# puis lit le cache local
+for i in $(seq -w 1 18); do
+  Rscript scripts/${i}_*.R
+done
+
+# Rendu Quarto (22 pages, ~5 min)
 quarto render
-
-# 4. Tester localement (les modules JS Quarto exigent un serveur HTTP)
-cd _site && python3 -m http.server 8765
-# Ouvrir http://localhost:8765/
 ```
 
-## Déploiement GitHub Pages
-
-Limite GitHub Pages : 100 MB par fichier, 1 GB par site. Toutes les pages
-sont en dessous (la plus grosse, Élections, fait 45 MB).
+### Build incrémental (si parquets déjà présents)
 
 ```bash
-# Option 1 : publier _site/ sur la branche gh-pages
-git checkout --orphan gh-pages
-git rm -rf .
-cp -r _site/* .
-git add -A && git commit -m "Deploy"
-git push origin gh-pages
-
-# Option 2 : utiliser Quarto Publish
-quarto publish gh-pages
+quarto render
+quarto preview  # serveur local sur http://localhost:4848
 ```
 
-Activer GitHub Pages dans Settings → Pages → Source = `gh-pages` branch.
+## 📦 Sources de données
 
-## État d'avancement
+13 sources publiques, toutes via data.gouv.fr (sauf contours géo via [gregoiredavid/france-geojson](https://github.com/gregoiredavid/france-geojson)). Détails complets : [`docs/data-sources.qmd`](docs/data-sources.qmd).
 
-**État actuel : 10 pages thématiques + analyse + méthodologie, déployable GitHub Pages.**
+| Source | Org | Couverture | Snapshot |
+|--------|-----|------------|----------|
+| Législatives 2024 | Min. Intérieur | ~35 000 communes | 2024-07 |
+| Municipales 2026 | Min. Intérieur | 34 836 communes (élus toutes communes) | 2026-03 |
+| DVF immobilier | DGFiP / Etalab | 655 495 ventes | 2021-2024 |
+| Atmo air | Atmo France | ~25 000 communes | 30 j glissants |
+| SSMSI délinquance + BAAC accidents | Min. Intérieur / ONISR | ~18 000 + 11 099 | 2025 / 2024 |
+| DGFiP finances | DGFiP | ~35 000 | 2024 |
+| APL santé (5 pros) + EV INSEE | DREES + INSEE | ~35 000 + 28 000 | 2023-2024 |
+| FiLoSoFi revenus | INSEE | ~30 000 | 2021 |
+| Populations + Grille densité INSEE | INSEE | ~35 000 | 2017-2024 |
+| DEFM chômage | DARES | ~7 400 | 1 trimestre |
+| Empreinte carbone | RARE / CITEPA | ~34 800 | base 2018 |
+| MOBPRO mobilité | INSEE RP 2019 | ~34 800 | 2019 |
+| Agriculture bio | Agence Bio | 23 100 | 2024 |
 
-- [x] **Étapes 0-6** : socle (Législatives, DVF, Air, Bivariate, Explorer)
-- [x] **+ Sécurité** : SSMSI délinquance 2025 + BAAC accidents 2024
-- [x] **+ Finances** : DGFiP comptes communaux 2024
-- [x] **+ Santé** : APL 5 pros (médecins, infirmières, sages-femmes, dentistes, kinés) + espérance de vie INSEE 2024
-- [x] **+ Revenus** : INSEE FiLoSoFi 2021 (médiane, déciles, Gini)
-- [x] **+ Municipales 2026** : Min. Intérieur, communes T2 (1 526)
-- [x] **+ Démographie** : populations INSEE + grille de densité officielle
-- [x] **Bivariate étendu** : 2 dropdowns groupés, 37 variables, 1 369 paires possibles
-- [x] **Split multi-page** : 10 pages séparées (chacune < 100 MB), compatible GitHub Pages
+## 🏗️ Architecture
 
-## Structure
+- **Stack** : Quarto Dashboard en R, leaflet pour les cartes, ggplot2+ggiraph pour les heatmaps, networkD3 pour le Sankey, SVG natif pour les radar/scatter custom.
+- **Pipeline** : 18 scripts R numérotés (`scripts/01_…` à `scripts/18_…`), idempotents (cache local des raw downloads).
+- **Multi-page** : 1 page Quarto par thématique pour respecter la limite GitHub Pages de 100 MB/fichier (max actuel : 49 MB).
+- **Data** : 13 parquets dans `data/processed/`, ~41 MB total, versionnés. Raw downloads (`data/raw/`) gitignorés.
+
+## ⚠️ Avertissements
+
+**Ce dashboard est descriptif, pas causal.** Toute corrélation observée est une association au niveau communal, soumise au [biais écologique (Robinson, 1950)](docs/correlations.qmd). La densité urbaine est un confondant majeur de presque toutes les variables.
+
+Les snapshots des sources sont décalés (MOBPRO 2019, FiLoSoFi 2021, DGFiP 2024, etc.). Les croisements impliquent "dernière observation disponible × dernière observation disponible".
+
+Cf. [`docs/decisions.qmd`](docs/decisions.qmd) pour les choix méthodologiques détaillés.
+
+## 📂 Structure du repo
 
 ```
 .
-├── _quarto.yml           Config Quarto (site web)
-├── index.qmd             Page d'accueil
-├── dashboard.qmd         Dashboard (format: dashboard)
-├── R/                    Helpers R sourcés dans les .qmd
-├── scripts/              Pipeline data (R one-shot, numéroté)
+├── _quarto.yml                # config Quarto multi-page
+├── index.qmd                  # page d'accueil
+├── pages/                     # 12 thématiques + 4 analyse
+│   ├── elections.qmd
+│   ├── municipales.qmd
+│   ├── immobilier.qmd
+│   ├── ...
+│   ├── explorer.qmd
+│   ├── bivariate.qmd
+│   ├── profil.qmd
+│   └── departements.qmd
+├── docs/                      # docs méthodo (Quarto)
+│   ├── data-sources.qmd
+│   ├── decisions.qmd
+│   └── correlations.qmd
+├── R/                         # helpers partagés
+│   ├── setup_dashboard.R      # chargement données (sourcé par chaque page)
+│   ├── map_helpers.R          # choropleth_metropole, choropleth_municipales, DROM insets
+│   ├── socio_helpers.R        # choropleth_socio générique
+│   ├── dvf_helpers.R          # DVF breaks
+│   └── air_helpers.R          # ATMO
+├── scripts/                   # 18 scripts pipeline numérotés
+│   ├── 01_geo_boundaries.R
+│   ├── 02_elections.R
+│   ├── ...
+│   └── 18_municipales_elus.R
 ├── data/
-│   ├── raw/              Téléchargements bruts (gitignored)
-│   └── processed/        Artefacts (parquet, geojson) — commit
-├── styles/custom.scss    Thème
-└── docs/                 Sources, décisions, note sur corrélations
+│   ├── raw/                   # téléchargements .gitignore'd
+│   └── processed/             # parquets versionnés (~41 MB)
+└── styles/                    # SCSS custom
 ```
 
-## Méthodologie
+## 📜 Licence
 
-Toutes les décisions structurantes (filtres DVF, rattachement commune-station,
-choix de la métrique de corrélation, stratification) sont documentées dans
-[`docs/decisions.qmd`](docs/decisions.qmd). La note dédiée aux corrélations
-([`docs/correlations.qmd`](docs/correlations.qmd)) couvre le biais écologique
-et la lecture du *bivariate choropleth*.
+Code : **MIT** (cf. [LICENSE](LICENSE)).
 
-## Reproductibilité
+Données sources : restent sous leur licence d'origine, principalement **Licence Ouverte 2.0** (Etalab) — utilisation libre y compris commerciale, avec mention de la source. Cf. [data.gouv.fr/licences](https://www.data.gouv.fr/licences).
 
-- Versions R figées via `renv.lock`
-- Scripts du pipeline idempotents
-- Snapshots datés des sources dans `docs/data-sources.qmd`
-- Code source du dashboard visible (chunks repliables)
+## 🤝 Contribuer
+
+Issues + PR bienvenus. Pour ajouter une source :
+
+1. Créer `scripts/19_ma_source.R` qui télécharge + agrège par commune
+2. Étendre `R/setup_dashboard.R` pour charger le parquet
+3. Créer une page `pages/ma_source.qmd` (template depuis `pages/securite.qmd`)
+4. Ajouter au navbar dans `_quarto.yml`
+5. Documenter dans `docs/data-sources.qmd`
+
+---
+
+*Pierre Beaucoral · 2026*

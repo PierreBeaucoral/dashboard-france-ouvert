@@ -190,3 +190,44 @@ if (dgfip_ready) {
 ```
 :::
 
+## Row {height="18%" .fill}
+
+```{r}
+#| label: drom-fin-prep
+#| include: false
+if (dgfip_ready) {
+  fin_drom_vals <- dgfip_data |>
+    dplyr::transmute(code_commune, value = fin_recettes)
+}
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "971", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "971")
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "972", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "972")
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "973", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "973")
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "974", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "974")
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "976", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "976")
+```
+:::
+

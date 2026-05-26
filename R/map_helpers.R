@@ -49,21 +49,44 @@ drom_long_names <- c(
      }")
 }
 
-# Helper interne : ajoute un hook JS qui re-trigge map.invalidateSize() à
-# chaque changement de taille du conteneur (expansion modale de la card
-# Quarto Dashboard, redimensionnement fenêtre, etc.). Sans ce hook, leaflet
-# garde la taille initiale et la carte reste minuscule dans la modale.
+# Helper interne : ajoute un hook JS qui re-trigge map.invalidateSize() ET
+# re-fit les bounds à chaque changement de taille du conteneur (expansion
+# modale Quarto Dashboard, fullscreen, redimensionnement fenêtre).
+#
+# Sans re-fit, leaflet garde l'échelle calculée pour la taille initiale du
+# conteneur — un cartouche DROM 150×150 px reste affiché en mode fullscreen
+# avec ses 150 px de zoom natif, et la France/DROM occupe un timbre-poste
+# au centre. On stocke les bounds initiaux puis on les ré-applique à chaque
+# resize.
 .add_resize_handler <- function(map) {
   htmlwidgets::onRender(map,
     "function(el, x) {
        var self = this;
+       var initialBounds = null;
+       // Capture les bounds initiaux après le premier rendu.
+       setTimeout(function () {
+         try { initialBounds = self.getBounds(); } catch (e) {}
+       }, 200);
        var refresh = function () {
-         setTimeout(function () { self.invalidateSize(); }, 80);
+         setTimeout(function () {
+           self.invalidateSize(true);
+           if (initialBounds) {
+             try { self.fitBounds(initialBounds, { padding: [6, 6], animate: false }); }
+             catch (e) {}
+           }
+         }, 100);
        };
        if (typeof ResizeObserver !== 'undefined') {
          new ResizeObserver(refresh).observe(el);
+         // Observer aussi le parent direct .card (Quarto wrap) qui peut
+         // changer de classe sur expansion sans dimensionner el directement.
+         var card = el.closest('.card, .quarto-dashboard-card');
+         if (card) new ResizeObserver(refresh).observe(card);
        }
        window.addEventListener('resize', refresh);
+       // Quarto émet un événement custom à l'expansion. Pas garanti mais
+       // si présent, double sécurité.
+       document.addEventListener('fullscreenchange', refresh);
      }")
 }
 
@@ -244,6 +267,132 @@ choropleth_metropole <- function(com_sf, dep_sf) {
       className = "famille-legend"
     ) |>
     .add_resize_handler()
+}
+
+#' Choroplèthe Municipales — variante avec palette mieux contrastée pour
+#' "Divers" (~80% des communes sur ce scrutin) et stroke différencié T1/T2
+#' pour rendre visibles les ~2 300 communes décidées au 1er tour.
+#'
+#' @param com_sf sf des communes avec `famille_vainqueur` (NFP/ENS/RN/LR/Divers)
+#'   et `tour` ("T1"/"T2"). NAs autorisées (communes sans donnée).
+#' @param dep_sf sf des départements (sur-couche).
+choropleth_municipales <- function(com_sf, dep_sf) {
+  # Palette municipales : Divers boosté pour visibilité (olive saturé au
+  # lieu du gris national #8A8A8A) ; les autres familles inchangées.
+  mun_palette <- c(
+    "NFP"    = "#C73659",
+    "ENS"    = "#E6B800",
+    "RN"     = "#1B3A57",
+    "LR"     = "#4A90D9",
+    "Divers" = "#A18047"   # olive saturé (au lieu du gris national)
+  )
+  mun_color <- function(x) {
+    out <- unname(mun_palette[as.character(x)])
+    out[is.na(out)] <- "#E8E4DC"  # NA = beige neutre
+    out
+  }
+
+  # Stroke différencie T1 (or doré) et T2 (blanc) — l'œil voit immédiatement
+  # quelle commune est décidée à quel tour.
+  stroke_color <- ifelse(is.na(com_sf$tour), "#FFFFFF",
+                  ifelse(com_sf$tour == "T1", "#F0A500", "#FFFFFF"))
+  stroke_weight <- ifelse(is.na(com_sf$tour), 0.1,
+                  ifelse(com_sf$tour == "T1", 0.6, 0.3))
+  fill_opacity  <- ifelse(is.na(com_sf$famille_vainqueur), 0.20, 0.85)
+
+  tooltips <- sprintf(
+    "<div style='font-family:Inter,sans-serif;'>
+       <strong>%s</strong> <span style='color:#7A7A7A;'>(%s)</span><br>
+       <span style='font-family:IBM Plex Mono,monospace;'>%s · %s</span><br>
+       <span style='color:#7A7A7A;font-size:0.85em;'>%s%% au %s</span>
+     </div>",
+    htmltools::htmlEscape(com_sf$nom),
+    com_sf$code,
+    ifelse(is.na(com_sf$famille_vainqueur), "—", com_sf$famille_vainqueur),
+    ifelse(is.na(com_sf$nuance_vainqueur), "—", com_sf$nuance_vainqueur),
+    ifelse(is.na(com_sf$pct_vainqueur), "—",
+           format(round(com_sf$pct_vainqueur, 1), nsmall = 1)),
+    ifelse(is.na(com_sf$tour), "—", com_sf$tour)
+  ) |> lapply(htmltools::HTML)
+
+  leaflet::leaflet(
+    com_sf,
+    options = leaflet::leafletOptions(
+      preferCanvas       = TRUE,
+      zoomControl        = TRUE,
+      attributionControl = FALSE,
+      minZoom            = 4,
+      maxZoom            = 12
+    )
+  ) |>
+    .fit_to_sf(com_sf, padding = c(20, 20)) |>
+    leaflet::addPolygons(
+      data         = com_sf,
+      fillColor    = mun_color(com_sf$famille_vainqueur),
+      fillOpacity  = fill_opacity,
+      color        = stroke_color,
+      weight       = stroke_weight,
+      opacity      = 0.9,
+      smoothFactor = 0.4,
+      label        = tooltips,
+      labelOptions = leaflet::labelOptions(
+        style = list(
+          "padding"    = "6px 10px",
+          "background" = "#FFFFFF",
+          "border"     = "1px solid #DCD8CF",
+          "box-shadow" = "0 2px 6px rgba(0,0,0,0.06)"
+        ),
+        direction = "auto",
+        offset    = c(8, 0)
+      ),
+      highlightOptions = leaflet::highlightOptions(
+        weight       = 1.6,
+        color        = "#1A1A1A",
+        bringToFront = TRUE
+      ),
+      layerId = com_sf$code
+    ) |>
+    leaflet::addPolygons(
+      data         = dep_sf,
+      fill         = FALSE,
+      color        = "#1A1A1A",
+      weight       = 0.6,
+      opacity      = 0.55,
+      smoothFactor = 0.4,
+      options      = leaflet::pathOptions(interactive = FALSE)
+    ) |>
+    leaflet::addControl(
+      html      = .mun_legend_html(mun_palette),
+      position  = "bottomright",
+      className = "famille-legend"
+    ) |>
+    .add_resize_handler()
+}
+
+.mun_legend_html <- function(palette) {
+  rows <- paste0(
+    "<div class='lgd-row'>",
+    "<span class='lgd-swatch' style='background:", unname(palette), ";'></span>",
+    "<span class='lgd-label'>", names(palette), "</span>",
+    "<span class='lgd-hex'>", toupper(unname(palette)), "</span>",
+    "</div>",
+    collapse = ""
+  )
+  htmltools::HTML(paste0(
+    "<div class='lgd-box famille-legend'>",
+    "<div class='lgd-title'>Famille gagnante</div>",
+    rows,
+    "<div class='lgd-row' style='margin-top:8px;border-top:1px dashed #DCD8CF;padding-top:6px;'>",
+    "<span class='lgd-swatch' style='background:transparent;border:2px solid #F0A500;'></span>",
+    "<span class='lgd-label'>Décidé au T1</span></div>",
+    "<div class='lgd-row'>",
+    "<span class='lgd-swatch' style='background:transparent;border:2px solid #FFFFFF;outline:1px solid #DCD8CF;'></span>",
+    "<span class='lgd-label'>Décidé au T2</span></div>",
+    "<div class='lgd-row' style='margin-top:6px;'>",
+    "<span class='lgd-swatch' style='background:#E8E4DC;'></span>",
+    "<span class='lgd-label' style='color:#7A7A7A;'>&lt; 1 000 hab. (scrutin individuel)</span></div>",
+    "</div>"
+  ))
 }
 
 #' Légende HTML des familles politiques (utilisée par addControl).

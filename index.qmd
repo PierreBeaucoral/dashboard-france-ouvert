@@ -1,15 +1,23 @@
 ---
 title: "France · Données ouvertes"
-subtitle: "Tableau de bord exploratoire — 35 000 communes, 7 thématiques croisées"
+subtitle: "Tableau de bord exploratoire — 35 000 communes, 13 sources publiques, 49 indicateurs croisables"
 ---
 
 ```{=html}
 <style>
+.intro {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: #2A2A2A;
+  max-width: 780px;
+  margin: 8px 0 24px 0;
+}
+.intro strong { color: #1A1A1A; }
 .theme-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 16px;
-  margin: 24px 0;
+  margin: 16px 0 32px 0;
 }
 .theme-card {
   display: block;
@@ -27,91 +35,231 @@ subtitle: "Tableau de bord exploratoire — 35 000 communes, 7 thématiques croi
   transform: translateY(-1px);
 }
 .theme-card h3 { margin: 0 0 6px 0; font-size: 1.05rem; }
-.theme-card p { margin: 0; font-size: 0.85rem; color: #7A7A7A; line-height: 1.4; }
+.theme-card p { margin: 0; font-size: 0.85rem; color: #4A4A4A; line-height: 1.45; }
 .theme-card .src { font-size: 0.72rem; color: #999; margin-top: 8px; font-family: monospace; }
-.section-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: #7A7A7A; font-weight: 600; margin-top: 28px; margin-bottom: 4px; }
+.section-title {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #7A7A7A;
+  font-weight: 600;
+  margin-top: 36px;
+  margin-bottom: 4px;
+}
+.section-sub {
+  margin: 4px 0 14px 0;
+  color: #4A4A4A;
+  font-size: 0.92rem;
+  max-width: 720px;
+  line-height: 1.5;
+}
+.howto {
+  background: #F5F2EC;
+  border: 1px solid #DCD8CF;
+  border-radius: 6px;
+  padding: 18px 22px;
+  margin: 12px 0 24px 0;
+}
+.howto ol { margin: 8px 0 0 18px; padding: 0; }
+.howto li { margin: 6px 0; font-size: 0.92rem; line-height: 1.5; color: #2A2A2A; }
+.howto li strong { color: #A4243B; }
+.kpi-bar {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin: 12px 0 28px 0;
+  padding: 14px 18px;
+  background: #FAFAF8;
+  border: 1px solid #E8E4DC;
+  border-radius: 6px;
+}
+.kpi { text-align: left; }
+.kpi .v { font-family: "IBM Plex Mono", monospace; font-size: 1.4rem; font-weight: 600; color: #1A1A1A; }
+.kpi .l { font-size: 0.78rem; color: #7A7A7A; text-transform: uppercase; letter-spacing: 0.04em; }
 </style>
 ```
 
-Croisez **35 000 communes** de France métropolitaine et DROM sur 7 thématiques.
-Cliquez sur une commune pour voir tous ses indicateurs. Explorez les corrélations entre variables.
+::: {.intro}
+**Que sait-on d'une commune française ?** Population, votes, prix de l'immobilier,
+qualité de l'air, désert médical, dettes municipales, empreinte carbone, flux
+quotidiens domicile-travail, surfaces bio, accidents de la route — toutes ces
+informations existent en open data, mais éparpillées sur dix portails et
+treize formats différents.
 
-::: {.section-title}
-Thématiques
+Ce tableau de bord les **rassemble pour les 35 000 communes** et permet de les
+croiser. Cliquez sur une commune, voyez son profil sur les 49 indicateurs.
+Cherchez les corrélations entre variables. Comparez 96 départements d'un coup d'œil.
+:::
+
+```{=html}
+<div class="kpi-bar">
+  <div class="kpi"><div class="v">35 000</div><div class="l">communes</div></div>
+  <div class="kpi"><div class="v">13</div><div class="l">sources data.gouv</div></div>
+  <div class="kpi"><div class="v">49</div><div class="l">indicateurs</div></div>
+  <div class="kpi"><div class="v">16</div><div class="l">paires bivariées</div></div>
+  <div class="kpi"><div class="v">12</div><div class="l">thématiques</div></div>
+</div>
+```
+
+## Comment lire ce dashboard {.section-title}
+
+::: {.howto}
+1. **Une page = une thématique.** Choisissez un sujet dans la grille ci-dessous
+   (élections, immobilier, santé, etc.). Chaque page affiche une carte cliquable
+   et un panneau de détail pour la commune sélectionnée.
+2. **Cliquez sur une commune** pour faire apparaître ses indicateurs à droite.
+   Sur certaines pages (Démographie, Sécurité, Immobilier, Mobilité…), un sélecteur
+   d'indicateur change ce qui est cartographié en restant sur la même carte.
+3. **Pour croiser deux variables** entre elles, utilisez **🔀 Carte bivariée**
+   (palette 3×3 terciles) ou **📈 Explorer** (heatmap des 49×49 paires + scatter).
+4. **Pour voir une commune sur tous ses axes**, utilisez **🕸️ Profil radar** —
+   8 dimensions normalisées en rang centile national.
+5. **Pour comparer 96 départements**, utilisez **🗂️ Small multiples** — chaque
+   tuile = un département coloré par sa médiane.
+:::
+
+
+## Thématiques par commune {.section-title}
+
+::: {.section-sub}
+12 pages cartographiques, chacune avec un panneau cliquable et 5 cartouches DROM.
+Pour chaque thématique : couverture, source, snapshot.
 :::
 
 ```{=html}
 <div class="theme-grid">
   <a href="pages/elections.html" class="theme-card">
     <h3>🗳️ Législatives 2024</h3>
-    <p>Famille gagnante par commune, T1 et T2 détaillés.</p>
+    <p>Famille gagnante par commune au tour décisif, marge, abstention. T1 fallback pour les ~6 000 communes décidées au 1er tour.</p>
     <div class="src">Min. Intérieur · 35 000 communes</div>
   </a>
   <a href="pages/municipales.html" class="theme-card">
     <h3>🏛️ Municipales 2026</h3>
-    <p>Résultats par commune ayant eu un 2nd tour. Famille politique de la liste élue.</p>
-    <div class="src">Min. Intérieur · 1 526 communes T2</div>
+    <p>T1 + T2 combinés. Famille politique de la liste élue, marge, abstention. Stroke orange pour les communes décidées au T1.</p>
+    <div class="src">Min. Intérieur · ~3 300 communes ≥ 1 000 hab.</div>
   </a>
   <a href="pages/immobilier.html" class="theme-card">
     <h3>🏠 Immobilier</h3>
-    <p>Prix médian m² par commune, appartements et maisons, évolution 2021-2024.</p>
+    <p>Prix médian m² par commune, appartements et maisons. Évolution 2021-2024 sur le panneau commune.</p>
     <div class="src">DVF Etalab · 655 000 ventes</div>
   </a>
   <a href="pages/air.html" class="theme-card">
     <h3>🌬️ Qualité de l'air</h3>
-    <p>Indice ATMO moyen 30 jours, 5 polluants. EPCI expandés (Bretagne, Occitanie).</p>
+    <p>Indice ATMO moyen 30 jours sur 5 polluants (NO₂, O₃, PM₁₀, PM₂.₅). EPCI expandés là où la maille AASQA est intercommunale.</p>
     <div class="src">Atmo France · WFS</div>
   </a>
   <a href="pages/securite.html" class="theme-card">
     <h3>🚨 Sécurité</h3>
-    <p>Délinquance (8 indicateurs ‰) et accidents corporels par commune.</p>
+    <p>8 indicateurs SSMSI ‰ habitants : cambriolages, vols, violences, dégradations, trafic stup… + accidents corporels BAAC.</p>
     <div class="src">SSMSI 2025 · BAAC 2024</div>
   </a>
   <a href="pages/finances.html" class="theme-card">
     <h3>💶 Finances communales</h3>
-    <p>Recettes, charges, dette, CAF, taux des taxes locales.</p>
+    <p>Recettes, charges, dette, CAF en €/habitant. Taux des 3 taxes locales (habitation, foncier bâti, non-bâti).</p>
     <div class="src">DGFiP · comptes 2024</div>
   </a>
   <a href="pages/sante.html" class="theme-card">
     <h3>⚕️ Désert médical</h3>
-    <p>APL aux médecins, infirmières, sages-femmes, dentistes, kinésithérapeutes.</p>
-    <div class="src">DREES · APL 2023</div>
+    <p>APL 5 professions : médecins (+ ≤65 ans), infirmières, sages-femmes, dentistes, kinés. Espérance de vie INSEE par commune.</p>
+    <div class="src">DREES · INSEE · 2023-2024</div>
   </a>
   <a href="pages/revenus.html" class="theme-card">
     <h3>📊 Revenus</h3>
-    <p>Revenu médian, déciles D1/D9, indice de Gini, part des prestations.</p>
+    <p>Revenu médian disponible, déciles D1/D9, indice de Gini, part des prestations / activité, % ménages imposés.</p>
     <div class="src">INSEE · FiLoSoFi 2021</div>
+  </a>
+  <a href="pages/demographie.html" class="theme-card">
+    <h3>👥 Démographie & social</h3>
+    <p>Population recensement, typologie INSEE 6 niveaux (rural → grand centre urbain), taux de chômage DEFM A+B+C.</p>
+    <div class="src">INSEE · DARES</div>
+  </a>
+  <a href="pages/energie.html" class="theme-card">
+    <h3>🔥 Énergie · carbone</h3>
+    <p>Empreinte carbone par habitant en approche consommation (EXIOBASE × CITEPA). Médiane FR ≈ 7,9 tCO₂eq/hab/an.</p>
+    <div class="src">RARE · CITEPA · 2018</div>
+  </a>
+  <a href="pages/mobilite.html" class="theme-card">
+    <h3>🚗 Mobilité</h3>
+    <p>Flux domicile-travail : modes (voiture/TC/vélo/marche), part d'emploi local, top destination, Sankey des 100 plus gros flux.</p>
+    <div class="src">INSEE · MOBPRO 2019</div>
+  </a>
+  <a href="pages/agriculture.html" class="theme-card">
+    <h3>🌱 Agriculture bio</h3>
+    <p>Surfaces certifiées AB + en conversion, nombre d'exploitations bio, nombre d'opérateurs (production + transformation + distribution).</p>
+    <div class="src">Agence Bio · 2024</div>
   </a>
 </div>
 ```
 
-::: {.section-title}
-Analyse croisée
+
+## Analyses croisées {.section-title}
+
+::: {.section-sub}
+Quatre vues pour explorer **les liens entre indicateurs** plutôt qu'un sujet à la fois.
+Du tactique (deux variables côte à côte) au stratégique (49 variables d'un coup).
 :::
 
 ```{=html}
 <div class="theme-grid">
   <a href="pages/bivariate.html" class="theme-card">
     <h3>🔀 Carte bivariée</h3>
-    <p>Croisez 2 variables au choix parmi 37 indicateurs. Terciles × terciles, palette Stevens 3 × 3.</p>
-    <div class="src">1 369 combinaisons possibles</div>
+    <p>Croisez deux variables (49 disponibles) en terciles × terciles. Palette Stevens 3×3, 9 classes. Idéal pour démêler "X et Y vont-ils ensemble géographiquement ?"</p>
+    <div class="src">1 176 combinaisons possibles</div>
   </a>
   <a href="pages/explorer.html" class="theme-card">
     <h3>📈 Explorer</h3>
-    <p>Heatmap des corrélations Spearman entre toutes les variables. Scatter %RN × prix m² avec hexbin et LOESS.</p>
-    <div class="src">Analyse · 28 variables</div>
+    <p>Heatmap Spearman 49×49 + top 25 corrélations inter-thématiques (les tautologies intra-groupe sont exclues) + scatter interactif X/Y avec courbe LOESS.</p>
+    <div class="src">Spearman + Pearson · 5 strates</div>
+  </a>
+  <a href="pages/profil.html" class="theme-card">
+    <h3>🕸️ Profil commune</h3>
+    <p>Radar 8 dimensions normalisées en rang centile national. La "forme" du polygone révèle le profil-type : grande ville aisée, rural périurbain, banlieue ouvrière.</p>
+    <div class="src">35 408 communes · recherche par nom</div>
+  </a>
+  <a href="pages/departements.html" class="theme-card">
+    <h3>🗂️ Small multiples départements</h3>
+    <p>96 tuiles, chacune un département coloré par sa médiane communale. Toggle 9 indicateurs, tri valeur ou code. Vue d'ensemble nationale sans carte.</p>
+    <div class="src">96 départements métropole</div>
   </a>
 </div>
 ```
 
-::: {.section-title}
-Méthodologie
+
+## Avertissements importants {.section-title}
+
+::: {.callout-warning title="Ce dashboard est descriptif, pas causal"}
+**Toute corrélation observée est une association au niveau communal.**
+Elle ne dit **rien** de la causalité, ni du comportement individuel.
+
+- **Biais écologique (Robinson, 1950)** : si les communes où le vote RN est élevé
+  ont aussi des prix m² faibles, on ne peut **pas** en déduire que les électeurs
+  RN paient leur logement moins cher.
+- **Confondant urbain/rural** : la densité de population est corrélée à presque
+  toutes les variables (prix, vote, pollution, services, mobilité). La stratification
+  par typologie INSEE 6 niveaux permet d'en isoler une partie ; sur l'Explorer, le
+  scatter offre un filtre par strate.
+- **Snapshots décalés** : les sources n'ont pas la même date — MOBPRO 2019,
+  FiLoSoFi 2021, APL 2023, DGFiP 2024, Législatives 2024, Atmo 30j glissants,
+  Carbone 2018, SSMSI 2025, Municipales 2026. Les croisements impliquent une
+  comparaison "dernière observation contre dernière observation".
+- **Secret statistique** : SSMSI, DVF, FiLoSoFi appliquent un seuil minimal (n=5
+  par défaut). Les très petites communes apparaissent en gris ("non publié").
 :::
 
-- 📚 [Sources de données](docs/data-sources.qmd) — URL, format, snapshot de chaque source.
-- ⚙️  [Décisions méthodologiques](docs/decisions.qmd) — filtres, conventions, choix d'agrégation.
-- ⚠️  [Note sur les corrélations](docs/correlations.qmd) — biais écologique, stratification.
 
-::: {.callout-warning}
-Ce dashboard est exploratoire. Toute corrélation observée est descriptive — elle n'établit pas de relation causale. La densité urbaine est un confondant majeur de presque toutes les variables (vote, prix, pollution, services).
+## Méthodologie {.section-title}
+
+```{=html}
+<ul style="list-style:none;padding:0;margin:8px 0;">
+  <li style="margin:8px 0;"><a href="docs/data-sources.html" style="color:#2A6F97;">📚 Sources de données détaillées</a> — pour chaque source : ID data.gouv.fr, URL de téléchargement, format, snapshot, couverture commune.</li>
+  <li style="margin:8px 0;"><a href="docs/decisions.html" style="color:#2A6F97;">⚙️ Décisions méthodologiques</a> — filtres DVF, mapping nuances → familles politiques, agrégation PLM, traitement DROM, stratification densité.</li>
+  <li style="margin:8px 0;"><a href="docs/correlations.html" style="color:#2A6F97;">⚠️ Note sur les corrélations</a> — biais écologique, stratification, Spearman vs Pearson, lecture du bivariate choropleth.</li>
+</ul>
+```
+
+::: {.section-sub}
+Code source, scripts de prep et règles de build sont versionnés. Les ~12 scripts
+R (`scripts/01_…` à `scripts/16_…`) sont rerun-ables : `Rscript scripts/05_merge_and_explore.R`
+reconstruit `commune_merged.parquet`. Le rendu Quarto est statique et déployable
+sur GitHub Pages.
 :::

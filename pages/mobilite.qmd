@@ -1,0 +1,341 @@
+---
+title: "Mobilité · MOBPRO 2019"
+format:
+  dashboard:
+    orientation: rows
+    theme:
+      - cosmo
+      - ../styles/custom.scss
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+```
+
+```{r}
+#| label: inject-mob-data
+#| results: asis
+#| echo: false
+if (mob_ready_dt) {
+  mob_for_js <- mob_data |>
+    dplyr::transmute(
+      code  = code_commune,
+      n     = mob_n_actifs,
+      loc   = mob_pct_emploi_local,
+      voi   = mob_pct_voiture,
+      tc    = mob_pct_tc,
+      velo  = mob_pct_velo,
+      pied  = mob_pct_pied,
+      dest  = mob_top_dest_code,
+      flux  = mob_top_dest_flux
+    )
+  mob_json <- jsonlite::toJSON(mob_for_js, auto_unbox = TRUE, na = "null")
+  pal_js   <- jsonlite::toJSON(c("#F5F2EC", "#C6DCD0", "#85B2A1",
+                                 "#4A8071", "#1F4F40"))
+  cat('<script>\n',
+      'window.mobRaw = ', as.character(mob_json), ';\n',
+      'window.mobPalette = ', as.character(pal_js), ';\n',
+      'window.mobData = {};\n',
+      'window.mobRaw.forEach(function(r) { window.mobData[r.code] = r; });\n',
+      'window.mobFieldMap = { mob_pct_emploi_local:"loc", mob_pct_voiture:"voi", mob_pct_tc:"tc", mob_pct_velo:"velo" };\n',
+      'window.mobBreaks = {};\n',
+      'Object.keys(window.mobFieldMap).forEach(function(field) {\n',
+      '  var key = window.mobFieldMap[field];\n',
+      '  var vals = window.mobRaw.map(function(r) { return r[key]; })\n',
+      '             .filter(function(v) { return v != null && isFinite(v); })\n',
+      '             .sort(function(a,b){return a-b;});\n',
+      '  var n = vals.length;\n',
+      '  window.mobBreaks[field] = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return vals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
+      '});\n',
+      'window.mobColorFor = function(v, field) {\n',
+      '  if (v == null) return "#E8E4DC";\n',
+      '  var br = window.mobBreaks[field];\n',
+      '  for (var i = 1; i < 5; i++) { if (v < br[i]) return window.mobPalette[i-1]; }\n',
+      '  return window.mobPalette[4];\n',
+      '};\n',
+      'window.mobRecolor = function(field) {\n',
+      '  if (!window.mobMap) return;\n',
+      '  var key = window.mobFieldMap[field];\n',
+      '  window.mobMap.eachLayer(function(layer) {\n',
+      '    if (!layer.options || !layer.options.layerId) return;\n',
+      '    var ent = window.mobData[layer.options.layerId];\n',
+      '    var v = ent ? ent[key] : null;\n',
+      '    layer.setStyle({ fillColor: window.mobColorFor(v, field), fillOpacity: (v != null ? 0.85 : 0.25) });\n',
+      '  });\n',
+      '};\n',
+      'window.updateMobPanel = function(code) {\n',
+      '  var el = document.getElementById("mob-content");\n',
+      '  if (!el) return;\n',
+      '  var d = window.mobData[code];\n',
+      '  // Lookup nom + département : essaie communeLookup (page Elections), sinon fpcNames/fpcDepts (cette page).\n',
+      '  var elec = window.communeLookup && window.communeLookup[code];\n',
+      '  var nom  = elec ? elec.nom_commune : (window.fpcNames ? (window.fpcNames[code] || code) : code);\n',
+      '  var dept;\n',
+      '  if (elec) { dept = elec.libelle_dept + " (" + elec.code_dept + ")"; }\n',
+      '  else if (window.fpcDepts && window.fpcDepts[code]) { dept = "Dépt " + window.fpcDepts[code]; }\n',
+      '  else { dept = ""; }\n',
+      '  if (!d) { el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + (dept ? dept + " · " : "") + code + \'</div></div><div class="dvf-empty">Pas de données mobilité INSEE.</div>\'; return; }\n',
+      '  function fmt(x) { if (x == null) return "—"; return Number(x).toFixed(1); }\n',
+      '  function fmtInt(x) { return (x == null) ? "—" : Number(x).toLocaleString("fr-FR"); }\n',
+      '  var destNom = window.fpcNames && window.fpcNames[d.dest] ? window.fpcNames[d.dest] : ((window.communeLookup && window.communeLookup[d.dest]) ? window.communeLookup[d.dest].nom_commune : d.dest);\n',
+      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + (dept ? dept + " · " : "") + code + \'</div></div>\' +\n',
+      '    \'<div class="cp-section"><h4>Actifs occupés (RP 2019)</h4>\' +\n',
+      '    \'<div class="cp-kvs">\' +\n',
+      '    \'<div class="cp-kv"><span>Total pondéré</span><span class="cp-num">\' + fmtInt(d.n) + \'</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Emploi local</span><span class="cp-num">\' + fmt(d.loc) + \' %</span></div>\' +\n',
+      '    \'</div></div>\' +\n',
+      '    \'<div class="cp-section"><h4>Mode de transport principal</h4>\' +\n',
+      '    \'<div class="cp-kvs">\' +\n',
+      '    \'<div class="cp-kv"><span>Voiture</span><span class="cp-num">\' + fmt(d.voi) + \' %</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Transports en commun</span><span class="cp-num">\' + fmt(d.tc) + \' %</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Vélo</span><span class="cp-num">\' + fmt(d.velo) + \' %</span></div>\' +\n',
+      '    \'<div class="cp-kv"><span>Marche</span><span class="cp-num">\' + fmt(d.pied) + \' %</span></div>\' +\n',
+      '    \'</div></div>\' +\n',
+      '    (d.dest && d.dest !== code ? \'<div class="cp-section"><h4>Top destination</h4><div class="cp-kvs"><div class="cp-kv"><span>\' + destNom + \' (\' + d.dest + \')</span><span class="cp-num">\' + fmtInt(d.flux) + \' actifs</span></div></div></div>\' : "");\n',
+      '};\n',
+      '</script>\n',
+      sep = ""
+  )
+}
+```
+
+
+## Row {height="55%"}
+
+::: {.card title="Mobilité domicile-travail · part voiture / TC / emploi local" width="72%"}
+```{=html}
+<div class="dvf-controls">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Indicateur</span>
+    <div class="dvf-ctrl-radios" id="mob-radios">
+      <label><input type="radio" name="mob-ind" value="mob_pct_voiture" checked> % voiture</label>
+      <label><input type="radio" name="mob-ind" value="mob_pct_tc"> % TC</label>
+      <label><input type="radio" name="mob-ind" value="mob_pct_velo"> % vélo</label>
+      <label><input type="radio" name="mob-ind" value="mob_pct_emploi_local"> % emploi local</label>
+    </div>
+  </div>
+</div>
+```
+
+```{r}
+#| label: map-mob
+if (mob_ready_dt) {
+  vals0 <- mob_data |>
+    dplyr::transmute(code_commune, value = mob_pct_voiture)
+  m <- choropleth_socio(com_metro_only, dep_metro, vals0,
+                        palette = c("#F5F2EC", "#C6DCD0", "#85B2A1",
+                                    "#4A8071", "#1F4F40"),
+                        legend_title = "% voiture",
+                        value_unit   = "%",
+                        value_fmt    = function(x) format(round(x, 1), nsmall = 1))
+  m |>
+    htmlwidgets::onRender(
+      "function(el, x) {
+         window.mobMap = this;
+         var self = this;
+         this.on('click', function(e) {
+           if (e.layer && e.layer.options && e.layer.options.layerId) {
+             if (window.updateMobPanel) window.updateMobPanel(e.layer.options.layerId);
+             if (window.fpcRender)     window.fpcRender(e.layer.options.layerId);
+           }
+         });
+         function attach() {
+           self.eachLayer(function(layer) {
+             if (layer.options && layer.options.layerId && !layer._mobClickOn) {
+               layer._mobClickOn = true;
+               layer.on('click', function(e) {
+                 if (window.updateMobPanel) window.updateMobPanel(e.target.options.layerId);
+                 if (window.fpcRender)     window.fpcRender(e.target.options.layerId);
+               });
+             }
+           });
+         }
+         setTimeout(attach, 60);
+         setTimeout(attach, 500);
+         setTimeout(attach, 2000);
+         self.on('layeradd', function() { setTimeout(attach, 0); });
+         function onChange() {
+           var sel = document.querySelector('input[name=mob-ind]:checked');
+           if (sel && window.mobRecolor) window.mobRecolor(sel.value);
+         }
+         setTimeout(function() {
+           document.querySelectorAll('input[name=mob-ind]').forEach(function(r) {
+             r.addEventListener('change', onChange);
+           });
+         }, 300);
+       }"
+    )
+} else {
+  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>MOBPRO non chargé. Lancer <code>Rscript scripts/14_mobilite.R</code>.</p>")
+}
+```
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
+<div id="mob-panel" class="commune-panel">
+  <div id="mob-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir ses indicateurs de mobilité.</p>
+      <p class="cp-hint">Modes de transport, emploi local, top destination du flux sortant.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Source</strong> · INSEE · MOBPRO (RP 2019).<br>
+    Actifs occupés pondérés. % du total commune de résidence. TRANS = mode principal déclaré.
+  </div>
+</div>
+```
+:::
+
+## Row {height="30%"}
+
+::: {.card title="Flux de la commune sélectionnée · top 5 entrants + top 5 sortants"}
+```{r}
+#| label: inject-fpc-data
+#| results: asis
+#| echo: false
+if (fpc_ready) {
+  # On indexe par code_focal pour lookup JS instantané.
+  fpc_for_js <- fpc_data |>
+    dplyr::transmute(
+      code  = code_focal,
+      dir   = direction,
+      cnt   = code_counter,
+      nom   = nom_counter,
+      dept  = dept_counter,
+      flux  = flux,
+      rang  = rang
+    )
+  fpc_json <- jsonlite::toJSON(fpc_for_js, auto_unbox = TRUE, na = "null")
+
+  # Lookup nom de la commune focale (pour le titre). Construit depuis le
+  # même geo populations.parquet que script 17 (inclut ARM Paris/Lyon/Marseille
+  # consolidés vers leur ville mère via la consolidation PLM en amont).
+  focal_names <- arrow::read_parquet(here::here("data", "processed", "insee",
+                                                 "populations.parquet")) |>
+    dplyr::filter(type_com %in% c("COM", "ARM")) |>
+    dplyr::distinct(code_commune, nom_commune, code_dept) |>
+    dplyr::transmute(code = code_commune, nom = nom_commune, dept = code_dept)
+  # Ajouter les 3 codes PLM consolidés qui n'apparaissent pas tels quels
+  # dans le fichier populations (Paris=75056 si pas ARM, Lyon=69123, Marseille=13055).
+  plm_focal <- tibble::tibble(
+    code = c("75056", "69123", "13055"),
+    nom  = c("Paris", "Lyon",   "Marseille"),
+    dept = c("75",    "69",     "13")
+  )
+  focal_names <- dplyr::bind_rows(focal_names, plm_focal) |>
+    dplyr::distinct(code, .keep_all = TRUE)
+  focal_names_json <- jsonlite::toJSON(focal_names, auto_unbox = TRUE)
+  cat('<script>\n',
+      'window.fpcRaw = ', as.character(fpc_json), ';\n',
+      'window.fpcNames = {};\n',
+      'window.fpcDepts = {};\n',
+      'var _fn = ', as.character(focal_names_json), ';\n',
+      '_fn.forEach(function(r) { window.fpcNames[r.code] = r.nom; window.fpcDepts[r.code] = r.dept; });\n',
+      'window.fpcIndex = {};\n',
+      "window.fpcRaw.forEach(function(r) {\n",
+      '  if (!window.fpcIndex[r.code]) window.fpcIndex[r.code] = { in: [], out: [] };\n',
+      '  window.fpcIndex[r.code][r.dir].push(r);\n',
+      "});\n",
+      'window.fpcRender = function(code) {\n',
+      "  var canvas = document.getElementById('fpc-canvas');\n",
+      '  if (!canvas) return;\n',
+      '  var d = window.fpcIndex[code];\n',
+      '  var nom = window.fpcNames[code] || code;\n',
+      '  if (!d) {\n',
+      "    canvas.innerHTML = '<div style=\"padding:1.5rem;color:#7A7A7A;font-size:0.9rem;text-align:center;\">Pas de flux significatif depuis MOBPRO pour <strong>' + nom + '</strong> (' + code + ').</div>';\n",
+      '    return;\n',
+      '  }\n',
+      '  var maxFlux = 0;\n',
+      "  ['in','out'].forEach(function(dir) { (d[dir]||[]).forEach(function(r){ if (r.flux > maxFlux) maxFlux = r.flux; }); });\n",
+      '  function bar(items, dir, title, accentColor) {\n',
+      '    items = (items || []).slice().sort(function(a,b){return a.rang - b.rang;});\n',
+      "    var html = '<div style=\"flex:1;min-width:0;padding:8px 12px;\">';\n",
+      "    html += '<div style=\"font-size:0.78rem;text-transform:uppercase;letter-spacing:0.05em;color:#7A7A7A;font-weight:600;margin-bottom:8px;\">' + title + '</div>';\n",
+      '    if (items.length === 0) {\n',
+      "      html += '<div style=\"color:#7A7A7A;font-size:0.85rem;font-style:italic;\">Aucun flux significatif.</div>';\n",
+      '    } else {\n',
+      '      items.forEach(function(r) {\n',
+      '        var w = maxFlux > 0 ? (100 * r.flux / maxFlux) : 0;\n',
+      "        html += '<div style=\"margin-bottom:6px;\">';\n",
+      "        html += '<div style=\"display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:2px;\">';\n",
+      "        html += '<span style=\"color:#1A1A1A;\">' + r.nom + ' <span style=\\\"color:#7A7A7A;font-size:0.74rem;\\\">(' + r.dept + ')</span></span>';\n",
+      "        html += '<span style=\"font-family:IBM Plex Mono,monospace;color:#1A1A1A;\">' + Number(r.flux).toLocaleString('fr-FR') + '</span>';\n",
+      "        html += '</div>';\n",
+      "        html += '<div style=\"height:6px;background:#F0EDE6;border-radius:3px;overflow:hidden;\">';\n",
+      "        html += '<div style=\"height:100%;width:' + w.toFixed(1) + '%;background:' + accentColor + ';\"></div>';\n",
+      "        html += '</div>';\n",
+      "        html += '</div>';\n",
+      '      });\n',
+      '    }\n',
+      "    html += '</div>';\n",
+      '    return html;\n',
+      '  }\n',
+      "  var entrants = bar(d['in'],  'in',  '⬇ Top 5 ENTRANTS · résidents qui viennent travailler à ' + nom, '#2A6F97');\n",
+      "  var sortants = bar(d['out'], 'out', '⬆ Top 5 SORTANTS · résidents de ' + nom + ' qui partent travailler', '#A4243B');\n",
+      "  canvas.innerHTML = '<div style=\"display:flex;flex-direction:row;gap:12px;width:100%;height:100%;\">' + entrants + sortants + '</div>';\n",
+      '};\n',
+      '</script>\n',
+      sep = "")
+}
+```
+
+```{=html}
+<div id="fpc-canvas" style="width:100%;height:100%;min-height:240px;">
+  <div style="padding:1.5rem;color:#7A7A7A;font-size:0.9rem;text-align:center;">
+    <strong>Cliquez une commune sur la carte ci-dessus</strong> pour voir ses 5 plus gros flux entrants
+    (résidents d'ailleurs qui viennent y travailler) et ses 5 plus gros flux sortants (résidents qui en partent).
+    <br><span style="font-size:0.78rem;">Source : MOBPRO 2019 · PLM consolidé · 34 822 communes avec flux significatifs.</span>
+  </div>
+</div>
+```
+:::
+
+
+## Row {height="15%" .fill}
+
+```{r}
+#| label: drom-mob-prep
+#| include: false
+if (mob_ready_dt) {
+  mob_drom_vals <- mob_data |>
+    dplyr::transmute(code_commune, value = mob_pct_voiture)
+  .mob_drom_palette <- c("#F5F2EC", "#C6DCD0", "#85B2A1", "#4A8071", "#1F4F40")
+}
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (mob_ready_dt) choropleth_drom_socio_inset(com_drom_only, "971", mob_drom_vals, palette = .mob_drom_palette) else if (data_ready) drom_inset(dep_drom, "971")
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (mob_ready_dt) choropleth_drom_socio_inset(com_drom_only, "972", mob_drom_vals, palette = .mob_drom_palette) else if (data_ready) drom_inset(dep_drom, "972")
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (mob_ready_dt) choropleth_drom_socio_inset(com_drom_only, "973", mob_drom_vals, palette = .mob_drom_palette) else if (data_ready) drom_inset(dep_drom, "973")
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (mob_ready_dt) choropleth_drom_socio_inset(com_drom_only, "974", mob_drom_vals, palette = .mob_drom_palette) else if (data_ready) drom_inset(dep_drom, "974")
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (mob_ready_dt) choropleth_drom_socio_inset(com_drom_only, "976", mob_drom_vals, palette = .mob_drom_palette) else if (data_ready) drom_inset(dep_drom, "976")
+```
+:::

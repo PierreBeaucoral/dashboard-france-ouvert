@@ -37,6 +37,9 @@ dens_path  <- here::here("data", "processed", "insee_densite", "grille_densite.p
 defm_path  <- here::here("data", "processed", "dares", "defm_commune.parquet")
 apl_path   <- here::here("data", "processed", "drees", "apl_medecins.parquet")
 baac_path  <- here::here("data", "processed", "baac", "accidents_commune.parquet")
+carb_path  <- here::here("data", "processed", "energie", "carbone_commune.parquet")
+mob_path   <- here::here("data", "processed", "mobilite", "mobilite_commune.parquet")
+bio_path   <- here::here("data", "processed", "agriculture", "bio_commune.parquet")
 out_dir   <- here::here("data", "processed", "explorer")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -52,6 +55,9 @@ dens  <- if (file.exists(dens_path))  arrow::read_parquet(dens_path)  else NULL
 defm  <- if (file.exists(defm_path))  arrow::read_parquet(defm_path)  else NULL
 apl   <- if (file.exists(apl_path))   arrow::read_parquet(apl_path)   else NULL
 baac  <- if (file.exists(baac_path))  arrow::read_parquet(baac_path)  else NULL
+carb  <- if (file.exists(carb_path))  arrow::read_parquet(carb_path)  else NULL
+mob   <- if (file.exists(mob_path))   arrow::read_parquet(mob_path)   else NULL
+bio   <- if (file.exists(bio_path))   arrow::read_parquet(bio_path)   else NULL
 
 # ---- Préparer DVF : pivot 2024 App + Maison ----
 dvf_2024 <- dvf |>
@@ -189,6 +195,34 @@ if (!is.null(baac)) {
     )
 }
 
+# Bloc G — Empreinte carbone par habitant (RARE/CITEPA)
+if (!is.null(carb)) {
+  merged <- merged |>
+    dplyr::left_join(carb |> dplyr::select(code_commune, carb_hab_total),
+                     by = "code_commune")
+}
+
+# Bloc I — Mobilité INSEE MOBPRO 2019 (modes + emploi local)
+if (!is.null(mob)) {
+  merged <- merged |>
+    dplyr::left_join(
+      mob |> dplyr::select(code_commune, mob_pct_emploi_local,
+                           mob_pct_voiture, mob_pct_tc,
+                           mob_pct_velo, mob_pct_pied),
+      by = "code_commune"
+    )
+}
+
+# Bloc K — Agriculture biologique (Agence Bio)
+if (!is.null(bio)) {
+  merged <- merged |>
+    dplyr::left_join(
+      bio |> dplyr::select(code_commune, bio_surface_ha,
+                           bio_n_exploit, bio_n_operateurs),
+      by = "code_commune"
+    )
+}
+
 # Normaliser DEFM par population (taux chômage approx)
 if ("defm_abc" %in% names(merged) && "ctx_pop_latest" %in% names(merged)) {
   merged <- merged |>
@@ -249,7 +283,16 @@ NUMERIC_VARS <- c(
   # Chômage (Bloc 3 DARES) — taux pour 1000 hab.
   "defm_taux_pop",
   # Accidents corporels BAAC 2024 — taux pour 1000 hab.
-  "acc_taux_pop"
+  "acc_taux_pop",
+  # Typologie spatiale INSEE — rang 1 (rural) → 6 (grand centre urbain)
+  "densite_rang",
+  # Bloc G — Empreinte carbone (tCO2eq/hab/an)
+  "carb_hab_total",
+  # Bloc I — Mobilité (% du total commune)
+  "mob_pct_emploi_local", "mob_pct_voiture", "mob_pct_tc",
+  "mob_pct_velo", "mob_pct_pied",
+  # Bloc K — Agriculture biologique
+  "bio_surface_ha", "bio_n_exploit", "bio_n_operateurs"
 )
 
 corr_long <- function(df, method, strate_label = "Toutes") {
@@ -303,7 +346,20 @@ bivariate_pairs <- list(
   c("elec_pct_rn", "air_pm25"),
   c("elec_pct_nfp", "dvf_prix_app"),
   c("elec_abstention", "dvf_prix_app"),
-  c("dvf_prix_app", "air_qual")
+  c("dvf_prix_app", "air_qual"),
+  # Croisements introduits avec la page Démographie + nouvelles sources
+  c("defm_taux_pop", "elec_pct_rn"),
+  c("defm_taux_pop", "revenu_median"),
+  c("densite_rang", "dvf_prix_app"),
+  c("densite_rang", "elec_pct_rn"),
+  c("apl_medecins", "ctx_log_pop"),
+  c("revenu_median", "elec_pct_rn"),
+  c("gini", "del_total_pour_mille"),
+  # Blocs G / I / K (énergie, mobilité, agriculture)
+  c("carb_hab_total", "revenu_median"),
+  c("mob_pct_voiture", "densite_rang"),
+  c("mob_pct_emploi_local", "ctx_log_pop"),
+  c("bio_surface_ha", "elec_pct_nfp")
 )
 
 bin_pair <- function(df, x, y) {

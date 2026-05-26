@@ -109,6 +109,70 @@ if (elec_ready) {
   filo_ready  <- file.exists(filo_path_d)
   if (filo_ready) filo_data <- arrow::read_parquet(filo_path_d)
 
+  # ---- Démographie & social (population, densité, chômage) ----
+  densite_path <- here::here("data", "processed", "insee_densite",
+                             "grille_densite.parquet")
+  densite_ready <- file.exists(densite_path)
+  if (densite_ready) densite_data <- arrow::read_parquet(densite_path)
+
+  defm_path  <- here::here("data", "processed", "dares",
+                           "defm_commune.parquet")
+  defm_ready <- file.exists(defm_path)
+  if (defm_ready) {
+    defm_raw <- arrow::read_parquet(defm_path)
+    # Le fichier publie 1 trimestre — on prend le plus récent par commune.
+    defm_data <- defm_raw |>
+      dplyr::group_by(code_commune) |>
+      dplyr::slice_max(trimestre, n = 1L, with_ties = FALSE) |>
+      dplyr::ungroup()
+  }
+
+  # Population : on a déjà pop_insee chargé plus haut, mais on en re-extrait
+  # une copie autonome pour la page Démographie (peut tourner sans elec).
+  pop_path_alt <- here::here("data", "processed", "insee", "populations.parquet")
+  pop_ready_alt <- file.exists(pop_path_alt)
+  if (pop_ready_alt) {
+    pop_data <- arrow::read_parquet(pop_path_alt) |>
+      dplyr::filter(!is.na(code_commune)) |>
+      dplyr::group_by(code_commune) |>
+      dplyr::slice_max(pop_latest, n = 1L, with_ties = FALSE,
+                       na_rm = TRUE) |>
+      dplyr::ungroup() |>
+      dplyr::transmute(code_commune, pop_latest, strate_pop)
+  }
+  demo_ready <- pop_ready_alt && densite_ready  # DEFM optionnel
+
+  # ---- Bloc G : Empreinte carbone (RARE/CITEPA) ----
+  carb_path  <- here::here("data", "processed", "energie",
+                           "carbone_commune.parquet")
+  carb_ready <- file.exists(carb_path)
+  if (carb_ready) carb_data <- arrow::read_parquet(carb_path)
+
+  # ---- Bloc I : Mobilité domicile-travail (INSEE MOBPRO 2019) ----
+  mob_path  <- here::here("data", "processed", "mobilite",
+                          "mobilite_commune.parquet")
+  mob_ready_dt <- file.exists(mob_path)
+  if (mob_ready_dt) mob_data <- arrow::read_parquet(mob_path)
+
+  # Flux top-200 résidence × destination (script 16, pour Sankey)
+  flows_path  <- here::here("data", "processed", "mobilite",
+                            "flows_top.parquet")
+  flows_ready <- file.exists(flows_path)
+  if (flows_ready) flows_data <- arrow::read_parquet(flows_path)
+
+  # Top 5 entrants + top 5 sortants par commune (script 17)
+  fpc_path  <- here::here("data", "processed", "mobilite",
+                          "flows_per_commune.parquet")
+  fpc_ready <- file.exists(fpc_path)
+  if (fpc_ready) fpc_data <- arrow::read_parquet(fpc_path)
+
+  # ---- Bloc K : Agriculture biologique (Agence Bio) ----
+  bio_path  <- here::here("data", "processed", "agriculture",
+                          "bio_commune.parquet")
+  bio_ready <- file.exists(bio_path)
+  if (bio_ready) bio_data <- arrow::read_parquet(bio_path)
+
+
   plm_map <- tibble::tibble(
     arrond = c(
       sprintf("751%02d", 1:20),
@@ -132,10 +196,22 @@ if (elec_ready) {
   com_drom_results  <- com_results |>
     filter( substr(code, 1, 3) %in% DROM_CODES)
 
-  # Municipales 2026 (T2 seulement, ~1 500 communes)
+  # com_metro_only / com_drom_only : versions sans données élections
+  # (utiles pour les pages socio qui ont leurs propres jointures).
+  com_metro_only <- com |>
+    dplyr::filter(!substr(code, 1, 3) %in% DROM_CODES)
+  com_drom_only  <- com |>
+    dplyr::filter( substr(code, 1, 3) %in% DROM_CODES)
+
+  # Municipales 2026 (T1 + T2 combinés, ~3 300 communes ≥ 1 000 hab.)
   mun_path <- here::here("data", "processed", "municipales_2026",
-                        "resultats_t2.parquet")
+                        "resultats.parquet")
   mun_ready <- file.exists(mun_path)
+  # Élus 2026 par commune (script 18, couvre 34 836 communes y compris < 1 000 hab.)
+  elus_path  <- here::here("data", "processed", "municipales_2026",
+                           "elus_commune.parquet")
+  elus_ready <- file.exists(elus_path)
+  if (elus_ready) elus_data <- arrow::read_parquet(elus_path)
   if (mun_ready) {
     mun_data <- arrow::read_parquet(mun_path)
     com_mun_results <- com |>
@@ -200,8 +276,7 @@ if (dvf_ready) {
                   !estimation_insuffisante) |>
     dplyr::select(code_commune, prix_m2_median, n_transactions)
 
-  com_metro_only <- com |>
-    dplyr::filter(!substr(code, 1, 3) %in% DROM_CODES)
+  # com_metro_only / com_drom_only désormais définis plus haut (elec_ready).
 
   dvf_nested <- dvf |>
     dplyr::filter(!estimation_insuffisante) |>
