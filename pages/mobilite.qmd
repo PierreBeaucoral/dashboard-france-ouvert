@@ -18,6 +18,13 @@ source(here::here("R", "setup_dashboard.R"))
 ```
 
 ```{r}
+#| label: inject-commune-names
+#| results: asis
+#| echo: false
+emit_commune_names_js()
+```
+
+```{r}
 #| label: inject-mob-data
 #| results: asis
 #| echo: false

@@ -18,6 +18,13 @@ source(here::here("R", "setup_dashboard.R"))
 ```
 
 ```{r}
+#| label: inject-commune-names
+#| results: asis
+#| echo: false
+emit_commune_names_js()
+```
+
+```{r}
 #| label: inject-sec-data
 #| results: asis
 #| echo: false
@@ -76,8 +83,9 @@ if (ssmsi_ready) {
       '  if (!el) return;\n',
       '  var d = window.secData[code];\n',
       '  var elec = window.communeLookup && window.communeLookup[code];\n',
-      '  var nom = elec ? elec.nom_commune : code;\n',
-      '  var dept = elec ? (elec.libelle_dept + " (" + elec.code_dept + ")") : "";\n',
+      '  var alt  = window.communeNames && window.communeNames[code];\n',
+      '  var nom  = elec ? elec.nom_commune : (alt ? alt.nom : code);\n',
+      '  var dept = elec ? (elec.libelle_dept + " (" + elec.code_dept + ")") : (alt ? ("Dépt " + alt.dept) : "");\n',
       '  if (!d) {\n',
       '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Aucun taux publié (secret stat ou commune absente du fichier SSMSI).</div>\';\n',
       '    return;\n',

@@ -44,6 +44,45 @@ elec_path    <- here::here("data", "processed", "elections",
 
 DROM_CODES <- c("971", "972", "973", "974", "976")
 
+# ---- Lookup partagé : code commune → {nom, dept} ----------------
+# Sourcé par toutes les pages. Sert de fallback pour les panels cliquables
+# quand window.communeLookup (défini uniquement par pages/elections.qmd)
+# n'est pas disponible. Couvre COM + ARM (arrondissements PLM) + alias
+# consolidés Paris/Lyon/Marseille.
+.pop_path_for_names <- here::here("data", "processed", "insee", "populations.parquet")
+if (file.exists(.pop_path_for_names)) {
+  commune_names_df <- arrow::read_parquet(.pop_path_for_names) |>
+    dplyr::filter(type_com %in% c("COM", "ARM")) |>
+    dplyr::distinct(code_commune, nom_commune, code_dept) |>
+    dplyr::transmute(code = code_commune,
+                     nom  = nom_commune,
+                     dept = code_dept)
+  # Alias consolidés PLM (75056 Paris, 69123 Lyon, 13055 Marseille)
+  commune_names_df <- dplyr::bind_rows(
+    commune_names_df,
+    tibble::tibble(
+      code = c("75056", "69123", "13055"),
+      nom  = c("Paris", "Lyon",   "Marseille"),
+      dept = c("75",    "69",     "13")
+    )
+  ) |> dplyr::distinct(code, .keep_all = TRUE)
+}
+
+#' Émet une balise `<script>` qui peuple `window.communeNames` côté navigateur.
+#' À appeler depuis un chunk `results: asis, echo: false` sur chaque page qui
+#' affiche un panneau commune.
+emit_commune_names_js <- function() {
+  if (!exists("commune_names_df")) return(invisible())
+  json <- jsonlite::toJSON(commune_names_df, auto_unbox = TRUE, na = "null")
+  cat('<script>\n',
+      'window.communeNames = {};\n',
+      'var _cn_init = ', as.character(json), ';\n',
+      '_cn_init.forEach(function(r) { window.communeNames[r.code] = { nom: r.nom, dept: r.dept }; });\n',
+      '</script>\n',
+      sep = "")
+}
+
+
 data_ready <- file.exists(geo_dep_path)
 if (data_ready) {
   dep <- sf::read_sf(geo_dep_path, quiet = TRUE) |>

@@ -18,6 +18,13 @@ source(here::here("R", "setup_dashboard.R"))
 ```
 
 ```{r}
+#| label: inject-commune-names
+#| results: asis
+#| echo: false
+emit_commune_names_js()
+```
+
+```{r}
 #| label: inject-dvf-data
 #| results: asis
 #| echo: false
@@ -68,8 +75,9 @@ if (dvf_ready) {
       '  if (!el) return;\n',
       '  var entries = window.dvfData[code];\n',
       '  var elecInfo = window.communeLookup && window.communeLookup[code];\n',
-      '  var nom = elecInfo ? elecInfo.nom_commune : code;\n',
-      '  var dept = elecInfo ? (elecInfo.libelle_dept + " (" + elecInfo.code_dept + ")") : "";\n',
+      '  var alt      = window.communeNames && window.communeNames[code];\n',
+      '  var nom  = elecInfo ? elecInfo.nom_commune : (alt ? alt.nom : code);\n',
+      '  var dept = elecInfo ? (elecInfo.libelle_dept + " (" + elecInfo.code_dept + ")") : (alt ? ("Dépt " + alt.dept) : "");\n',
       '  if (!entries) {\n',
       '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Pas de transaction publiée (mono-local, App/Maison) sur 2021-2024.</div>\';\n',
       '    return;\n',
