@@ -30,7 +30,8 @@ if (apl_ready) {
       apli = round(apl_infirmieres, 2),
       apls = round(apl_sagefemmes, 2),
       apld = round(apl_dentistes, 2),
-      aplk = round(apl_kines, 2)
+      aplk = round(apl_kines, 2),
+      ev   = if ("esperance_vie" %in% names(apl_data)) round(esperance_vie, 1) else NA_real_
     )
   sante_json <- jsonlite::toJSON(sante_for_js, auto_unbox = TRUE, na = "null")
   apl_div_palette <- jsonlite::toJSON(c("#7A2424", "#D49687", "#E8E4DC",
@@ -47,14 +48,17 @@ if (apl_ready) {
       '  apl_infirmieres:     "apli",\n',
       '  apl_sagefemmes:      "apls",\n',
       '  apl_dentistes:       "apld",\n',
-      '  apl_kines:           "aplk"\n',
+      '  apl_kines:           "aplk",\n',
+      '  esperance_vie:       "ev"\n',
       '};\n',
-      '// Médecins : breaks fixes au seuil désert médical 2.5\n',
+      '// Médecins : breaks fixes au seuil désert médical 2,5.\n',
+      '// Espérance de vie : breaks divergents autour de la médiane nationale 83 ans.\n',
       '// Autres pros : quintiles auto (échelles incomparables — pour\n',
-      '// infirmières/kinés mesure en ETP/100k hab, ordres ~100)\n',
+      '// infirmières/kinés mesure en ETP/100k hab, ordres ~100).\n',
       'window.santeBreaks = {\n',
       '  apl_medecins:        [0, 1.5, 2.5, 3.5, 5, 50],\n',
-      '  apl_medecins_jeunes: [0, 1.5, 2.5, 3.5, 5, 50]\n',
+      '  apl_medecins_jeunes: [0, 1.5, 2.5, 3.5, 5, 50],\n',
+      '  esperance_vie:       [60, 78, 81, 84, 87, 110]\n',
       '};\n',
       '// Compute quintiles for the other 4 pros\n',
       '["apl_infirmieres","apl_sagefemmes","apl_dentistes","apl_kines"].forEach(function(field) {\n',
@@ -109,7 +113,8 @@ if (apl_ready) {
       '    \'<div class="cp-kv"><span>Sages-femmes</span><span class="cp-num">\' + fmt(d.apls) + \'</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Dentistes</span><span class="cp-num">\' + fmt(d.apld) + \'</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Kinésithérapeutes</span><span class="cp-num">\' + fmt(d.aplk) + \'</span></div>\' +\n',
-      '    \'</div></div>\';\n',
+      '    \'</div></div>\' +\n',
+      '    (d.ev != null ? \'<div class="cp-section"><h4>Espérance de vie (INSEE 2024)</h4><div class="cp-kvs"><div class="cp-kv"><span>Naissance</span><span class="cp-num">\' + fmt(d.ev) + \' ans</span></div></div></div>\' : "");\n',
       '};\n',
       '</script>\n',
       sep = ""
@@ -132,6 +137,7 @@ if (apl_ready) {
       <label><input type="radio" name="sante-ind" value="apl_sagefemmes"> Sages-femmes</label>
       <label><input type="radio" name="sante-ind" value="apl_dentistes"> Dentistes</label>
       <label><input type="radio" name="sante-ind" value="apl_kines"> Kinésithérapeutes</label>
+      <label><input type="radio" name="sante-ind" value="esperance_vie"> Espérance de vie</label>
     </div>
   </div>
 </div>
@@ -201,8 +207,8 @@ if (apl_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · DREES · APL 2023 · 5 professions.<br>
-    APL médecins en consultations/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab.
+    <strong>Sources</strong> · DREES · APL 2023 (5 pros). INSEE · Espérance de vie 2024.<br>
+    APL médecins en c/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab. EV en années, médiane nationale ~83.
   </div>
 </div>
 ```

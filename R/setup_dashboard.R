@@ -96,6 +96,14 @@ if (elec_ready) {
   apl_ready <- file.exists(apl_path)
   if (apl_ready) apl_data <- arrow::read_parquet(apl_path)
 
+  # Espérance de vie INSEE → joint à APL pour partager la page Santé
+  ev_path <- here::here("data", "processed", "insee_extra", "esperance_vie.parquet")
+  if (file.exists(ev_path) && apl_ready) {
+    ev_data <- arrow::read_parquet(ev_path) |>
+      dplyr::select(code_commune, esperance_vie)
+    apl_data <- apl_data |> dplyr::left_join(ev_data, by = "code_commune")
+  }
+
   filo_path_d <- here::here("data", "processed", "filosofi",
                             "revenus_communes.parquet")
   filo_ready  <- file.exists(filo_path_d)

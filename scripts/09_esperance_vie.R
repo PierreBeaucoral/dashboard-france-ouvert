@@ -1,26 +1,26 @@
 # ============================================================
 # scripts/09_esperance_vie.R
 #
-# Bloc 5 (suite) — Espérance de vie à la naissance par commune.
+# Bloc F (Santé suite) — Espérance de vie à la naissance par commune.
 #
-# Source : data.gouv.fr (snapshot 2024 INSEE)
-#   Dataset : 2024-esperance-de-vie-par-regions-departements-et-villes
-#   Ressource : CSV 74 KB
+# Source : data.gouv.fr "2024 : Espérance de vie par régions,
+# départements et villes" — INSEE.
 #
-# Format source : 1 colonne "Région-Département-Ville" + 1 colonne valeur.
-# 1 680 lignes (les principales communes + agrégats région/département).
+# Format source : 1 col "Région-Département-Ville" + 1 col valeur années.
+# 1 680 communes (principales). Pas de code INSEE → join par (nom_commune,
+# libelle_dept) normalisé contre le référentiel des populations INSEE.
 #
-# Caveat : espérance de vie au niveau commune est BRUITÉE pour les
-# petites communes (1-2 décès/an dominent la statistique). Médiane
-# nationale ~83 ans = cohérent. Outliers (11, 105) à interpréter
-# comme bruit de petit échantillon. Les analyses sérieuses devraient
-# pondérer par taille ou utiliser le niveau dépt.
+# Caveat : médiane nationale ~83 ans cohérente, mais variance brute par
+# commune (1-2 décès dominent une petite commune). À interpréter avec
+# prudence sur les très petites populations.
 #
 # Sortie : data/processed/insee_extra/esperance_vie.parquet
+#   (code_commune, esperance_vie, nom_commune, libelle_dept)
 # ============================================================
 
 suppressPackageStartupMessages({
   library(dplyr)
+  library(tidyr)
   library(arrow)
   library(here)
   library(readr)
@@ -28,21 +28,19 @@ suppressPackageStartupMessages({
   library(glue)
 })
 
-raw_path <- here::here("data", "raw", "insee_extra", "esperance_vie.csv")
-out_dir  <- here::here("data", "processed", "insee_extra")
-out_path <- file.path(out_dir, "esperance_vie.parquet")
+raw_path  <- here::here("data", "raw", "insee_extra", "esperance_vie.csv")
+out_dir   <- here::here("data", "processed", "insee_extra")
+out_path  <- file.path(out_dir, "esperance_vie.parquet")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 ev <- readr::read_csv(raw_path, show_col_types = FALSE)
 names(ev) <- c("hierarchie", "esperance_vie")
 
-# Parser "Région - Département - Ville" en 3 colonnes
+# Parser "Région - Département - Ville"
 ev_parsed <- ev |>
   tidyr::separate(hierarchie, into = c("region", "dept", "ville"),
                   sep = " - ", fill = "right", remove = FALSE) |>
   dplyr::mutate(
-    # Si "ville" est NA, c'est un agrégat département/région — on les
-    # garde séparément pour usage éventuel
     niveau = dplyr::case_when(
       is.na(dept)  ~ "region",
       is.na(ville) ~ "departement",
@@ -50,37 +48,60 @@ ev_parsed <- ev |>
     )
   )
 
-# Garder commune-level pour la carte (jointure par nom approximatif —
-# pas d'INSEE code dans la source). On laisse la possibilité d'utiliser
-# le niveau dept pour l'analyse macro.
+# Garde commune-level pour le join
 ev_commune <- ev_parsed |>
   dplyr::filter(niveau == "commune") |>
-  dplyr::transmute(
-    nom_commune_norm = stringr::str_to_lower(stringr::str_trim(ville)),
-    region, dept,
-    nom_commune = ville,
-    esperance_vie = as.numeric(esperance_vie)
-  )
+  dplyr::select(region, dept_src = dept, nom_src = ville, esperance_vie)
 
-arrow::write_parquet(ev_commune, out_path)
+# ---- Normalisation pour join (case + accents + espaces) ----
+normalize <- function(s) {
+  s |>
+    stringr::str_to_lower() |>
+    stringr::str_trim() |>
+    iconv(to = "ASCII//TRANSLIT", from = "UTF-8") |>
+    stringr::str_remove_all("[\\'\\\"^]") |>
+    stringr::str_replace_all("\\s+", " ")
+}
 
-# Aussi un agrégat dept (utile pour analyse macro / fallback)
-ev_dept <- ev_parsed |>
-  dplyr::filter(niveau == "departement") |>
+# Référentiel : combinaison nom commune + nom dept depuis les élections
+# (= seule source qui a les deux noms harmonisés à l'INSEE et code_insee)
+elec_path <- here::here("data", "processed", "elections",
+                        "legislatives_2024_t2.parquet")
+ref <- arrow::read_parquet(elec_path) |>
   dplyr::transmute(
-    region, nom_dept = dept,
-    esperance_vie_dept = as.numeric(esperance_vie)
-  )
-arrow::write_parquet(ev_dept, file.path(out_dir, "esperance_vie_dept.parquet"))
+    code_commune = code_insee,
+    key = paste(normalize(nom_commune), normalize(libelle_dept), sep = "|")
+  ) |>
+  dplyr::distinct(key, .keep_all = TRUE)
+
+ev_commune <- ev_commune |>
+  dplyr::mutate(key = paste(normalize(nom_src), normalize(dept_src), sep = "|"))
+
+joined <- ev_commune |>
+  dplyr::left_join(ref, by = "key")
+
+match_rate <- sum(!is.na(joined$code_commune)) / nrow(joined)
+message(glue::glue("Match : {sum(!is.na(joined$code_commune))} / {nrow(joined)} ",
+                   "({round(match_rate*100,1)}%)"))
+
+# Sortie : 1 ligne / commune matchée
+out <- joined |>
+  dplyr::filter(!is.na(code_commune)) |>
+  dplyr::transmute(
+    code_commune,
+    esperance_vie = as.numeric(esperance_vie),
+    nom_src,
+    dept_src,
+    region
+  ) |>
+  dplyr::distinct(code_commune, .keep_all = TRUE)
+
+arrow::write_parquet(out, out_path)
 
 cat(glue::glue("
 
-  ✔ Espérance de vie {nrow(ev_commune)} communes → {out_path}
-  ✔ Espérance de vie {nrow(ev_dept)} départements → esperance_vie_dept.parquet
+  ✔ {nrow(out)} communes matchées sur {nrow(ev_commune)} ({round(100*nrow(out)/nrow(ev_commune),1)}%) → {out_path}
 
-  Distribution commune-level (à interpréter avec prudence — bruit fort
-  sur les petites communes) :
+  Distribution espérance de vie (années) :
 "))
-print(summary(ev_commune$esperance_vie))
-cat("\n  Distribution dept-level (robuste) :\n")
-print(summary(ev_dept$esperance_vie_dept))
+print(summary(out$esperance_vie))
