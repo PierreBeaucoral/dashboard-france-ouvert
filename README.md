@@ -23,26 +23,60 @@ Le dashboard permet l'exploration de chaque sujet **et** l'analyse des
 # 1. Installer l'environnement R
 Rscript scripts/00_setup_env.R
 
-# 2. Construire les artefacts data (à venir, par étape)
-# Rscript scripts/01_geo_boundaries.R    # Étape 1
-# Rscript scripts/02_elections.R         # Étape 2
-# ...
+# 2. Construire les artefacts data dans l'ordre
+Rscript scripts/01_geo_boundaries.R       # contours géo
+Rscript scripts/02_elections.R            # Législatives 2024
+Rscript scripts/03_dvf_aggregate.R        # DVF (immobilier)
+Rscript scripts/04_air_atmo.R             # Atmo France (air)
+Rscript scripts/06_insee_populations.R    # INSEE populations + COG
+Rscript scripts/07_ssmsi_dgfip.R          # SSMSI + DGFiP
+Rscript scripts/08_drees_apl.R            # APL santé (5 pros)
+Rscript scripts/09_esperance_vie.R        # INSEE espérance vie
+Rscript scripts/10_filosofi_densite_defm.R # FiLoSoFi + densité + DARES
+Rscript scripts/11_baac.R                 # accidents BAAC
+Rscript scripts/12_municipales_2026.R     # Municipales 2026 T2
+Rscript scripts/05_merge_and_explore.R    # merge final pour Explorer
 
-# 3. Rendre le dashboard
+# 3. Rendre le site
 quarto render
+
+# 4. Tester localement (les modules JS Quarto exigent un serveur HTTP)
+cd _site && python3 -m http.server 8765
+# Ouvrir http://localhost:8765/
 ```
 
-Le site rendu est dans `_site/`.
+## Déploiement GitHub Pages
+
+Limite GitHub Pages : 100 MB par fichier, 1 GB par site. Toutes les pages
+sont en dessous (la plus grosse, Élections, fait 45 MB).
+
+```bash
+# Option 1 : publier _site/ sur la branche gh-pages
+git checkout --orphan gh-pages
+git rm -rf .
+cp -r _site/* .
+git add -A && git commit -m "Deploy"
+git push origin gh-pages
+
+# Option 2 : utiliser Quarto Publish
+quarto publish gh-pages
+```
+
+Activer GitHub Pages dans Settings → Pages → Source = `gh-pages` branch.
 
 ## État d'avancement
 
-- [x] **Étape 0 — Setup** : structure projet, thème, scaffolding
-- [x] **Étape 1 — Squelette carte** : contours départements (101 entités, simplifiés à 299 KB), 5 cartouches DROM, navigation cliquable
-- [x] **Étape 2 — Législatives 2024** : choroplèthe communal par famille gagnante (NFP/ENS/LR/RN/Divers) sur 35 232 communes T1+T2, tooltip riche, légende, rendu canvas, panneau latéral au clic
-- [x] **Étape 3 — DVF** : agrégation duckdb 4 ans (2021-2024), choroplèthe prix m² par commune, sélecteurs année/type, panneau trend temporel
-- [x] **Étape 4 — Qualité de l'air** : indice ATMO snapshot par commune (~25k), sélecteur sous-polluant (NO₂/O₃/PM₁₀/PM₂.₅), panneau pills colorées
-- [x] **Étape 5 — Mode bivarié** : choroplèthe 3×3 sur paires pré-calculées (% RN × Prix App, % NFP × Prix, Abstention × Prix, % RN × PM₂.₅, Prix × ATMO), légende Stevens
-- [x] **Étape 6 — Explorer** : heatmap interactive ggiraph des corrélations Spearman, scatter hexbin %RN × prix App avec LOESS, note méthodo
+**État actuel : 10 pages thématiques + analyse + méthodologie, déployable GitHub Pages.**
+
+- [x] **Étapes 0-6** : socle (Législatives, DVF, Air, Bivariate, Explorer)
+- [x] **+ Sécurité** : SSMSI délinquance 2025 + BAAC accidents 2024
+- [x] **+ Finances** : DGFiP comptes communaux 2024
+- [x] **+ Santé** : APL 5 pros (médecins, infirmières, sages-femmes, dentistes, kinés) + espérance de vie INSEE 2024
+- [x] **+ Revenus** : INSEE FiLoSoFi 2021 (médiane, déciles, Gini)
+- [x] **+ Municipales 2026** : Min. Intérieur, communes T2 (1 526)
+- [x] **+ Démographie** : populations INSEE + grille de densité officielle
+- [x] **Bivariate étendu** : 2 dropdowns groupés, 37 variables, 1 369 paires possibles
+- [x] **Split multi-page** : 10 pages séparées (chacune < 100 MB), compatible GitHub Pages
 
 ## Structure
 
