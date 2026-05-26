@@ -1,0 +1,112 @@
+---
+title: "Explorer · corrélations"
+format:
+  dashboard:
+    orientation: rows
+    theme:
+      - cosmo
+      - ../styles/custom.scss
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+```
+
+
+## Row {height="30%"}
+
+::: {.card title="Lecture · biais écologique"}
+**Corrélation n'est pas causalité.** Les liens montrés sont descriptifs au
+niveau communal. Ils sont sujets au **biais écologique** : une corrélation
+entre variables au niveau commune ne dit rien sur les individus.
+
+La densité urbaine est un **confondant majeur** — prix immobilier, vote,
+pollution et abstention sont tous corrélés au caractère urbain/rural.
+La stratification par taille de commune permet d'en démêler une partie.
+[Note méthodologique complète](docs/correlations.qmd).
+:::
+
+## Row {height="70%"}
+
+::: {.card title="Corrélations entre variables · Spearman, global" width="50%"}
+```{r}
+#| label: corr-heatmap
+#| fig-width: 7
+#| fig-height: 7
+if (explorer_ready) {
+  suppressPackageStartupMessages({ library(ggplot2); library(ggiraph) })
+
+  pretty_label <- c(
+    "elec_pct_nfp"     = "% NFP",
+    "elec_pct_ens"     = "% Ensemble",
+    "elec_pct_rn"      = "% RN",
+    "elec_pct_lr"      = "% LR",
+    "elec_pct_divers"  = "% Divers",
+    "elec_abstention"  = "Abstention",
+    "elec_marge"       = "Marge vainq.",
+    "dvf_prix_app"     = "Prix m² App",
+    "dvf_prix_mai"     = "Prix m² Mai",
+    "air_qual"         = "ATMO global",
+    "air_no2"          = "NO₂",
+    "air_o3"           = "O₃",
+    "air_pm10"         = "PM₁₀",
+    "air_pm25"         = "PM₂.₅",
+    "ctx_log_inscrits" = "log(inscrits)",
+    "ctx_log_pop"      = "log(population)",
+    "del_total_pour_mille" = "Délinq. totale ‰",
+    "del_cambriolages" = "Cambriolages ‰",
+    "del_violences_sex" = "Viol. sexuelles ‰",
+    "del_trafic_stup"  = "Trafic stup. ‰",
+    "del_degradations" = "Dégradations ‰",
+    "del_vols_pers"    = "Vols personnes ‰",
+    "fin_recettes"     = "Recettes €/hab",
+    "fin_charges"      = "Charges €/hab",
+    "fin_dette"        = "Dette €/hab",
+    "fin_caf"          = "CAF €/hab",
+    "fin_taux_taxe_hab" = "Taxe hab. (%)",
+    "fin_taux_fonc_bati" = "Foncier bâti (%)"
+  )
+
+  d <- correlations |>
+    dplyr::filter(method == "spearman", strate == "Toutes") |>
+    dplyr::mutate(
+      v1_label = factor(pretty_label[v1], levels = unname(pretty_label)),
+      v2_label = factor(pretty_label[v2], levels = unname(pretty_label))
+    )
+
+  # Matrice symétrique (les paires en haut-droite)
+  d_sym <- dplyr::bind_rows(
+    d,
+    d |> dplyr::transmute(v1 = v2, v2 = v1, method, strate, n, rho,
+                          v1_label = v2_label, v2_label = v1_label)
+  )
+
+  p <- ggplot(d_sym, aes(x = v2_label, y = v1_label, fill = rho)) +
+    geom_tile_interactive(aes(
+      tooltip = sprintf("%s × %s\nρ = %.2f (n = %d)",
+                        v1_label, v2_label, rho, n)
+    ), color = "white", linewidth = 0.3) +
+    scale_fill_gradient2(
+      low = "#1B3A57", mid = "#F5F2EC", high = "#A4243B",
+      midpoint = 0, limits = c(-1, 1), na.value = "#E8E4DC",
+      name = "ρ"
+    ) +
+    coord_fixed() +
+    theme_minimal(base_family = "Inter") +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+      axis.text.y = element_text(size = 9),
+      axis.title = element_blank(),
+      panel.grid = element_blank(),
+      legend.position = "right"
+    )
+
+  girafe(ggobj = p, width_svg = 6.5, height_svg = 6.5,
+         options = list(opts_tooltip(css = "background:white;color:#1A1A1A;padding:6px 10px;border:1px solid #DCD8CF;border-radius:4px;font-family:Inter;font-size:12px;")))
+}
+```

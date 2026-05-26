@@ -3,20 +3,40 @@ project:
   output-dir: _site
   render:
     - index.qmd
-    - dashboard.qmd
+    - pages/*.qmd
     - docs/*.qmd
 
 website:
   title: "France · Données ouvertes"
-  description: "Tableau de bord exploratoire — élections, immobilier, qualité de l'air"
+  description: "Tableau de bord exploratoire — Législatives 2024, immobilier, qualité de l'air, sécurité, finances, santé, revenus"
   navbar:
     background: light
     pinned: true
     left:
       - href: index.qmd
         text: Accueil
-      - href: dashboard.qmd
-        text: Dashboard
+      - text: Thématiques
+        menu:
+          - href: pages/elections.qmd
+            text: Élections
+          - href: pages/immobilier.qmd
+            text: Immobilier
+          - href: pages/air.qmd
+            text: Qualité de l'air
+          - href: pages/securite.qmd
+            text: Sécurité
+          - href: pages/finances.qmd
+            text: Finances
+          - href: pages/sante.qmd
+            text: Santé
+          - href: pages/revenus.qmd
+            text: Revenus
+      - text: Analyse
+        menu:
+          - href: pages/bivariate.qmd
+            text: Carte bivariée
+          - href: pages/explorer.qmd
+            text: Explorer · corrélations
       - text: Méthodologie
         menu:
           - href: docs/data-sources.qmd
@@ -36,13 +56,13 @@ format:
       - styles/custom.scss
     toc: false
     code-fold: true
-    code-tools: true
+    code-tools: false
     code-copy: true
     fig-responsive: true
     smooth-scroll: true
 
 execute:
-  echo: true
+  echo: false
   warning: false
   message: false
   freeze: auto

@@ -1,36 +1,112 @@
 ---
 title: "France · Données ouvertes"
-subtitle: "Tableau de bord exploratoire"
+subtitle: "Tableau de bord exploratoire — 35 000 communes, 7 thématiques croisées"
 ---
 
-## Ce projet
+```{=html}
+<style>
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin: 24px 0;
+}
+.theme-card {
+  display: block;
+  padding: 18px 20px;
+  border: 1px solid #DCD8CF;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  background: #FFFFFF;
+  transition: all 0.15s;
+}
+.theme-card:hover {
+  border-color: #2A6F97;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+.theme-card h3 { margin: 0 0 6px 0; font-size: 1.05rem; }
+.theme-card p { margin: 0; font-size: 0.85rem; color: #7A7A7A; line-height: 1.4; }
+.theme-card .src { font-size: 0.72rem; color: #999; margin-top: 8px; font-family: monospace; }
+.section-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.06em; color: #7A7A7A; font-weight: 600; margin-top: 28px; margin-bottom: 4px; }
+</style>
+```
 
-Tableau de bord interactif sur la France métropolitaine et les DROM, croisant trois sources
-ouvertes :
+Croisez **35 000 communes** de France métropolitaine et DROM sur 7 thématiques.
+Cliquez sur une commune pour voir tous ses indicateurs. Explorez les corrélations entre variables.
 
-- **Élections** — résultats des Législatives 2024 (second tour) par commune, depuis le
-  Ministère de l'Intérieur via [data.gouv.fr](https://www.data.gouv.fr).
-- **Immobilier** — prix médian au m² par commune, calculé sur les Demandes de Valeurs
-  Foncières (DVF) de 2019 à 2024.
-- **Qualité de l'air** — mesures des stations AASQA / Geod'air (NO₂, PM₂.₅, PM₁₀, O₃).
+::: {.section-title}
+Thématiques
+:::
 
-L'objectif est triple :
+```{=html}
+<div class="theme-grid">
+  <a href="pages/elections.html" class="theme-card">
+    <h3>🗳️ Élections</h3>
+    <p>Législatives 2024, famille gagnante par commune, T1 et T2 détaillés.</p>
+    <div class="src">Min. Intérieur · 35 000 communes</div>
+  </a>
+  <a href="pages/immobilier.html" class="theme-card">
+    <h3>🏠 Immobilier</h3>
+    <p>Prix médian m² par commune, appartements et maisons, évolution 2021-2024.</p>
+    <div class="src">DVF Etalab · 655 000 ventes</div>
+  </a>
+  <a href="pages/air.html" class="theme-card">
+    <h3>🌬️ Qualité de l'air</h3>
+    <p>Indice ATMO moyen 30 jours, 5 polluants. EPCI expandés (Bretagne, Occitanie).</p>
+    <div class="src">Atmo France · WFS</div>
+  </a>
+  <a href="pages/securite.html" class="theme-card">
+    <h3>🚨 Sécurité</h3>
+    <p>Délinquance (8 indicateurs ‰) et accidents corporels par commune.</p>
+    <div class="src">SSMSI 2025 · BAAC 2024</div>
+  </a>
+  <a href="pages/finances.html" class="theme-card">
+    <h3>💶 Finances communales</h3>
+    <p>Recettes, charges, dette, CAF, taux des taxes locales.</p>
+    <div class="src">DGFiP · comptes 2024</div>
+  </a>
+  <a href="pages/sante.html" class="theme-card">
+    <h3>⚕️ Désert médical</h3>
+    <p>APL aux médecins, infirmières, sages-femmes, dentistes, kinésithérapeutes.</p>
+    <div class="src">DREES · APL 2023</div>
+  </a>
+  <a href="pages/revenus.html" class="theme-card">
+    <h3>📊 Revenus</h3>
+    <p>Revenu médian, déciles D1/D9, indice de Gini, part des prestations.</p>
+    <div class="src">INSEE · FiLoSoFi 2021</div>
+  </a>
+</div>
+```
 
-1. Explorer chaque sujet en cartographie choroplèthe (élections, immobilier) ou en
-   semis de points (stations).
-2. Croiser les variables via un **mode bivarié** sur la carte principale et un onglet
-   **Explorer** dédié aux corrélations.
-3. Documenter chaque choix méthodologique (filtres DVF, rattachement commune-station,
-   stratification urbain/rural) de façon transparente — le code source est visible.
+::: {.section-title}
+Analyse croisée
+:::
 
-## Accès
+```{=html}
+<div class="theme-grid">
+  <a href="pages/bivariate.html" class="theme-card">
+    <h3>🔀 Carte bivariée</h3>
+    <p>Croisez 2 variables au choix parmi 37 indicateurs. Terciles × terciles, palette Stevens 3 × 3.</p>
+    <div class="src">1 369 combinaisons possibles</div>
+  </a>
+  <a href="pages/explorer.html" class="theme-card">
+    <h3>📈 Explorer</h3>
+    <p>Heatmap des corrélations Spearman entre toutes les variables. Scatter %RN × prix m² avec hexbin et LOESS.</p>
+    <div class="src">Analyse · 28 variables</div>
+  </a>
+</div>
+```
 
-- 🗺️  [Dashboard](dashboard.qmd) — la carte et les panneaux interactifs.
-- 📚 [Sources de données](docs/data-sources.qmd) — URL, formats, dates de snapshot.
-- ⚙️  [Décisions méthodologiques](docs/decisions.qmd) — filtres et conventions.
+::: {.section-title}
+Méthodologie
+:::
+
+- 📚 [Sources de données](docs/data-sources.qmd) — URL, format, snapshot de chaque source.
+- ⚙️  [Décisions méthodologiques](docs/decisions.qmd) — filtres, conventions, choix d'agrégation.
 - ⚠️  [Note sur les corrélations](docs/correlations.qmd) — biais écologique, stratification.
 
-::: {.callout-note}
-Ce dashboard est un projet exploratoire et itératif. Toute corrélation observée est
-descriptive — elle n'établit pas de relation causale. Voir la note méthodologique.
+::: {.callout-warning}
+Ce dashboard est exploratoire. Toute corrélation observée est descriptive — elle n'établit pas de relation causale. La densité urbaine est un confondant majeur de presque toutes les variables (vote, prix, pollution, services).
 :::
