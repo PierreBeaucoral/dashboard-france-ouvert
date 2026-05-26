@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Départements · small multiples – France · Données ouvertes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7075d6c6b08816836a78c08b3fd54c83.css" rel="stylesheet" class="quarto-color-scheme" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-dark-f913be5bbebd4b3a878dd8d854ca751d.css" rel="stylesheet" class="quarto-color-scheme quarto-color-alternate" id="quarto-text-highlighting-styles">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7075d6c6b08816836a78c08b3fd54c83.css" rel="stylesheet" class="quarto-color-scheme-extra" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-0d1b0f8abc60790c348382dc76d818d5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-dark-0d1b0f8abc60790c348382dc76d818d5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme quarto-color-alternate" id="quarto-bootstrap" data-mode="light">
+<link href="../site_libs/bootstrap/bootstrap-0d1b0f8abc60790c348382dc76d818d5.min.css" rel="stylesheet" append-hash="true" class="quarto-color-scheme-extra" id="quarto-bootstrap" data-mode="light">
+<script src="../site_libs/quarto-dashboard/quarto-dashboard.js"></script>
+<script src="../site_libs/quarto-dashboard/stickythead.js"></script>
+
+
+
+<script src="../site_libs/quarto-dashboard/web-components.js" type="module"></script>
+<script src="../site_libs/quarto-dashboard/components.js"></script>
+
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "Pas de résultats",
+    "search-matching-documents-text": "documents trouvés",
+    "search-copy-link-title": "Copier le lien vers la recherche",
+    "search-hide-matches-text": "Cacher les correspondances additionnelles",
+    "search-more-match-text": "correspondance de plus dans ce document",
+    "search-more-matches-text": "correspondances de plus dans ce document",
+    "search-clear-button-title": "Effacer",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Annuler",
+    "search-submit-button-title": "Envoyer",
+    "search-label": "Recherche"
+  }
+}</script>
+
+
+</head>
+
+<body class="quarto-dashboard nav-fixed dashboard-fill fullcontent quarto-light">
+
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">France · Données ouvertes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Recherche"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Basculer la navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Accueil</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-thématiques" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Thématiques</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-thématiques">    
+        <li>
+    <a class="dropdown-item" href="../pages/elections.html">
+ <span class="dropdown-text">Législatives 2024</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/municipales.html">
+ <span class="dropdown-text">Municipales 2026</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/immobilier.html">
+ <span class="dropdown-text">Immobilier</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/air.html">
+ <span class="dropdown-text">Qualité de l’air</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/securite.html">
+ <span class="dropdown-text">Sécurité</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/finances.html">
+ <span class="dropdown-text">Finances</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/sante.html">
+ <span class="dropdown-text">Santé</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/revenus.html">
+ <span class="dropdown-text">Revenus</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/demographie.html">
+ <span class="dropdown-text">Démographie &amp; social</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/energie.html">
+ <span class="dropdown-text">Énergie · carbone</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/mobilite.html">
+ <span class="dropdown-text">Mobilité</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/agriculture.html">
+ <span class="dropdown-text">Agriculture bio</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-analyse" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Analyse</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-analyse">    
+        <li>
+    <a class="dropdown-item" href="../pages/bivariate.html">
+ <span class="dropdown-text">Carte bivariée</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/explorer.html">
+ <span class="dropdown-text">Explorer · corrélations</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/profil.html">
+ <span class="dropdown-text">Profil commune · radar 8D</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/departements.html">
+ <span class="dropdown-text">Départements · small multiples</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-méthodologie" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Méthodologie</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-méthodologie">    
+        <li>
+    <a class="dropdown-item" href="../docs/data-sources.html">
+ <span class="dropdown-text">Sources de données</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/decisions.html">
+ <span class="dropdown-text">Décisions méthodologiques</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/correlations.html">
+ <span class="dropdown-text">Note sur les corrélations</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+<header id="quarto-dashboard-header">
+<nav class="navbar navbar-expand-md slim" data-bs-theme="dark">
+  <div class="navbar-container container-fluid">
+    <button class="navbar-toggler hidden" type="button" data-bs-toggle="collapse" data-bs-target="#dashboard-collapse" aria-controls="dashboard-collapse" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>    
+
+
+    <div class="navbar-brand-container">
+
+
+      <div class="navbar-title">
+        <div class="navbar-title-text"><a href="#">Départements · small multiples</a></div>
+        
+        
+      </div>
+    </div>
+</div>
+</nav>
+</header></header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-layout-custom page-navbar quarto-dashboard-content bslib-gap-spacing html-fill-container bslib-page-fill">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+<!-- main -->
+
+<div class="bslib-grid-item html-fill-item bslib-grid" data-layout="fill" style="display: grid; grid-template-rows: minmax(3em, 14fr) minmax(3em, 6fr) minmax(3em, 80fr); grid-auto-columns: minmax(0, 1fr);">
+<div class="bslib-grid" style="display: grid; grid-template-columns: minmax(3em, 1fr);
+grid-auto-rows: minmax(0, 1fr);">
+<div class="card bslib-card html-fill-container" title="Lecture" data-bslib-card-init="" data-require-bs-caller="card()" data-full-screen="false">
+<div style="padding:8px 14px;font-size:0.88rem;line-height:1.55;color:#2A2A2A;">
+<p style="margin:0 0 8px 0;"><strong>Une tuile = un département métropolitain</strong> (96 au total).
+Chaque tuile est colorée par la statistique de référence ci-dessous, calculée à partir
+des communes du département.</p>
+
+<p style="margin:0 0 8px 0;"><strong>Statistique utilisée selon l'indicateur :</strong></p>
+<ul style="margin:0 0 8px 18px;padding:0;">
+  <li><strong>Médiane communale</strong> pour les variables continues à distribution monotone :
+  prix m², revenu médian, APL médecins, chômage ‰, CO₂/hab, % voiture.</li>
+  <li><strong>Moyenne</strong> pour la <strong>délinquance ‰</strong> et les <strong>accidents BAAC ‰</strong> —
+  les distributions sont bimodales (secret stat SSMSI rend nulles ~17 000 communes), donc la
+  médiane dégénère à 0 dans 86/96 départements. La moyenne capture la queue urbaine.</li>
+  <li><strong>Somme</strong> pour la <strong>surface bio</strong> (échelle départementale plutôt que communale).</li>
+  <li><strong>Plurality</strong> (commune-vote majoritaire) pour la <strong>famille politique dominante</strong>.</li>
+</ul>
+
+<p style="margin:0;color:#4A4A4A;">Le sélecteur de tri (à droite) permet de basculer entre rang de valeur
+(top des départements en queue, ou vice-versa) et tri alphabétique par code. Les codes "ZX",
+"ZZ" (Français hors de France) et 97x/98x (DROM) sont exclus.</p>
+</div>
+<bslib-tooltip placement="auto" bsoptions="[]" data-require-bs-version="5" data-require-bs-caller="tooltip()">
+    <template>Expand</template>
+    <span class="bslib-full-screen-enter badge rounded-pill">
+        <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 24 24" style="height:1em;width:1em;" aria-hidden="true" role="img"><path d="M20 5C20 4.4 19.6 4 19 4H13C12.4 4 12 3.6 12 3C12 2.4 12.4 2 13 2H21C21.6 2 22 2.4 22 3V11C22 11.6 21.6 12 21 12C20.4 12 20 11.6 20 11V5ZM4 19C4 19.6 4.4 20 5 20H11C11.6 20 12 20.4 12 21C12 21.6 11.6 22 11 22H3C2.4 22 2 21.6 2 21V13C2 12.4 2.4 12 3 12C3.6 12 4 12.4 4 13V19Z"></path></svg>
+    </span>
+</bslib-tooltip><script data-bslib-card-init="">bslib.Card.initializeAllCards();</script></div>
+</div>
+<div class="bslib-grid" style="display: grid; grid-template-columns: minmax(3em, 1fr);
+grid-auto-rows: minmax(0, 1fr);">
+<div class="card bslib-card html-fill-container" data-bslib-card-init="" data-require-bs-caller="card()" data-full-screen="false">
+<div class="dvf-controls" style="padding:6px 12px;">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Indicateur</span>
+    <div class="dvf-ctrl-radios" id="dept-radios">
+      <label><input type="radio" name="dept-ind" value="famille" checked=""> Famille dominante</label>
+      <label><input type="radio" name="dept-ind" value="prix_app"> Prix m² App</label>
+      <label><input type="radio" name="dept-ind" value="revenu"> Revenu médian</label>
+      <label><input type="radio" name="dept-ind" value="apl"> APL médecins</label>
+      <label><input type="radio" name="dept-ind" value="chomage"> Chômage ‰</label>
+      <label><input type="radio" name="dept-ind" value="delinq"> Délinquance ‰</label>
+      <label><input type="radio" name="dept-ind" value="accidents"> Accidents ‰</label>
+      <label><input type="radio" name="dept-ind" value="carbone"> CO₂ t/hab</label>
+      <label><input type="radio" name="dept-ind" value="voiture"> % voiture</label>
+      <label><input type="radio" name="dept-ind" value="bio"> Surface bio (ha)</label>
+    </div>
+  </div>
+  <div class="dvf-ctrl-group" style="margin-left:auto;">
+    <span class="dvf-ctrl-label">Tri</span>
+    <select id="dept-sort" class="biv-select" style="font-size:0.85rem;">
+      <option value="value-desc" selected="">Valeur ↓</option>
+      <option value="value-asc">Valeur ↑</option>
+      <option value="code">Code département</option>
+    </select>
+  </div>
+</div>
+<bslib-tooltip placement="auto" bsoptions="[]" data-require-bs-version="5" data-require-bs-caller="tooltip()">
+    <template>Expand</template>
+    <span class="bslib-full-screen-enter badge rounded-pill">
+        <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 24 24" style="height:1em;width:1em;" aria-hidden="true" role="img"><path d="M20 5C20 4.4 19.6 4 19 4H13C12.4 4 12 3.6 12 3C12 2.4 12.4 2 13 2H21C21.6 2 22 2.4 22 3V11C22 11.6 21.6 12 21 12C20.4 12 20 11.6 20 11V5ZM4 19C4 19.6 4.4 20 5 20H11C11.6 20 12 20.4 12 21C12 21.6 11.6 22 11 22H3C2.4 22 2 21.6 2 21V13C2 12.4 2.4 12 3 12C3.6 12 4 12.4 4 13V19Z"></path></svg>
+    </span>
+</bslib-tooltip><script data-bslib-card-init="">bslib.Card.initializeAllCards();</script></div>
+</div>
+<div class="bslib-grid" style="display: grid; grid-template-columns: minmax(3em, 1fr);
+grid-auto-rows: minmax(0, 1fr);">
+<div class="card bslib-card html-fill-container" title="96 départements métropolitains" data-bslib-card-init="" data-require-bs-caller="card()" data-full-screen="false">
+<div id="dept-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:8px;padding:12px;width:100%;height:100%;overflow:auto;"></div>
+<script>
+window.deptRaw = [{"code":"01","nom":"Ain","n":402,"fam":"RN","prix_app":2419,"revenu":24530,"apl":2.29,"chomage":null,"delinq":7.8,"accidents":1.82,"carbone":9,"voiture":87.9,"bio":23439},{"code":"02","nom":"Aisne","n":807,"fam":"RN","prix_app":1329,"revenu":22250,"apl":2.66,"chomage":null,"delinq":2.3,"accidents":3.14,"carbone":7.2,"voiture":87.5,"bio":10800},{"code":"03","nom":"Allier","n":319,"fam":"RN","prix_app":962,"revenu":21415,"apl":2.58,"chomage":null,"delinq":2.4,"accidents":2.66,"carbone":8.83,"voiture":86.4,"bio":23524},{"code":"04","nom":"Alpes-de-Haute-Provence","n":200,"fam":"RN","prix_app":1928,"revenu":21220,"apl":2.2,"chomage":null,"delinq":4.5,"accidents":3.33,"carbone":7.58,"voiture":83,"bio":51591},{"code":"05","nom":"Hautes-Alpes","n":167,"fam":"NFP","prix_app":2597,"revenu":21645,"apl":3.79,"chomage":null,"delinq":5.9,"accidents":3.12,"carbone":7.87,"voiture":82.7,"bio":35988},{"code":"06","nom":"Alpes-Maritimes","n":164,"fam":"RN","prix_app":3891,"revenu":23370,"apl":2.87,"chomage":null,"delinq":11.5,"accidents":2.39,"carbone":9.57,"voiture":81.4,"bio":9208},{"code":"07","nom":"Ardèche","n":338,"fam":"RN","prix_app":1516,"revenu":21215,"apl":2.38,"chomage":85.9,"delinq":3.6,"accidents":2.82,"carbone":8.57,"voiture":86.4,"bio":31049},{"code":"08","nom":"Ardennes","n":455,"fam":"RN","prix_app":943,"revenu":22100,"apl":3.16,"chomage":71.6,"delinq":2.5,"accidents":2.95,"carbone":7.73,"voiture":87.5,"bio":16735},{"code":"09","nom":"Ariège","n":332,"fam":"NFP","prix_app":1422,"revenu":20830,"apl":2.97,"chomage":89.5,"delinq":2.1,"accidents":4.28,"carbone":7.33,"voiture":88.9,"bio":40897},{"code":"10","nom":"Aube","n":431,"fam":"RN","prix_app":1438,"revenu":23220,"apl":2.44,"chomage":70.4,"delinq":3.2,"accidents":3.86,"carbone":8.03,"voiture":88.5,"bio":20799},{"code":"11","nom":"Aude","n":436,"fam":"RN","prix_app":1775,"revenu":20550,"apl":2.61,"chomage":87.7,"delinq":3.6,"accidents":2.66,"carbone":7.67,"voiture":84.8,"bio":66215},{"code":"12","nom":"Aveyron","n":288,"fam":"ENS","prix_app":1410,"revenu":21200,"apl":2.89,"chomage":55.1,"delinq":1.6,"accidents":2.4,"carbone":7.27,"voiture":81.5,"bio":75887},{"code":"13","nom":"Bouches-du-Rhône","n":119,"fam":"RN","prix_app":3503,"revenu":25810,"apl":4,"chomage":73.5,"delinq":30,"accidents":1.09,"carbone":8.33,"voiture":86.1,"bio":48923},{"code":"14","nom":"Calvados","n":554,"fam":"ENS","prix_app":3115,"revenu":23690,"apl":3.42,"chomage":64.3,"delinq":4.2,"accidents":2.75,"carbone":8.23,"voiture":88,"bio":35492},{"code":"15","nom":"Cantal","n":250,"fam":"Divers","prix_app":1083,"revenu":20860,"apl":2.88,"chomage":46.6,"delinq":0.6,"accidents":3.42,"carbone":8.4,"voiture":78.7,"bio":24313},{"code":"16","nom":"Charente","n":377,"fam":"RN","prix_app":1624,"revenu":21550,"apl":2.83,"chomage":78.2,"delinq":3.5,"accidents":2.29,"carbone":7.4,"voiture":88.2,"bio":24473},{"code":"17","nom":"Charente-Maritime","n":469,"fam":"RN","prix_app":3057,"revenu":21910,"apl":3.22,"chomage":null,"delinq":5.3,"accidents":1.87,"carbone":7.43,"voiture":88.2,"bio":19653},{"code":"18","nom":"Cher","n":286,"fam":"RN","prix_app":1074,"revenu":22190,"apl":1.72,"chomage":null,"delinq":3.3,"accidents":2.69,"carbone":7.8,"voiture":87.9,"bio":25970},{"code":"19","nom":"Corrèze","n":285,"fam":"NFP","prix_app":1140,"revenu":21780,"apl":2.68,"chomage":null,"delinq":1.9,"accidents":2.32,"carbone":7.8,"voiture":88.4,"bio":16930},{"code":"21","nom":"Côte-d'Or","n":708,"fam":"RN","prix_app":1944,"revenu":23780,"apl":2.83,"chomage":null,"delinq":2.5,"accidents":4.15,"carbone":9.3,"voiture":86.6,"bio":58658},{"code":"22","nom":"Côtes-d'Armor","n":356,"fam":"ENS","prix_app":2465,"revenu":22090,"apl":2.89,"chomage":null,"delinq":5.9,"accidents":1.29,"carbone":7.07,"voiture":86.3,"bio":44085},{"code":"23","nom":"Creuse","n":258,"fam":"RN","prix_app":777,"revenu":20040,"apl":2.58,"chomage":null,"delinq":1,"accidents":3.6,"carbone":7.27,"voiture":83.3,"bio":22009},{"code":"24","nom":"Dordogne","n":517,"fam":"RN","prix_app":1471,"revenu":21220,"apl":2.69,"chomage":null,"delinq":2.2,"accidents":2.3,"carbone":7.23,"voiture":86.9,"bio":48118},{"code":"25","nom":"Doubs","n":578,"fam":"RN","prix_app":2076,"revenu":24830,"apl":3.39,"chomage":64.1,"delinq":2.9,"accidents":3.51,"carbone":8.57,"voiture":87.8,"bio":15556},{"code":"26","nom":"Drôme","n":366,"fam":"NFP","prix_app":1903,"revenu":22575,"apl":2.85,"chomage":87.8,"delinq":5.3,"accidents":2.2,"carbone":9.1,"voiture":85.7,"bio":60794},{"code":"27","nom":"Eure","n":598,"fam":"RN","prix_app":1747,"revenu":24150,"apl":2.33,"chomage":72.1,"delinq":3.3,"accidents":2.12,"carbone":7.87,"voiture":89.1,"bio":12290},{"code":"28","nom":"Eure-et-Loir","n":374,"fam":"RN","prix_app":2164,"revenu":24290,"apl":2.14,"chomage":64.9,"delinq":4.1,"accidents":2.93,"carbone":8,"voiture":85.7,"bio":13249},{"code":"29","nom":"Finistère","n":280,"fam":"ENS","prix_app":2476,"revenu":22920,"apl":3.7,"chomage":75.5,"delinq":7.4,"accidents":1.04,"carbone":7.37,"voiture":88,"bio":37672},{"code":"2A","nom":"Corse-du-Sud","n":124,"fam":"Divers","prix_app":4198,"revenu":22590,"apl":1.91,"chomage":null,"delinq":3.4,"accidents":3.94,"carbone":9.93,"voiture":87.6,"bio":13272},{"code":"2B","nom":"Haute-Corse","n":237,"fam":"Divers","prix_app":3134,"revenu":21060,"apl":0.33,"chomage":null,"delinq":2.6,"accidents":5,"carbone":9.67,"voiture":87.9,"bio":20881},{"code":"30","nom":"Gard","n":354,"fam":"RN","prix_app":2097,"revenu":22000,"apl":3.08,"chomage":null,"delinq":7.4,"accidents":1.59,"carbone":7.5,"voiture":88,"bio":49388},{"code":"31","nom":"Haute-Garonne","n":590,"fam":"NFP","prix_app":2502,"revenu":23970,"apl":3.36,"chomage":null,"delinq":6.5,"accidents":1.89,"carbone":8.87,"voiture":88.9,"bio":49447},{"code":"32","nom":"Gers","n":469,"fam":"ENS","prix_app":1352,"revenu":21980,"apl":3.18,"chomage":64.9,"delinq":1.1,"accidents":3.41,"carbone":7.2,"voiture":85.7,"bio":110129},{"code":"33","nom":"Gironde","n":540,"fam":"RN","prix_app":3099,"revenu":22495,"apl":3.62,"chomage":86.6,"delinq":9.5,"accidents":1.29,"carbone":7.93,"voiture":88,"bio":41450},{"code":"34","nom":"Hérault","n":343,"fam":"RN","prix_app":3241,"revenu":21755,"apl":3.38,"chomage":97.1,"delinq":13.4,"accidents":1.73,"carbone":7.97,"voiture":85.7,"bio":45883},{"code":"35","nom":"Ille-et-Vilaine","n":339,"fam":"ENS","prix_app":2855,"revenu":22940,"apl":3.18,"chomage":69.7,"delinq":8.2,"accidents":0.91,"carbone":7.4,"voiture":85.7,"bio":48112},{"code":"36","nom":"Indre","n":243,"fam":"RN","prix_app":1073,"revenu":21070,"apl":2.27,"chomage":62.3,"delinq":2.9,"accidents":2.51,"carbone":7.57,"voiture":86.3,"bio":23368},{"code":"37","nom":"Indre-et-Loire","n":276,"fam":"ENS","prix_app":2512,"revenu":22730,"apl":3.38,"chomage":71.4,"delinq":6.4,"accidents":1.49,"carbone":7.87,"voiture":86.8,"bio":21419},{"code":"38","nom":"Isère","n":524,"fam":"RN","prix_app":2549,"revenu":24690,"apl":2.83,"chomage":null,"delinq":11.5,"accidents":1.35,"carbone":9.2,"voiture":86.8,"bio":31775},{"code":"39","nom":"Jura","n":510,"fam":"LR","prix_app":1594,"revenu":23590,"apl":3.25,"chomage":null,"delinq":1.7,"accidents":3.17,"carbone":8.17,"voiture":89.3,"bio":28387},{"code":"40","nom":"Landes","n":329,"fam":"NFP","prix_app":3385,"revenu":22580,"apl":3.47,"chomage":null,"delinq":4.3,"accidents":1.64,"carbone":7.53,"voiture":89.2,"bio":12130},{"code":"41","nom":"Loir-et-Cher","n":272,"fam":"RN","prix_app":1848,"revenu":22980,"apl":2.21,"chomage":67.9,"delinq":4.9,"accidents":1.93,"carbone":7.6,"voiture":87.3,"bio":13148},{"code":"42","nom":"Loire","n":329,"fam":"LR","prix_app":1690,"revenu":22845,"apl":2.79,"chomage":63.8,"delinq":5.9,"accidents":1.38,"carbone":9,"voiture":88.1,"bio":26430},{"code":"43","nom":"Haute-Loire","n":258,"fam":"LR","prix_app":1415,"revenu":21250,"apl":2.53,"chomage":66.9,"delinq":2,"accidents":2.14,"carbone":8.67,"voiture":84.6,"bio":31897},{"code":"44","nom":"Loire-Atlantique","n":211,"fam":"ENS","prix_app":3185,"revenu":23300,"apl":3.05,"chomage":73,"delinq":15.2,"accidents":0.56,"carbone":7.93,"voiture":86.9,"bio":89421},{"code":"45","nom":"Loiret","n":327,"fam":"RN","prix_app":1774,"revenu":23930,"apl":1.79,"chomage":68.5,"delinq":6.2,"accidents":1.63,"carbone":8,"voiture":87.4,"bio":12061},{"code":"46","nom":"Lot","n":319,"fam":"NFP","prix_app":1340,"revenu":21830,"apl":2.72,"chomage":78.4,"delinq":1.3,"accidents":2.6,"carbone":7.13,"voiture":86.6,"bio":32257},{"code":"47","nom":"Lot-et-Garonne","n":320,"fam":"RN","prix_app":1335,"revenu":21260,"apl":2.56,"chomage":77.8,"delinq":3,"accidents":2.1,"carbone":7.53,"voiture":86.8,"bio":37852},{"code":"48","nom":"Lozère","n":159,"fam":"RN","prix_app":1362,"revenu":20480,"apl":1.97,"chomage":null,"delinq":1.2,"accidents":4.2,"carbone":7.27,"voiture":77.4,"bio":47716},{"code":"49","nom":"Maine-et-Loire","n":199,"fam":"ENS","prix_app":2150,"revenu":22280,"apl":3.24,"chomage":null,"delinq":10.1,"accidents":0.84,"carbone":7.75,"voiture":86.1,"bio":85678},{"code":"50","nom":"Manche","n":468,"fam":"ENS","prix_app":2139,"revenu":22060,"apl":2.65,"chomage":null,"delinq":5.3,"accidents":2.62,"carbone":7.87,"voiture":87.5,"bio":42244},{"code":"51","nom":"Marne","n":614,"fam":"RN","prix_app":1875,"revenu":24920,"apl":2.87,"chomage":null,"delinq":3.2,"accidents":3.99,"carbone":8.07,"voiture":87.5,"bio":16395},{"code":"52","nom":"Haute-Marne","n":428,"fam":"RN","prix_app":1027,"revenu":21870,"apl":2.52,"chomage":68.5,"delinq":3.2,"accidents":4.65,"carbone":7.65,"voiture":88.6,"bio":29652},{"code":"53","nom":"Mayenne","n":249,"fam":"ENS","prix_app":1793,"revenu":21800,"apl":2.46,"chomage":59.5,"delinq":2.8,"accidents":1.53,"carbone":7.67,"voiture":84.4,"bio":35618},{"code":"54","nom":"Meurthe-et-Moselle","n":592,"fam":"RN","prix_app":1564,"revenu":24140,"apl":2.98,"chomage":58,"delinq":4.4,"accidents":2.48,"carbone":8.27,"voiture":89.3,"bio":27165},{"code":"55","nom":"Meuse","n":496,"fam":"RN","prix_app":1004,"revenu":22430,"apl":3.12,"chomage":57.9,"delinq":1.5,"accidents":5.07,"carbone":7.43,"voiture":88.8,"bio":21588},{"code":"56","nom":"Morbihan","n":256,"fam":"ENS","prix_app":3452,"revenu":22460,"apl":3.3,"chomage":79,"delinq":10.3,"accidents":0.9,"carbone":7.2,"voiture":88.2,"bio":41369},{"code":"57","nom":"Moselle","n":728,"fam":"RN","prix_app":null,"revenu":24105,"apl":3.07,"chomage":60.1,"delinq":4.1,"accidents":1.43,"carbone":8,"voiture":89.7,"bio":28802},{"code":"58","nom":"Nièvre","n":310,"fam":"RN","prix_app":841,"revenu":21175,"apl":2.21,"chomage":61.4,"delinq":1.9,"accidents":3.71,"carbone":8.03,"voiture":83.3,"bio":27812},{"code":"59","nom":"Nord","n":648,"fam":"RN","prix_app":2332,"revenu":23030,"apl":3.64,"chomage":76.3,"delinq":12.6,"accidents":1.03,"carbone":7.73,"voiture":86.2,"bio":14457},{"code":"60","nom":"Oise","n":691,"fam":"RN","prix_app":2264,"revenu":24590,"apl":2.71,"chomage":70.9,"delinq":4.5,"accidents":2.37,"carbone":7.33,"voiture":86.3,"bio":15312},{"code":"61","nom":"Orne","n":395,"fam":"Divers","prix_app":1137,"revenu":22100,"apl":2.67,"chomage":67.5,"delinq":2.7,"accidents":3.14,"carbone":7.87,"voiture":85.7,"bio":37817},{"code":"62","nom":"Pas-de-Calais","n":893,"fam":"RN","prix_app":1880,"revenu":22150,"apl":3.3,"chomage":68.8,"delinq":5.8,"accidents":1.81,"carbone":7.73,"voiture":87.9,"bio":9329},{"code":"63","nom":"Puy-de-Dôme","n":470,"fam":"NFP","prix_app":1920,"revenu":22315,"apl":3.01,"chomage":69.8,"delinq":3.5,"accidents":2.6,"carbone":9.13,"voiture":86.9,"bio":29080},{"code":"64","nom":"Pyrénées-Atlantiques","n":548,"fam":"NFP","prix_app":3371,"revenu":22830,"apl":3.4,"chomage":64.6,"delinq":2.2,"accidents":2.38,"carbone":7.97,"voiture":87.5,"bio":17798},{"code":"65","nom":"Hautes-Pyrénées","n":471,"fam":"NFP","prix_app":2252,"revenu":22315,"apl":2.98,"chomage":72,"delinq":1.8,"accidents":5.21,"carbone":7.83,"voiture":90.6,"bio":10773},{"code":"66","nom":"Pyrénées-Orientales","n":229,"fam":"RN","prix_app":2475,"revenu":21260,"apl":2.88,"chomage":104.5,"delinq":10.8,"accidents":3.35,"carbone":7.8,"voiture":85.2,"bio":23538},{"code":"67","nom":"Bas-Rhin","n":516,"fam":"ENS","prix_app":null,"revenu":25780,"apl":3.8,"chomage":57.2,"delinq":4.6,"accidents":1.23,"carbone":7.87,"voiture":85,"bio":22674},{"code":"68","nom":"Haut-Rhin","n":367,"fam":"ENS","prix_app":null,"revenu":27405,"apl":2.91,"chomage":60.9,"delinq":5,"accidents":1.41,"carbone":7.8,"voiture":87.9,"bio":13253},{"code":"69","nom":"Rhône","n":271,"fam":"ENS","prix_app":3140,"revenu":25620,"apl":3.02,"chomage":55.9,"delinq":17.4,"accidents":1.16,"carbone":9.83,"voiture":83.4,"bio":20934},{"code":"70","nom":"Haute-Saône","n":541,"fam":"RN","prix_app":1000,"revenu":22260,"apl":3.31,"chomage":66.7,"delinq":1.4,"accidents":3.14,"carbone":7.8,"voiture":90,"bio":31365},{"code":"71","nom":"Saône-et-Loire","n":571,"fam":"RN","prix_app":1224,"revenu":22760,"apl":2.41,"chomage":69.3,"delinq":3.9,"accidents":2.39,"carbone":8.07,"voiture":87.5,"bio":24413},{"code":"72","nom":"Sarthe","n":363,"fam":"RN","prix_app":1393,"revenu":22260,"apl":2.43,"chomage":75.7,"delinq":5.2,"accidents":1.64,"carbone":7.87,"voiture":87.5,"bio":21766},{"code":"73","nom":"Savoie","n":282,"fam":"LR","prix_app":3532,"revenu":24475,"apl":3.22,"chomage":70.1,"delinq":11.1,"accidents":1.61,"carbone":9.2,"voiture":85.7,"bio":6181},{"code":"74","nom":"Haute-Savoie","n":282,"fam":"ENS","prix_app":4180,"revenu":29860,"apl":2.64,"chomage":66.2,"delinq":11.8,"accidents":1.28,"carbone":9.33,"voiture":88.2,"bio":8504},{"code":"75","nom":"Paris","n":1,"fam":"ENS","prix_app":null,"revenu":null,"apl":null,"chomage":null,"delinq":81.7,"accidents":null,"carbone":8.5,"voiture":10.6,"bio":214},{"code":"76","nom":"Seine-Maritime","n":711,"fam":"RN","prix_app":1947,"revenu":23390,"apl":3.35,"chomage":63.9,"delinq":4.2,"accidents":2.13,"carbone":8.33,"voiture":88.2,"bio":11510},{"code":"77","nom":"Seine-et-Marne","n":511,"fam":"RN","prix_app":3217,"revenu":26040,"apl":2.08,"chomage":62.5,"delinq":10.5,"accidents":1.95,"carbone":9.33,"voiture":77.4,"bio":20281},{"code":"78","nom":"Yvelines","n":262,"fam":"ENS","prix_app":3684,"revenu":29830,"apl":2.33,"chomage":55.5,"delinq":11.8,"accidents":1.29,"carbone":9.8,"voiture":74.7,"bio":8457},{"code":"79","nom":"Deux-Sèvres","n":273,"fam":"Divers","prix_app":1165,"revenu":21620,"apl":2.56,"chomage":67.3,"delinq":4,"accidents":1.52,"carbone":7.47,"voiture":86.7,"bio":46790},{"code":"80","nom":"Somme","n":780,"fam":"RN","prix_app":2423,"revenu":22310,"apl":3.61,"chomage":81.5,"delinq":3,"accidents":3.1,"carbone":7.27,"voiture":87.7,"bio":7437},{"code":"81","nom":"Tarn","n":316,"fam":"RN","prix_app":1646,"revenu":21950,"apl":2.86,"chomage":75.3,"delinq":2.6,"accidents":2.06,"carbone":7.47,"voiture":86.6,"bio":33641},{"code":"82","nom":"Tarn-et-Garonne","n":196,"fam":"RN","prix_app":1641,"revenu":21565,"apl":2.93,"chomage":85.3,"delinq":3.5,"accidents":1.8,"carbone":7.28,"voiture":87.8,"bio":25947},{"code":"83","nom":"Var","n":153,"fam":"RN","prix_app":2914,"revenu":23225,"apl":3.05,"chomage":87.2,"delinq":22,"accidents":2.07,"carbone":7.8,"voiture":84.9,"bio":27116},{"code":"84","nom":"Vaucluse","n":152,"fam":"RN","prix_app":2399,"revenu":23045,"apl":3.05,"chomage":91.4,"delinq":12.1,"accidents":2.11,"carbone":7.73,"voiture":87,"bio":38953},{"code":"85","nom":"Vendée","n":273,"fam":"ENS","prix_app":3424,"revenu":22320,"apl":2.58,"chomage":79.1,"delinq":7,"accidents":0.95,"carbone":7.6,"voiture":88.7,"bio":58871},{"code":"86","nom":"Vienne","n":269,"fam":"ENS","prix_app":1982,"revenu":21520,"apl":3.27,"chomage":70.5,"delinq":4.6,"accidents":1.72,"carbone":7.73,"voiture":87.8,"bio":40223},{"code":"87","nom":"Haute-Vienne","n":197,"fam":"RN","prix_app":1444,"revenu":21310,"apl":3.04,"chomage":63.4,"delinq":3.7,"accidents":2.15,"carbone":7.83,"voiture":87,"bio":29231},{"code":"88","nom":"Vosges","n":509,"fam":"RN","prix_app":1221,"revenu":22200,"apl":3.1,"chomage":71.7,"delinq":3.7,"accidents":3.33,"carbone":7.4,"voiture":88.7,"bio":26038},{"code":"89","nom":"Yonne","n":427,"fam":"RN","prix_app":1216,"revenu":22760,"apl":2.26,"chomage":null,"delinq":3.3,"accidents":3.41,"carbone":7.87,"voiture":85.6,"bio":56605},{"code":"90","nom":"Territoire de Belfort","n":102,"fam":"RN","prix_app":1287,"revenu":25835,"apl":3.01,"chomage":null,"delinq":4.7,"accidents":2.1,"carbone":8.33,"voiture":90,"bio":1114},{"code":"91","nom":"Essonne","n":196,"fam":"RN","prix_app":3164,"revenu":28045,"apl":2.37,"chomage":null,"delinq":17.6,"accidents":1.43,"carbone":9.58,"voiture":76.8,"bio":11661},{"code":"92","nom":"Hauts-de-Seine","n":36,"fam":"ENS","prix_app":5778,"revenu":31905,"apl":3.05,"chomage":null,"delinq":36.3,"accidents":1.95,"carbone":9.1,"voiture":32.7,"bio":293},{"code":"93","nom":"Seine-Saint-Denis","n":41,"fam":"NFP","prix_app":3407,"revenu":19060,"apl":3.16,"chomage":null,"delinq":49.9,"accidents":1.54,"carbone":8.3,"voiture":37.3,"bio":61},{"code":"94","nom":"Val-de-Marne","n":48,"fam":"NFP","prix_app":3756,"revenu":24990,"apl":3.49,"chomage":null,"delinq":38.7,"accidents":1.48,"carbone":8.77,"voiture":43.2,"bio":89},{"code":"95","nom":"Val-d'Oise","n":184,"fam":"RN","prix_app":3293,"revenu":27745,"apl":2.28,"chomage":null,"delinq":22.7,"accidents":3.36,"carbone":9.67,"voiture":72.7,"bio":907}];
+window.deptFamColors = {'NFP':'#C73659','ENS':'#E6B800','RN':'#1B3A57','LR':'#4A90D9','Divers':'#A18047'};
+window.deptPalettes = {
+  prix_app: ['#F5F2EC','#D9C896','#C0A05A','#92722A','#5E4615'],
+  revenu:   ['#F5F2EC','#C9D4B0','#94B091','#5E876E','#2F5145'],
+  apl:      ['#7A2424','#D49687','#F5F2EC','#94B091','#2F5145'],
+  chomage:  ['#F5F2EC','#E8C3B0','#D49687','#B85F5E','#7A2424'],
+  delinq:   ['#F5F2EC','#E8C3B0','#D49687','#B85F5E','#7A2424'],
+  accidents:['#F5F2EC','#E8C3B0','#D49687','#B85F5E','#7A2424'],
+  carbone:  ['#F5F2EC','#DDD8B3','#B8AE6E','#7E743E','#42391A'],
+  voiture:  ['#F5F2EC','#C6DCD0','#85B2A1','#4A8071','#1F4F40'],
+  bio:      ['#F5F2EC','#D9E0B4','#A8B870','#7A8740','#3D4A1F']
+};
+window.deptRender = function() {
+  var indSel = document.querySelector('input[name=dept-ind]:checked');
+  var sortSel = document.getElementById('dept-sort');
+  var grid = document.getElementById('dept-grid');
+  if (!indSel || !sortSel || !grid) return;
+  var ind  = indSel.value;
+  var sort = sortSel.value;
+  var data = window.deptRaw.slice();
+  if (ind !== 'famille') {
+    var vals = data.map(function(d){return d[ind];}).filter(function(v){return v != null;}).sort(function(a,b){return a-b;});
+    var n = vals.length;
+    var brk = [0,0.2,0.4,0.6,0.8,1.0].map(function(p){ return vals[Math.min(n-1, Math.floor(p*(n-1)))]; });
+    var pal = window.deptPalettes[ind];
+    data.forEach(function(d){
+      var v = d[ind];
+      d._color = v == null ? '#E8E4DC' : (function(){ for (var i=1;i<5;i++){ if (v < brk[i]) return pal[i-1]; } return pal[4]; })();
+      d._sortKey = v == null ? -Infinity : v;
+    });
+  } else {
+    data.forEach(function(d){
+      d._color = window.deptFamColors[d.fam] || '#E8E4DC';
+      d._sortKey = ({NFP:1, ENS:2, LR:3, RN:4, Divers:5}[d.fam]) || 99;
+    });
+  }
+  if (sort === 'value-desc') data.sort(function(a,b){return b._sortKey - a._sortKey;});
+  else if (sort === 'value-asc') data.sort(function(a,b){return a._sortKey - b._sortKey;});
+  else data.sort(function(a,b){return a.code.localeCompare(b.code);});
+  var fmt = function(v){ if (v == null) return '—'; return Number(v).toLocaleString('fr-FR',{maximumFractionDigits:2}); };
+  grid.innerHTML = data.map(function(d){
+    var sub = ind === 'famille' ? (d.fam || '—') : fmt(d[ind]);
+    return '<div class="dept-tile" style="background:' + d._color + ';padding:10px 12px;border-radius:5px;cursor:default;color:#1A1A1A;min-height:80px;display:flex;flex-direction:column;justify-content:space-between;">' +
+      '<div>' +
+        '<div style="font-family:IBM Plex Mono,monospace;font-size:0.72rem;opacity:0.65;letter-spacing:0.02em;">' + d.code + '</div>' +
+        '<div style="font-size:0.9rem;font-weight:600;margin-top:2px;line-height:1.22;">' + d.nom + '</div>' +
+      '</div>' +
+      '<div style="font-family:IBM Plex Mono,monospace;font-size:0.85rem;margin-top:6px;">' + sub + '</div>' +
+      '</div>';
+  }).join('');
+};
+if (document.readyState === 'complete') { setTimeout(window.deptRender, 200); }
+else { window.addEventListener('load', function(){ setTimeout(window.deptRender, 200); }); }
+document.addEventListener('change', function(e){ if (e.target && (e.target.name === 'dept-ind' || e.target.id === 'dept-sort')) window.deptRender(); });
+</script>
+<bslib-tooltip placement="auto" bsoptions="[]" data-require-bs-version="5" data-require-bs-caller="tooltip()">
+    <template>Expand</template>
+    <span class="bslib-full-screen-enter badge rounded-pill">
+        <svg xmlns="http://www.w3.org/2000/svg" viewbox="0 0 24 24" style="height:1em;width:1em;" aria-hidden="true" role="img"><path d="M20 5C20 4.4 19.6 4 19 4H13C12.4 4 12 3.6 12 3C12 2.4 12.4 2 13 2H21C21.6 2 22 2.4 22 3V11C22 11.6 21.6 12 21 12C20.4 12 20 11.6 20 11V5ZM4 19C4 19.6 4.4 20 5 20H11C11.6 20 12 20.4 12 21C12 21.6 11.6 22 11 22H3C2.4 22 2 21.6 2 21V13C2 12.4 2.4 12 3 12C3.6 12 4 12.4 4 13V19Z"></path></svg>
+    </span>
+</bslib-tooltip><script data-bslib-card-init="">bslib.Card.initializeAllCards();</script></div><div id="3ade8a4a-fb1d-4a6c-8409-ac45482d5fc9" class="hidden">
+
+</div>
+</div>
+</div>
+
+
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copié");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copié");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/PierreBeaucoral\.github\.io\/dashboard-france-ouvert\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sources · data.gouv.fr</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p>Construit avec Quarto</p>
+</div>
+  </div>
+</footer>
+
+<script type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (_event) {
+  if (window.bslib.Card) {
+    window.bslib.Card.initializeAllCards();
+  }
+}); 
+</script>
+  
+
+
+
+</body></html>

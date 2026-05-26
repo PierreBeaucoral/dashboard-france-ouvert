@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.9.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>Décisions méthodologiques – France · Données ouvertes</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-7075d6c6b08816836a78c08b3fd54c83.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-a5a4a27c88dd27304896ae63e9af9507.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "Pas de résultats",
+    "search-matching-documents-text": "documents trouvés",
+    "search-copy-link-title": "Copier le lien vers la recherche",
+    "search-hide-matches-text": "Cacher les correspondances additionnelles",
+    "search-more-match-text": "correspondance de plus dans ce document",
+    "search-more-matches-text": "correspondances de plus dans ce document",
+    "search-clear-button-title": "Effacer",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Annuler",
+    "search-submit-button-title": "Envoyer",
+    "search-label": "Recherche"
+  }
+}</script>
+<style>html{ scroll-behavior: smooth; }</style>
+
+
+</head>
+
+<body class="nav-fixed fullcontent quarto-light">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../index.html">
+    <span class="navbar-title">France · Données ouvertes</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Recherche"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" role="menu" aria-expanded="false" aria-label="Basculer la navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../index.html"> 
+<span class="menu-text">Accueil</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-thématiques" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Thématiques</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-thématiques">    
+        <li>
+    <a class="dropdown-item" href="../pages/elections.html">
+ <span class="dropdown-text">Législatives 2024</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/municipales.html">
+ <span class="dropdown-text">Municipales 2026</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/immobilier.html">
+ <span class="dropdown-text">Immobilier</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/air.html">
+ <span class="dropdown-text">Qualité de l’air</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/securite.html">
+ <span class="dropdown-text">Sécurité</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/finances.html">
+ <span class="dropdown-text">Finances</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/sante.html">
+ <span class="dropdown-text">Santé</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/revenus.html">
+ <span class="dropdown-text">Revenus</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/demographie.html">
+ <span class="dropdown-text">Démographie &amp; social</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/energie.html">
+ <span class="dropdown-text">Énergie · carbone</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/mobilite.html">
+ <span class="dropdown-text">Mobilité</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/agriculture.html">
+ <span class="dropdown-text">Agriculture bio</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-analyse" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Analyse</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-analyse">    
+        <li>
+    <a class="dropdown-item" href="../pages/bivariate.html">
+ <span class="dropdown-text">Carte bivariée</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/explorer.html">
+ <span class="dropdown-text">Explorer · corrélations</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/profil.html">
+ <span class="dropdown-text">Profil commune · radar 8D</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../pages/departements.html">
+ <span class="dropdown-text">Départements · small multiples</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-méthodologie" role="link" data-bs-toggle="dropdown" aria-expanded="false">
+ <span class="menu-text">Méthodologie</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-méthodologie">    
+        <li>
+    <a class="dropdown-item" href="../docs/data-sources.html">
+ <span class="dropdown-text">Sources de données</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/decisions.html">
+ <span class="dropdown-text">Décisions méthodologiques</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="../docs/correlations.html">
+ <span class="dropdown-text">Note sur les corrélations</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+          </div> <!-- /navcollapse -->
+            <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Décisions méthodologiques</h1>
+<p class="subtitle lead">Toutes les règles structurantes du dashboard, classées par catégorie.</p>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<style>
+.cat-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin: 16px 0 28px 0;
+}
+.cat-bar a {
+  display: block;
+  padding: 12px 14px;
+  background: #FAFAF8;
+  border: 1px solid #E8E4DC;
+  border-radius: 6px;
+  text-decoration: none;
+  color: #1A1A1A;
+  transition: all 0.15s;
+}
+.cat-bar a:hover { border-color: #2A6F97; background: #F0EDE6; }
+.cat-bar .ico { font-size: 1.2rem; margin-right: 6px; }
+.cat-bar .lbl { font-size: 0.85rem; font-weight: 600; display: inline-block; vertical-align: middle; }
+.cat-bar .cnt { display: block; font-size: 0.72rem; color: #7A7A7A; margin-top: 4px; font-family: monospace; }
+
+.decision {
+  border: 1px solid #DCD8CF;
+  border-left: 4px solid #2A6F97;
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 14px 0;
+  background: #FFFFFF;
+}
+.decision h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.02rem;
+  color: #1A1A1A;
+}
+.decision .meta {
+  display: inline-block;
+  font-size: 0.7rem;
+  color: #7A7A7A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: monospace;
+  margin-bottom: 6px;
+}
+.decision .rule {
+  margin: 6px 0;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #2A2A2A;
+}
+.decision .why {
+  margin: 6px 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #4A4A4A;
+  padding-left: 14px;
+  border-left: 2px solid #E8E4DC;
+}
+.decision .why::before {
+  content: "↳ Pourquoi";
+  display: block;
+  font-size: 0.7rem;
+  color: #7A7A7A;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.decision .alt {
+  margin: 6px 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #7A7A7A;
+  padding-left: 14px;
+  border-left: 2px dashed #E8E4DC;
+}
+.decision .alt::before {
+  content: "✗ Alternatives écartées";
+  display: block;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+.decision ul { margin: 4px 0 4px 18px; padding: 0; }
+.decision ul li { margin: 2px 0; font-size: 0.88rem; line-height: 1.45; }
+.decision code { font-size: 0.85em; background: #F5F2EC; padding: 1px 4px; border-radius: 3px; }
+.decision table { font-size: 0.85rem; margin: 6px 0; }
+.decision table th, .decision table td { padding: 4px 8px; }
+
+/* Couleur de bordure par catégorie */
+.decision.cat-arch { border-left-color: #5C8B7D; }
+.decision.cat-carto { border-left-color: #A4243B; }
+.decision.cat-data { border-left-color: #C0A05A; }
+.decision.cat-ana { border-left-color: #2A6F97; }
+.decision.cat-viz { border-left-color: #6D5634; }
+
+.cat-section-title {
+  font-size: 1.4rem;
+  margin-top: 36px;
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #E8E4DC;
+}
+.cat-section-sub {
+  color: #7A7A7A;
+  font-size: 0.92rem;
+  margin: 0 0 16px 0;
+  line-height: 1.5;
+}
+</style>
+
+<div class="cat-bar">
+  <a href="#architecture"><span class="ico">🏗️</span><span class="lbl">Architecture</span><span class="cnt">stack, hébergement, layout</span></a>
+  <a href="#cartographie"><span class="ico">🗺️</span><span class="lbl">Cartographie</span><span class="cnt">palettes, DROM, PLM, légendes</span></a>
+  <a href="#donnees"><span class="ico">📊</span><span class="lbl">Données par source</span><span class="cnt">13 sources, filtres métier</span></a>
+  <a href="#analyse"><span class="ico">🔬</span><span class="lbl">Analyse</span><span class="cnt">stratification, métriques</span></a>
+  <a href="#visualisations"><span class="ico">📈</span><span class="lbl">Visualisations</span><span class="cnt">radar, Sankey, multiples</span></a>
+</div>
+<p>Chaque décision donne <strong>la règle</strong>, <strong>la raison</strong> (↳), et les <strong>alternatives écartées</strong> (✗) quand pertinentes.</p>
+<hr>
+<section id="architecture" class="level2 cat-section-title">
+<h2 class="cat-section-title anchored" data-anchor-id="architecture">🏗️ Architecture</h2>
+<div class="cat-section-sub">
+<p>Choix de stack, hébergement, contraintes structurantes du site.</p>
+</div>
+<div class="decision cat-arch">
+  <h3 class="anchored">Quarto Dashboard en R, déploiement statique</h3>
+  <div class="rule">Cartes via <code>leaflet</code>, viz via <code>ggplot2 + ggiraph</code> ou SVG natif, Sankey via <code>networkD3</code>. Pipeline data en R (<code>duckdb + arrow + sf</code>).</div>
+  <div class="why">Document lisible cellule par cellule, pas un HTML/JS opaque. Quarto = literate computing. Pas de serveur Shiny → hébergeable sur GitHub Pages statique.</div>
+  <div class="alt">HTML/JS pur (pas un notebook) · Shiny serveur (pas statique) · Shinylive WebR (gardé en option).</div>
+</div>
+
+<div class="decision cat-arch">
+  <h3 class="anchored">Multi-page sous 100 MB par fichier</h3>
+  <div class="rule">Une page Quarto par thématique. Plafond cible : 45 MB HTML par page.</div>
+  <div class="why">GitHub Pages plafonne à <strong>100 MB par fichier</strong>. Un dashboard mono-page atteindrait 200+ MB.</div>
+  <div class="rule"><strong>Implémentation</strong> : <code>R/setup_dashboard.R</code> est sourcé par chaque page, charge les données conditionnellement (<code>if (carb_ready) …</code>). htmlwidgets n'embarque que les objets passés aux widgets de la page.</div>
+</div>
+
+<div class="decision cat-arch">
+  <h3 class="anchored">Périmètre géographique : Métropole + 5 DROM en cartouches</h3>
+  <div class="rule">DROM = <code>971</code> Guadeloupe, <code>972</code> Martinique, <code>973</code> Guyane, <code>974</code> La Réunion, <code>976</code> Mayotte. Convention IGN.</div>
+  <div class="why">Inclusivité sans dégrader la lisibilité de la carte principale.</div>
+  <div class="alt">Carte unique étirée sur Atlantique/Indien (illisible).</div>
+</div>
+</section>
+<section id="cartographie" class="level2 cat-section-title">
+<h2 class="cat-section-title anchored" data-anchor-id="cartographie">🗺️ Cartographie</h2>
+<div class="cat-section-sub">
+<p>Palettes, encodages, gestion des cas particuliers (PLM, DROM, légendes dynamiques).</p>
+</div>
+<div class="decision cat-carto">
+  <h3 class="anchored">Législatives : famille gagnante + opacité par marge</h3>
+  <div class="rule">Variable cartographiée : <strong>famille gagnante au tour décisif</strong> (NFP/ENS/RN/LR/Divers). Opacité proportionnelle à la marge (faible marge → couleur pâle).</div>
+  <div class="why">Le multipartisme se rend bien par couleur catégorielle. L'opacité ajoute la force de la victoire sans surcharger.</div>
+</div>
+
+<div class="decision cat-carto">
+  <h3 class="anchored">Municipales : helper dédié <code>choropleth_municipales()</code></h3>
+  <div class="rule">Différences vs Législatives :
+    <ul>
+      <li><strong>Palette "Divers" boostée</strong> : olive <code>#A18047</code> au lieu du gris national. Justification : 88% T1 + 81% T2 gagnés par "Divers" (LDIV/LDVG/LDVD/LREG) — invisibles sinon.</li>
+      <li><strong>Stroke différencié</strong> : T1 → orange <code>#F0A500</code> (0,6 px), T2 → blanc (0,3 px). L'œil distingue immédiatement le tour décisif.</li>
+      <li><strong>Opacité fixe 0,85</strong> pour toutes les communes avec famille, pas de fade par marge.</li>
+    </ul>
+  </div>
+  <div class="why">La marge moyenne T1 (47%) écraserait T2 (12%) ; un fade serait illisible.</div>
+</div>
+
+<div class="decision cat-carto">
+  <h3 class="anchored">Paris / Lyon / Marseille : règle par viz</h3>
+  <div class="rule">Données MI agrègent au niveau commune (<code>75056</code>, <code>69123</code>, <code>13055</code>), GeoJSON expose par arrondissement (<code>75101-75120</code>, etc.).
+    <ul>
+      <li><strong>Élections</strong> : résultat ville mère répercuté sur tous les arrondissements.</li>
+      <li><strong>Mobilité Sankey</strong> : consolidation <code>751xx</code> → <code>75056</code> avant agrégation (sinon 20 "Paris arrondissements" pollueraient le Sankey).</li>
+      <li><strong>Profil radar</strong> : filtre les communes avec &lt; 5/8 axes renseignés (exclut les codes PLM consolidés peu renseignés).</li>
+    </ul>
+  </div>
+  <div class="alt">Sommer pop + revenus + APL des arrondissements vers la commune mère — demanderait un script PLM dédié (à faire ultérieurement).</div>
+</div>
+
+<div class="decision cat-carto">
+  <h3 class="anchored">Légendes dynamiques (page Démographie)</h3>
+  <div class="rule">Quand l'utilisateur toggle entre "Population", "Densité INSEE", "Chômage", la légende swap entre format continu (5 breaks log-quantile) et format catégoriel (6 niveaux ordinaux).</div>
+  <div class="why">Un même barème continu n'a aucun sens pour une variable catégorielle.</div>
+</div>
+
+<div class="decision cat-carto">
+  <h3 class="anchored">DROM cartouches : re-fit bounds à l'expansion</h3>
+  <div class="rule"><code>R/map_helpers.R::.add_resize_handler()</code> capture les bounds initiaux puis ré-applique <code>fitBounds()</code> après chaque <code>invalidateSize()</code>. Observe aussi le parent <code>.card</code> (Quarto fullscreen).</div>
+  <div class="why">Sans re-fit, leaflet garde l'échelle calculée pour 150×150 px. Un DROM agrandi en fullscreen restait minuscule au centre.</div>
+</div>
+</section>
+<section id="donnees" class="level2 cat-section-title">
+<h2 class="cat-section-title anchored" data-anchor-id="donnees">📊 Données par source</h2>
+<div class="cat-section-sub">
+<p>Une décision par source : règles métier, filtres, snapshots. 13 sources au total.</p>
+</div>
+<div class="decision cat-data">
+  <h3 class="anchored">📥 Élections Législatives 2024 — T1 fallback</h3>
+  <div class="meta">Min. Intérieur · 35 000 communes</div>
+  <div class="rule">Variable cartographiée = famille gagnante au tour décisif. Pour les ~6 000 communes décidées au 1er tour (majorité absolue + seuil d'inscrits), on bascule au résultat T1 ; colonne <code>tour</code> trace la nature du résultat affiché.</div>
+  <div class="rule"><strong>Mapping nuance MI → 5 familles</strong> :
+    <ul>
+      <li><strong>NFP</strong> : UG, FI, SOC, COM, VEC, ECO</li>
+      <li><strong>ENS</strong> : ENS, HOR</li>
+      <li><strong>LR</strong> : LR, UDI, UDR</li>
+      <li><strong>RN</strong> : RN, UXD, EXD</li>
+      <li><strong>Divers</strong> : DVD, DVG, DVC, DSV, REG, EXG, DIV</li>
+    </ul>
+  </div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 Municipales 2026 — T1 + T2 combinés</h3>
+  <div class="meta">Min. Intérieur · ~3 300 communes</div>
+  <div class="rule">T2 prioritaire (1 526 communes) + T1 fallback (1 779 communes décidées au 1er tour) = ~3 300 communes ≥ 1 000 hab. Les ~32 000 communes &lt; 1 000 hab. utilisent le scrutin majoritaire individuel → absentes du fichier source, affichées en beige neutre.</div>
+  <div class="rule">Mapping nuance liste (préfixe <code>L</code>) → famille : <code>LUG</code>/<code>LFI</code>/<code>LSOC</code>/<code>LCOM</code>/<code>LVEC</code>/<code>LECO</code> = NFP ; <code>LUC</code> = ENS ; <code>LLR</code>/<code>LUDI</code>/<code>LUDR</code>/<code>LUD</code> = LR ; <code>LRN</code>/<code>LUXD</code>/<code>LEXD</code> = RN ; <code>LDIV</code>/<code>LDVG</code>/<code>LDVD</code>/<code>LDVC</code>/<code>LREG</code> = Divers.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 DVF Immobilier — filtres standards</h3>
+  <div class="meta">DGFiP · 655 000 ventes 2021-2024</div>
+  <div class="rule"><strong>Filtres</strong> :
+    <ul>
+      <li><code>nature_mutation = "Vente"</code></li>
+      <li><code>type_local ∈ {"Appartement", "Maison"}</code></li>
+      <li><code>surface_reelle_bati &gt; 9 m²</code></li>
+      <li>Bornes : <code>200 €/m² &lt; x &lt; 30 000 €/m²</code></li>
+      <li>Mutations mono-local uniquement</li>
+      <li>Médiane comme stat d'agrégation (robuste outliers)</li>
+      <li>N &lt; 5 ventes/an → <code>estimation_insuffisante</code>, grisée</li>
+    </ul>
+  </div>
+  <div class="why">Convention DVF standard. Mono-local évite la répartition prix sur lots. Médiane robuste.</div>
+  <div class="alt">Moyenne (sensible outliers) · Répartition proportionnelle (bruit non traçable).</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 Atmo Air — agrégation 30 jours glissants</h3>
+  <div class="meta">Atmo France · WFS · ~700 stations</div>
+  <div class="rule">Snapshot agrégé sur <strong>30 jours glissants</strong> au lieu du jour J. EPCI expansion pour Bretagne (Air Breizh), Occitanie (Atmo Occitanie), Pays de la Loire (Air PdL) qui publient par EPCI.</div>
+  <div class="why">L'indice journalier varie fortement (pollens, canicule). 30 j lisse les NA et reflète l'exposition chronique.</div>
+  <div class="rule">DROM couverts partiellement : Guadeloupe + Martinique seulement.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 SSMSI Délinquance — secret statistique</h3>
+  <div class="meta">SSMSI 2025 · ~18 000 communes après secret</div>
+  <div class="rule">8 indicateurs ‰ habitants : cambriolages, vols personnes, vols véhicules, violences sexuelles, dégradations, trafic stup, usage stup, total.</div>
+  <div class="rule">Secret stat : taux non publié si &lt; 5 faits cumulés sur 3 ans → ~17 000 communes (les plus petites) sont en gris "non publié". Échelle log_quantile sur la carte (distribution très skewée).</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 BAAC Accidents — taux ‰ habitants</h3>
+  <div class="meta">Min. Intérieur · 11 099 communes · 2024</div>
+  <div class="rule">Compte d'accidents corporels par commune, normalisé en ‰ habitants (joint avec <code>pop_latest</code>).</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 DGFiP Finances communales</h3>
+  <div class="meta">DGFiP · ~35 000 communes · 2024</div>
+  <div class="rule">Recettes, charges, dette, CAF en €/habitant. Taux de 3 taxes locales : habitation, foncier bâti, foncier non bâti.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 APL DREES — seuil désert médical</h3>
+  <div class="meta">DREES · ~35 000 communes · 2023</div>
+  <div class="rule">5 professions : médecins (+ ≤65 ans), infirmières, sages-femmes, dentistes, kinés.</div>
+  <div class="rule"><strong>APL médecins généralistes</strong> : palette divergente avec seuil <strong>2,5 consultations/an/hab = désert médical</strong> (DREES). Couleur change de rouge à vert au passage du seuil.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 Espérance de vie INSEE — join par nom</h3>
+  <div class="meta">INSEE · ~28 000 communes · 2024</div>
+  <div class="rule">INSEE-EV ne publie pas le code commune. Join par nom commune + département normalisé → 81,6% taux de match. Ajouté à la page Santé.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 FiLoSoFi Revenus INSEE</h3>
+  <div class="meta">INSEE · ~30 000 communes · 2021</div>
+  <div class="rule">Revenu médian disponible, déciles D1/D9, indice de Gini, % ménages imposés, part prestations vs activité.</div>
+  <div class="rule">CSV séparateur point-virgule (français), filtrage des très petites communes par INSEE (secret stat).</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 INSEE Populations + Strates de taille</h3>
+  <div class="meta">INSEE · ~35 000 communes · 2017-2021</div>
+  <div class="rule">5 strates de taille INSEE :
+    <ul>
+      <li>Très petite (&lt; 500 hab.)</li>
+      <li>Rurale (500 - 2 000)</li>
+      <li>Bourg / périurbain (2 000 - 10 000)</li>
+      <li>Ville moyenne (10 000 - 50 000)</li>
+      <li>Grande ville (≥ 50 000)</li>
+    </ul>
+  </div>
+  <div class="why">La densité urbaine est le principal confondant. Stratifier permet d'isoler les corrélations intra-strate.</div>
+  <div class="rule"><strong>Fallback proxy</strong> pour communes sans pop publiée : quartiles d'inscrits sur listes électorales.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 INSEE Grille de densité (typologie 6 niveaux)</h3>
+  <div class="meta">INSEE · ~35 000 communes · 2024</div>
+  <div class="rule">Variable catégorielle ordinale rural → urbain :
+    <ol>
+      <li>Rural non périurbain</li>
+      <li>Rural périurbain</li>
+      <li>Petites villes</li>
+      <li>Centres urbains intermédiaires</li>
+      <li>Ceintures urbaines</li>
+      <li>Grands centres urbains</li>
+    </ol>
+  </div>
+  <div class="rule">Mappée en palette catégorielle (page Démographie). Sert aussi de variable continue <code>densite_rang</code> (1-6) dans Explorer + Bivariée.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 DARES Chômage DEFM A+B+C</h3>
+  <div class="meta">DARES · ~7 400 communes · 1 trimestre</div>
+  <div class="rule">Demandeurs d'Emploi en Fin de Mois cat. A+B+C. Normalisé en taux ‰ habitants via <code>defm_abc / pop_latest * 1000</code>.</div>
+  <div class="rule">Couverture limitée : ~7 400 communes seulement (DARES ne publie pas pour toutes les petites).</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 RARE/CITEPA Empreinte carbone — approche conso</h3>
+  <div class="meta">RARE · ~34 800 communes · base 2018</div>
+  <div class="rule">Empreinte carbone <strong>par habitant en approche consommation</strong> (EXIOBASE × CITEPA). Médiane FR ≈ 7,9 tCO₂eq/hab/an.</div>
+  <div class="why">Reflète le mode de vie (logement, transport, alimentation, biens), indépendamment de la localisation des usines. Une grande ville pollue <em>là où sont ses usines</em> (souvent banlieue) ; l'empreinte conso lui attribue son vrai poids.</div>
+  <div class="alt">Empreinte territoriale (émissions sur le sol) — biaise les communes industrielles.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 INSEE MOBPRO — codes TRANS RP 2019</h3>
+  <div class="meta">INSEE · ~34 800 communes · RP 2019</div>
+  <div class="rule">⚠️ <strong>INSEE a révisé le codage TRANS au RP 2017+</strong>. Codes actuels :
+    <ul>
+      <li><code>1</code> Pas de transport</li>
+      <li><code>2</code> Marche à pied</li>
+      <li><code>3</code> Vélo (y compris VAE)</li>
+      <li><code>4</code> 2-roues motorisés</li>
+      <li><code>5</code> <strong>Voiture / camion / fourgonnette</strong></li>
+      <li><code>6</code> <strong>Transports en commun</strong></li>
+    </ul>
+  </div>
+  <div class="why">Un bug initial a confondu TRANS=5 avec TC → médiane voiture à 0% sur la carte. Fix appliqué et codes documentés ici pour éviter la récidive.</div>
+  <div class="rule">Indicateurs dérivés : % emploi local, % voiture/TC/vélo/marche, top destination + flux.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3 class="anchored">📥 Agence Bio Agriculture</h3>
+  <div class="meta">Agence Bio · 23 100 communes · 2024</div>
+  <div class="rule">Surface bio totale = AB certifiée + en conversion (C1 + C2 + C3). Nombre d'opérateurs = exploitations + transformateurs + distributeurs.</div>
+  <div class="rule">Fichier opérateurs en long (1 ligne par production × activité) → agrégé par <code>sum(nboperateur)</code> par commune × année.</div>
+  <div class="rule">Couverture : 23 100 communes (les ~12 000 sans aucune exploitation bio n'apparaissent pas dans le fichier source). Échelle log-quantile sur la carte (distribution skewée, médiane 47 ha, max 16 817).</div>
+</div>
+</section>
+<section id="analyse" class="level2 cat-section-title">
+<h2 class="cat-section-title anchored" data-anchor-id="analyse">🔬 Analyse</h2>
+<div class="cat-section-sub">
+<p>Stratification, métriques de corrélation, filtres de tautologies.</p>
+</div>
+<div class="decision cat-ana">
+  <h3 class="anchored">Spearman par défaut, Pearson alternatif</h3>
+  <div class="rule">Toutes les corrélations calculées en <strong>Spearman</strong> (rang) par défaut. Pearson disponible en toggle pour comparaison.</div>
+  <div class="why">Distributions prix m², chômage, délinquance, bio ont des queues lourdes. Spearman est monotone et robuste aux outliers.</div>
+</div>
+
+<div class="decision cat-ana">
+  <h3 class="anchored">Top 25 corrélations — filtrage des tautologies</h3>
+  <div class="rule">Le top affiché à droite de la heatmap Explorer <strong>exclut les paires intra-thématique</strong>. 12 groupes thématiques servent de filtre.</div>
+  <div class="why">Sans filtre, le top serait saturé par des tautologies :
+    <ul>
+      <li><code>del_total × del_vols_pers</code> (ρ = 0,98) — total inclut les vols</li>
+      <li><code>fin_charges × fin_recettes</code> (ρ = 0,99) — budget équilibré</li>
+      <li><code>ctx_log_inscrits × ctx_log_pop</code> (ρ = 0,99) — inscrits ≈ pop adulte</li>
+      <li><code>revenu_median × revenu_d9</code> (ρ = 0,95) — bougent ensemble</li>
+    </ul>
+    Les corrélations vraiment intéressantes traversent les sujets : revenu × vote, densité × prix, CO₂ × mobilité.
+  </div>
+</div>
+
+<div class="decision cat-ana">
+  <h3 class="anchored">Bivariate choropleth — palette Stevens 3×3</h3>
+  <div class="rule">Encodage 2 variables en terciles × terciles → 9 classes (palette Stevens 2015). Les coins donnent les associations extrêmes ; le centre rassemble les "moyennes".</div>
+  <div class="rule">16 paires pré-calculées côté R (<code>scripts/05_merge_and_explore.R</code>). 1 176 combinaisons disponibles côté JS via selectors X/Y.</div>
+</div>
+
+<div class="decision cat-ana">
+  <h3 class="anchored">Stratification : 5 strates × variable continue densite_rang</h3>
+  <div class="rule">Les corrélations sont pré-calculées par <strong>paire × méthode × strate</strong> (Spearman/Pearson × 5 strates pop + Toutes) → 15 912 lignes dans <code>correlations.parquet</code>.</div>
+  <div class="rule">Variable alternative <code>densite_rang</code> (1-6, INSEE typologie 6 niveaux) disponible dans heatmap et Bivariée mais pas (encore) en strate Explorer.</div>
+</div>
+</section>
+<section id="visualisations" class="level2 cat-section-title">
+<h2 class="cat-section-title anchored" data-anchor-id="visualisations">📈 Visualisations</h2>
+<div class="cat-section-sub">
+<p>Choix d’encodage pour les 4 viz dérivées (radar, Sankey, small multiples, scatter Explorer).</p>
+</div>
+<div class="decision cat-viz">
+  <h3 class="anchored">Profil radar — 8 dimensions en rang centile</h3>
+  <div class="rule">8 axes retenus, critère couverture ≥ 30 000 communes ET diversité thématique :
+    <ol>
+      <li>Population (log)</li>
+      <li>Revenu médian</li>
+      <li>APL médecins</li>
+      <li>Recettes communales €/hab</li>
+      <li>Délinquance totale ‰</li>
+      <li>Empreinte CO₂/hab</li>
+      <li>% voiture mobilité</li>
+      <li>Densité INSEE (rang 1-6)</li>
+    </ol>
+  </div>
+  <div class="rule">Encodage en <strong>rang centile national</strong> (0-100) plutôt que valeur brute → lecture "rond ou écrasé" indépendante des unités. 50 = médiane FR.</div>
+  <div class="rule">Filtre : communes avec &lt; 5/8 axes renseignés sont exclues du lookup (cas PLM consolidés).</div>
+</div>
+
+<div class="decision cat-viz">
+  <h3 class="anchored">Sankey mobilité — Top 100 flux + PLM consolidé</h3>
+  <div class="rule">Préfixage des nœuds : "R · Lyon" pour résidence, "T · Lyon" pour destination. Sinon networkD3 collapse les deux côtés et perd l'orientation.</div>
+  <div class="rule">Pipeline (<code>scripts/16_mobilite_flows.R</code>) :
+    <ol>
+      <li>Consolidation PLM (<code>751xx</code>→<code>75056</code>, <code>6938x</code>→<code>69123</code>, <code>132xx</code>→<code>13055</code>)</li>
+      <li>Top 50 destinations par poids entrant total</li>
+      <li>Filtre <code>COMMUNE != DCLT</code> (exclut flux intra-commune)</li>
+      <li>Top 200 flux ≥ 100 actifs, puis top 100 pour le rendu</li>
+    </ol>
+  </div>
+</div>
+
+<div class="decision cat-viz">
+  <h3 class="anchored">Small multiples départements — 96 tuiles métropole</h3>
+  <div class="rule">Régex strict <code>^(0[1-9]|[1-8][0-9]|9[0-5]|2[AB])$</code> pour le filtre — exclut ZX (Saint-Martin), ZZ (Français hors de France) et 97x/98x (DROM, séparés).</div>
+  <div class="rule">Indicateur continu : médiane communale du département. Famille dominante : plurality (pas majorité absolue) des communes du département.</div>
+  <div class="rule">9 indicateurs sélectionnables, 8 palettes différentes selon le sens de l'indicateur (séquentielle, divergente, catégorielle).</div>
+</div>
+
+<div class="decision cat-viz">
+  <h3 class="anchored">Explorer scatter — LOESS approx + ρ live</h3>
+  <div class="rule">Échantillon stratifié (max 8 000 communes) pour ne pas saturer le SVG. ρ Spearman recalculé en JS sur l'échantillon courant.</div>
+  <div class="rule">Courbe "LOESS-like" : moyenne mobile sur 30 quantiles de X. Pas un vrai LOESS (trop coûteux côté JS) mais suffisant pour donner la tendance.</div>
+</div>
+</section>
+<section id="historique-des-règles" class="level2 cat-section-title">
+<h2 class="cat-section-title anchored" data-anchor-id="historique-des-règles">Historique des règles</h2>
+<ul style="font-size:0.88rem;line-height:1.55;color:#4A4A4A;">
+  <li><strong>2026-05-25</strong> — Décisions initiales : Quarto + leaflet, périmètre métropole+DROM, élections 2024 T2 + T1 fallback, DVF filtres standard, Atmo WFS + EPCI expansion, stratification 4 strates pop INSEE.</li>
+  <li><strong>2026-05-26 matin</strong> — Multi-page split GitHub Pages, ajout SSMSI + BAAC, DGFiP, APL 5 pros + EV INSEE, FiLoSoFi, grille densité INSEE 6 levels, DEFM, Municipales 2026 T1+T2. Passage 4 → 5 strates pop INSEE.</li>
+  <li><strong>2026-05-26 après-midi</strong> — Blocs G (carbone RARE/CITEPA), I (mobilité MOBPRO 2019), K (Agence Bio). Helper municipales dédié. Fix démographie click+legend, fix DROM resize fitBounds. Viz radar profil, Sankey mobilité, small multiples départements. Codes TRANS RP 2019 documentés post-bug.</li>
+</ul>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copié");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copié");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp("https:\/\/PierreBeaucoral\.github\.io\/dashboard-france-ouvert\/");
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+     var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+        }
+      }
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          let top = null;
+          let height = null;
+          let parent = null;
+          if (lineIds.length > 0) {
+              //compute the position of the single el (top and bottom and make a div)
+              const el = window.document.getElementById(lineIds[0]);
+              top = el.offsetTop;
+              height = el.offsetHeight;
+              parent = el.parentElement.parentElement;
+            if (lineIds.length > 1) {
+              const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+              const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+              height = bottom - top;
+            }
+            if (top !== null && height !== null && parent !== null) {
+              // cook up a div (if necessary) and position it 
+              let div = window.document.getElementById("code-annotation-line-highlight");
+              if (div === null) {
+                div = window.document.createElement("div");
+                div.setAttribute("id", "code-annotation-line-highlight");
+                div.style.position = 'absolute';
+                parent.appendChild(div);
+              }
+              div.style.top = top - 2 + "px";
+              div.style.height = height + 4 + "px";
+              div.style.left = 0;
+              let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+              if (gutterDiv === null) {
+                gutterDiv = window.document.createElement("div");
+                gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+                gutterDiv.style.position = 'absolute';
+                const codeCell = window.document.getElementById(targetCell);
+                const gutter = codeCell.querySelector('.code-annotation-gutter');
+                gutter.appendChild(gutterDiv);
+              }
+              gutterDiv.style.top = top - 2 + "px";
+              gutterDiv.style.height = height + 4 + "px";
+            }
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+</div> <!-- /content -->
+<footer class="footer">
+  <div class="nav-footer">
+    <div class="nav-footer-left">
+<p>Sources · data.gouv.fr</p>
+</div>   
+    <div class="nav-footer-center">
+      &nbsp;
+    </div>
+    <div class="nav-footer-right">
+<p>Construit avec Quarto</p>
+</div>
+  </div>
+</footer>
+
+
+
+
+<script src="../site_libs/quarto-html/zenscroll-min.js"></script>
+</body></html>
