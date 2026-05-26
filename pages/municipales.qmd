@@ -1,0 +1,40 @@
+---
+title: "Municipales 2026 · 2nd tour"
+format:
+  dashboard:
+    orientation: rows
+    theme:
+      - cosmo
+      - ../styles/custom.scss
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+```
+
+#
+
+## Row {height="100%"}
+
+::: {.card title="Municipales 2026 · 2nd tour · famille gagnante (1 526 communes)"}
+```{r}
+#| label: map-municipales
+if (mun_ready) {
+  m <- choropleth_metropole(com_metro_mun, dep_metro)
+  m
+} else {
+  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>Municipales non chargées. Lancer <code>Rscript scripts/12_municipales_2026.R</code>.</p>")
+}
+```
+
+::: {.cp-source}
+**Source** · Min. Intérieur · Municipales 2026 · 2nd tour.<br>
+**Communes affichées** : 1 526 ayant nécessité un 2nd tour (les ~32 000 autres ont été élues dès le T1, non incluses dans cette source — à compléter avec le fichier T1 dans une itération future).<br>
+**Familles** : LCOM/LFI/LSOC/LVEC → NFP · LUC → ENS · LLR/LUDI → LR · LRN/LUXD → RN · LDV* et LREG → Divers.
+:::
+:::

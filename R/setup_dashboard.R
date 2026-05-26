@@ -132,6 +132,24 @@ if (elec_ready) {
   com_drom_results  <- com_results |>
     filter( substr(code, 1, 3) %in% DROM_CODES)
 
+  # Municipales 2026 (T2 seulement, ~1 500 communes)
+  mun_path <- here::here("data", "processed", "municipales_2026",
+                        "resultats_t2.parquet")
+  mun_ready <- file.exists(mun_path)
+  if (mun_ready) {
+    mun_data <- arrow::read_parquet(mun_path)
+    com_mun_results <- com |>
+      mutate(
+        join_code = dplyr::coalesce(
+          plm_map$city[match(code, plm_map$arrond)],
+          code
+        )
+      ) |>
+      dplyr::left_join(mun_data, by = c("join_code" = "code_insee"))
+    com_metro_mun <- com_mun_results |>
+      filter(!substr(code, 1, 3) %in% DROM_CODES)
+  }
+
   commune_lookup_df <- com_metro_results |>
     sf::st_drop_geometry() |>
     dplyr::transmute(

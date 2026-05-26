@@ -18,7 +18,9 @@ website:
       - text: Thématiques
         menu:
           - href: pages/elections.qmd
-            text: Élections
+            text: Législatives 2024
+          - href: pages/municipales.qmd
+            text: Municipales 2026
           - href: pages/immobilier.qmd
             text: Immobilier
           - href: pages/air.qmd

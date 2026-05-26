@@ -43,9 +43,14 @@ Thématiques
 ```{=html}
 <div class="theme-grid">
   <a href="pages/elections.html" class="theme-card">
-    <h3>🗳️ Élections</h3>
-    <p>Législatives 2024, famille gagnante par commune, T1 et T2 détaillés.</p>
+    <h3>🗳️ Législatives 2024</h3>
+    <p>Famille gagnante par commune, T1 et T2 détaillés.</p>
     <div class="src">Min. Intérieur · 35 000 communes</div>
+  </a>
+  <a href="pages/municipales.html" class="theme-card">
+    <h3>🏛️ Municipales 2026</h3>
+    <p>Résultats par commune ayant eu un 2nd tour. Famille politique de la liste élue.</p>
+    <div class="src">Min. Intérieur · 1 526 communes T2</div>
   </a>
   <a href="pages/immobilier.html" class="theme-card">
     <h3>🏠 Immobilier</h3>
