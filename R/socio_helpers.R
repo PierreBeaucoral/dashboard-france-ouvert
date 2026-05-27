@@ -142,15 +142,15 @@ choropleth_socio <- function(com_sf, dep_sf, values_df,
     collapse = ""
   )
   htmltools::HTML(paste0(
-    "<div class='lgd-box'>",
-    "<div class='lgd-title'>", title, "</div>",
+    "<details class='lgd-box' open>",
+    "<summary class='lgd-title'>", title, "</summary>",
     rows,
     "<div class='lgd-row' style='margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;'>",
     "<span class='lgd-swatch' style='background:", .socio_na_color, ";'></span>",
     "<span class='lgd-label' style='color:#7A7A7A;'>Non publié</span>",
     "<span class='lgd-hex'>", toupper(.socio_na_color), "</span>",
     "</div>",
-    "</div>"
+    "</details>"
   ))
 }
 
@@ -192,14 +192,14 @@ choropleth_socio_cat <- function(com_sf, dep_sf, values_df,
     collapse = ""
   )
   lgd_html <- htmltools::HTML(paste0(
-    "<div class='lgd-box'>",
-    "<div class='lgd-title'>", legend_title, "</div>",
+    "<details class='lgd-box' open>",
+    "<summary class='lgd-title'>", legend_title, "</summary>",
     rows,
     "<div class='lgd-row' style='margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;'>",
     "<span class='lgd-swatch' style='background:", .socio_na_color, ";'></span>",
     "<span class='lgd-label' style='color:#7A7A7A;'>Non publié</span>",
     "<span class='lgd-hex'>", toupper(.socio_na_color), "</span>",
-    "</div></div>"
+    "</div></details>"
   ))
 
   leaflet::leaflet(

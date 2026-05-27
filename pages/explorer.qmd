@@ -268,7 +268,7 @@ if (explorer_ready) {
   </div>
   <span id="scat-rho" style="margin-left:auto;font-family:IBM Plex Mono,monospace;font-size:0.85rem;color:#1A1A1A;"></span>
 </div>
-<div id="scat-canvas" style="width:100%;height:calc(100% - 50px);min-height:200px;position:relative;"></div>
+<div id="scat-canvas" style="width:100%;height:calc(100% - 50px);min-height:200px;max-height:480px;position:relative;overflow:hidden;"></div>
 ```
 
 ```{r}
@@ -366,7 +366,8 @@ if (explorer_ready) {
       '  var xs = valid.map(function(r){return r[xVar];}), ys = valid.map(function(r){return r[yVar];});\n',
       '  var xMin = Math.min.apply(null, xs), xMax = Math.max.apply(null, xs);\n',
       '  var yMin = Math.min.apply(null, ys), yMax = Math.max.apply(null, ys);\n',
-      '  var w = canvas.clientWidth, h = Math.max(180, canvas.clientHeight);\n',
+      '  // Cap h at 480px : on mobile la cascade height:100% peut faire grossir le canvas à 4000+ px.\n',
+      '  var w = canvas.clientWidth, h = Math.max(180, Math.min(480, canvas.clientHeight));\n',
       "  var pad = {l:50, r:20, t:10, b:34};\n",
       '  var px = function(v){ return pad.l + (v - xMin) / (xMax - xMin) * (w - pad.l - pad.r); };\n',
       '  var py = function(v){ return h - pad.b - (v - yMin) / (yMax - yMin) * (h - pad.t - pad.b); };\n',

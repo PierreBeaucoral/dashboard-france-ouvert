@@ -379,8 +379,8 @@ choropleth_municipales <- function(com_sf, dep_sf) {
     collapse = ""
   )
   htmltools::HTML(paste0(
-    "<div class='lgd-box famille-legend'>",
-    "<div class='lgd-title'>Famille gagnante</div>",
+    "<details class='lgd-box famille-legend' open>",
+    "<summary class='lgd-title'>Famille gagnante</summary>",
     rows,
     "<div class='lgd-row' style='margin-top:8px;border-top:1px dashed #DCD8CF;padding-top:6px;'>",
     "<span class='lgd-swatch' style='background:transparent;border:2px solid #F0A500;'></span>",
@@ -391,7 +391,7 @@ choropleth_municipales <- function(com_sf, dep_sf) {
     "<div class='lgd-row' style='margin-top:6px;'>",
     "<span class='lgd-swatch' style='background:#E8E4DC;'></span>",
     "<span class='lgd-label' style='color:#7A7A7A;'>&lt; 1 000 hab. (scrutin individuel)</span></div>",
-    "</div>"
+    "</details>"
   ))
 }
 
@@ -413,10 +413,10 @@ choropleth_municipales <- function(com_sf, dep_sf) {
     collapse = ""
   )
   htmltools::HTML(paste0(
-    "<div class='lgd-box'>",
-    "<div class='lgd-title'>Famille gagnante · T2</div>",
+    "<details class='lgd-box' open>",
+    "<summary class='lgd-title'>Famille gagnante · T2</summary>",
     rows,
-    "</div>"
+    "</details>"
   ))
 }
 

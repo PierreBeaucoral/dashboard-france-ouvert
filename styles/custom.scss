@@ -331,39 +331,81 @@ pre.sourceCode {
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
   font-family: $font-family-sans-serif;
 }
-.lgd-box { padding: 10px 12px; }
+// .lgd-box est désormais un <details> HTML5 (collapsible). Le <summary>
+// est .lgd-title. Tap/click sur le titre toggle l'affichage des rows.
+.lgd-box {
+  padding: 6px 9px;
+  max-width: 200px;
+  // Masque le triangle natif du <details> — on rend notre propre chevron
+  // dans .lgd-title via ::after.
+  &::-webkit-details-marker { display: none; }
+  &[open] .lgd-title::after { transform: rotate(90deg); }
+}
 .lgd-title {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 600;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: $ink-soft;
-  margin-bottom: 6px;
-}
-.lgd-row {
+  margin: 0;
+  padding: 2px 0;
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 3px 0;
-  font-size: 0.82rem;
+  // Le chevron rotate quand open
+  &::after {
+    content: "▸";
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: $ink-muted;
+    transition: transform 0.12s ease;
+  }
+  &::-webkit-details-marker { display: none; }
+}
+// Espace entre le titre et les rows quand ouvert
+.lgd-box[open] .lgd-title { margin-bottom: 4px; }
+.lgd-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 2px 0;
+  font-size: 0.74rem;
   color: $ink;
 }
 .lgd-swatch {
-  width: 14px;
-  height: 14px;
+  width: 11px;
+  height: 11px;
   border-radius: 2px;
   flex: 0 0 auto;
 }
 .lgd-label { flex: 1 1 auto; }
 .lgd-hex {
   font-family: $font-family-monospace;
-  font-size: 0.68rem;
+  font-size: 0.62rem;
   color: $ink-muted;
   margin-left: auto;
-  padding-left: 8px;
+  padding-left: 6px;
   letter-spacing: 0.02em;
   text-transform: uppercase;
   flex: 0 0 auto;
+}
+
+// --- Mobile : légendes encore plus compactes ---------
+// Hex codes masqués (gain de largeur). Légende repliée par défaut via JS
+// inline ajouté à chaque page (cf. emit_commune_names_js() augmenté).
+@media (max-width: 600px) {
+  .famille-legend, .dvf-legend, .atmo-legend, .socio-legend {
+    max-width: 160px;
+    font-size: 0.7rem;
+  }
+  .lgd-box { padding: 4px 7px; }
+  .lgd-title { font-size: 0.6rem; }
+  .lgd-row { font-size: 0.68rem; gap: 4px; margin: 1px 0; }
+  .lgd-swatch { width: 9px; height: 9px; }
+  .lgd-hex { display: none; }
 }
 
 // ============================================================

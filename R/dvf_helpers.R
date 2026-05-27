@@ -141,14 +141,14 @@ choropleth_dvf <- function(com_sf, dep_sf, dvf_default, breaks) {
     collapse = ""
   )
   htmltools::HTML(paste0(
-    "<div class='lgd-box'>",
-    "<div class='lgd-title'>Prix m² médian · quintiles</div>",
+    "<details class='lgd-box' open>",
+    "<summary class='lgd-title'>Prix m² médian · quintiles</summary>",
     rows,
     "<div class='lgd-row' style='margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;'>",
     "<span class='lgd-swatch' style='background:", .dvf_na_color, ";'></span>",
     "<span class='lgd-label' style='color:#7A7A7A;'>N &lt; 5 ou non publié</span>",
     "<span class='lgd-hex'>", toupper(.dvf_na_color), "</span>",
     "</div>",
-    "</div>"
+    "</details>"
   ))
 }

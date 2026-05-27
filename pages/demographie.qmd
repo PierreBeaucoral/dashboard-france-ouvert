@@ -152,7 +152,7 @@ if (demo_ready) {
       '      rows += row(window.demoPopPalette[k], lab2, window.demoPopPalette[k]);\n',
       '    }\n',
       '  }\n',
-      "  return '<div class=\"lgd-box\"><div class=\"lgd-title\">' + title + '</div>' + rows + naRow() + '</div>';\n",
+      "  return '<details class=\"lgd-box\" open><summary class=\"lgd-title\">' + title + '</summary>' + rows + naRow() + '</details>';\n",
       '};\n',
       'window.demoSwapLegend = function(field) {\n',
       "  var ctrl = document.querySelector('.socio-legend');\n",

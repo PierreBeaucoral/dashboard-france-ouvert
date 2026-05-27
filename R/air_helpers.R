@@ -116,10 +116,10 @@ choropleth_atmo <- function(com_sf, dep_sf, atmo_df, indice_col = "qual_indice",
     paste0("<div class='lgd-sub'>", as.character(display_date), "</div>")
   else ""
   htmltools::HTML(paste0(
-    "<div class='lgd-box'>",
-    "<div class='lgd-title'>Indice ATMO · moyenne 30j</div>",
+    "<details class='lgd-box' open>",
+    "<summary class='lgd-title'>Indice ATMO · moyenne 30j</summary>",
     date_html,
     rows,
-    "</div>"
+    "</details>"
   ))
 }

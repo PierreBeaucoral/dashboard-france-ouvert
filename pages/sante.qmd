@@ -110,7 +110,7 @@ if (apl_ready) {
       "    rows += '<div class=\"lgd-row\"><span class=\"lgd-swatch\" style=\"background:' + window.santePalette[i] + ';\"></span><span class=\"lgd-label\">' + lab + '</span><span class=\"lgd-hex\">' + window.santePalette[i].toUpperCase() + '</span></div>';\n",
       '  }\n',
       "  rows += '<div class=\"lgd-row\" style=\"margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;\"><span class=\"lgd-swatch\" style=\"background:#E8E4DC;\"></span><span class=\"lgd-label\" style=\"color:#7A7A7A;\">Non publié</span><span class=\"lgd-hex\">#E8E4DC</span></div>';\n",
-      "  return '<div class=\"lgd-box\"><div class=\"lgd-title\">' + meta.title + '</div>' + rows + '</div>';\n",
+      "  return '<details class=\"lgd-box\" open><summary class=\"lgd-title\">' + meta.title + '</summary>' + rows + '</details>';\n",
       '};\n',
       'window.santeSwapLegend = function(field) {\n',
       "  var ctrl = document.querySelector('.socio-legend');\n",
