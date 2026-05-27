@@ -607,6 +607,19 @@ pre.sourceCode {
       margin: 0 0 8px 0;
     }
   }
+  // Définition contextuelle d'un indicateur (sous le h4 d'une cp-section).
+  // Conçue pour être courte : 1-2 phrases max, lecture rapide.
+  .cp-def {
+    font-size: 0.74rem;
+    line-height: 1.4;
+    color: $ink-soft;
+    background: $cream;
+    border-left: 2px solid $rule;
+    padding: 5px 9px;
+    margin: 0 0 8px 0;
+    border-radius: 0 3px 3px 0;
+    strong { color: $ink; font-weight: 600; }
+  }
   .cp-kvs .cp-kv {
     display: flex;
     justify-content: space-between;

@@ -89,6 +89,7 @@ if (atmo_ready) {
       '  var impBadge = ent.imputed ? \'<span class="cp-badge cp-badge-imp" title="Pas de mesure publiée pour cette commune ; valeur = moyenne des communes mesurées du même département.">Estimation dept</span>\' : "";\n',
       '  function num(x, dec) { if (x == null) return "—"; return Number(x).toFixed(dec || 1); }\n',
       '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \' \' + impBadge + \'</div></div>\' +\n',
+      '    \'<p class="cp-def" style="margin-top:8px;">Indice <strong>ATMO</strong> (Atmo France) : <strong>1</strong> Bon → <strong>6</strong> Extrême mauvais. Maximum sur 5 polluants : <strong>NO₂</strong> (trafic), <strong>O₃</strong> (canicule), <strong>PM₁₀ et PM₂.₅</strong> (particules fines). Moyenne <strong>30 j glissants</strong> pour lisser les pics.</p>\' +\n',
       '    \'<div class="cp-section">\' + pill("ATMO moyen 30j", ent.qual) + \'</div>\' +\n',
       '    \'<div class="cp-section cp-kvs">\' +\n',
       '    \'<div class="cp-kv"><span>Indice moyen</span><span class="cp-num">\' + num(ent.qmean, 1) + \' / 6</span></div>\' +\n',
