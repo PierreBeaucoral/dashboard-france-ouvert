@@ -44,6 +44,9 @@ jobs:
 
       - name: Install R packages
         run: |
+          # Utilise Posit Package Manager (binaires précompilés Ubuntu noble)
+          # → ~5 min vs ~2h en compilation source depuis CRAN.
+          options(repos = c(POSIT = Sys.getenv("RSPM", "https://packagemanager.posit.co/cran/__linux__/noble/latest")))
           install.packages(c(
             # Quarto required for .qmd execution
             "rmarkdown", "knitr",
@@ -55,7 +58,7 @@ jobs:
             "ggplot2", "ggiraph", "networkD3",
             # I/O
             "jsonlite", "duckdb", "DBI", "curl"
-          ), repos = "https://cloud.r-project.org")
+          ))
         shell: Rscript {0}
 
       - name: Setup Quarto
