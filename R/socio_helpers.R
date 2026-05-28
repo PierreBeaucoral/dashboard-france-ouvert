@@ -37,20 +37,42 @@ choropleth_socio <- function(com_sf, dep_sf, values_df,
 
   if (is.null(breaks)) {
     if (scale == "log_quantile") {
-      # Quantiles sur log(1+v) — donne plus de résolution dans les valeurs
-      # élevées d'une distribution skewée (cas typique : taux délinquance,
-      # consommation énergie, etc.)
-      logv <- log1p(vals[!is.na(vals) & vals >= 0])
-      logbr <- unname(quantile(logv, probs = seq(0, 1, by = 0.2), na.rm = TRUE))
-      breaks <- expm1(logbr)
+      # Pour les distributions zéro-saturées (cas typique : délinquance ‰
+      # avec 76 % de zéros à cause du secret stat SSMSI, surface bio avec
+      # ~12 000 communes sans aucune exploitation), on exclut explicitement
+      # les zéros du calcul des quantiles puis on impose 0 comme premier
+      # break. Sinon q0=q20=q40=0 fait tomber tout le monde dans la même
+      # classe la plus claire (artefact visible sur securite.qmd).
+      pos <- vals[!is.na(vals) & vals > 0]
+      if (length(pos) >= 5L) {
+        logv  <- log1p(pos)
+        logbr <- unname(quantile(logv, probs = seq(0, 1, by = 0.25),
+                                 na.rm = TRUE))
+        # 1 break à 0 + 4 quantiles non-nuls + maximum → 5 intervalles
+        breaks <- c(0, expm1(logbr))
+      } else {
+        # Pas assez de valeurs positives → seq linéaire sur la plage non-NA
+        rng <- range(vals, na.rm = TRUE)
+        breaks <- seq(rng[1], max(rng[1] + 1, rng[2]), length.out = 6)
+      }
     } else if (scale == "linear") {
-      breaks <- seq(min(vals, na.rm=TRUE), max(vals, na.rm=TRUE), length.out = 6)
+      breaks <- seq(min(vals, na.rm = TRUE), max(vals, na.rm = TRUE),
+                    length.out = 6)
     } else {
-      breaks <- unname(quantile(vals, probs = seq(0, 1, by = 0.2),
-                                na.rm = TRUE))
+      # Quantile standard : même garde-fou zéros si présents
+      pos <- vals[!is.na(vals) & vals > 0]
+      if (length(pos) >= 5L && sum(vals == 0, na.rm = TRUE) >= length(vals) * 0.3) {
+        # Plus de 30 % de zéros → zéro = bucket dédié
+        breaks <- c(0, unname(quantile(pos, probs = seq(0, 1, by = 0.25),
+                                       na.rm = TRUE)))
+      } else {
+        breaks <- unname(quantile(vals, probs = seq(0, 1, by = 0.2),
+                                  na.rm = TRUE))
+      }
     }
     if (length(unique(breaks)) < 6) {
-      breaks <- seq(min(vals, na.rm=TRUE), max(vals, na.rm=TRUE), length.out = 6)
+      breaks <- seq(min(vals, na.rm = TRUE), max(vals, na.rm = TRUE),
+                    length.out = 6)
     }
   }
 
