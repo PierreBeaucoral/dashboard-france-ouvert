@@ -3,9 +3,6 @@ title: "Immobilier · DVF 2021-2024"
 format:
   dashboard:
     orientation: rows
-    theme:
-      - cosmo
-      - ../styles/custom.scss
 execute:
   echo: false
   warning: false

@@ -45,11 +45,16 @@ jobs:
       - name: Install R packages
         run: |
           install.packages(c(
+            # Quarto required for .qmd execution
+            "rmarkdown", "knitr",
+            # Tidyverse + data
             "arrow", "dplyr", "tidyr", "readr", "stringr", "tibble", "glue",
-            "here", "rlang",
+            "here", "rlang", "purrr",
+            # Geo + viz
             "leaflet", "sf", "htmlwidgets", "htmltools",
             "ggplot2", "ggiraph", "networkD3",
-            "jsonlite", "duckdb", "DBI"
+            # I/O
+            "jsonlite", "duckdb", "DBI", "curl"
           ), repos = "https://cloud.r-project.org")
         shell: Rscript {0}
 

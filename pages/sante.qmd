@@ -3,9 +3,6 @@ title: "Santé · APL DREES 2023"
 format:
   dashboard:
     orientation: rows
-    theme:
-      - cosmo
-      - ../styles/custom.scss
 execute:
   echo: false
   warning: false

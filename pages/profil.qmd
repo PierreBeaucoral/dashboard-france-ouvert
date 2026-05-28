@@ -3,9 +3,6 @@ title: "Profil commune · radar 8D"
 format:
   dashboard:
     orientation: rows
-    theme:
-      - cosmo
-      - ../styles/custom.scss
 execute:
   echo: false
   warning: false
