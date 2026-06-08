@@ -1,0 +1,99 @@
+name: Refresh data sources
+
+# Refresh des sources data.gouv.fr sur cadence mensuelle (1er du mois).
+# Couvre :
+#   - Atmo air : moyenne 30 j glissants, change chaque jour → refresh mensuel
+#   - Sources annuelles : SSMSI, DGFiP, FiLoSoFi, APL, BAAC, carbone, bio.
+#     La plupart sortent 1×/an mais on tente le refresh tous les mois pour
+#     ne rien manquer (scripts idempotents : skip si fichier en cache).
+#
+# Lourdes (MOBPRO 82 MB zip, Municipales) : refresh manuel via
+# `workflow_dispatch` quand nécessaire.
+on:
+  schedule:
+    - cron: '0 6 1 * *'   # 1er du mois, 6h UTC (7h Paris)
+  workflow_dispatch:       # bouton manuel "Run workflow"
+
+permissions:
+  contents: write   # autorise le commit + push
+
+env:
+  R_LIBS_USER: ${{ github.workspace }}/Rlib
+  RSPM: https://packagemanager.posit.co/cran/__linux__/noble/latest
+  TZ: UTC
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4'
+          use-public-rspm: true
+
+      - name: System dependencies (sf, leaflet, curl)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudunits2-dev libgdal-dev libgeos-dev \
+            libproj-dev libcurl4-openssl-dev libxml2-dev libssl-dev
+
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-refresh-${{ runner.os }}-${{ hashFiles('.github/workflows/refresh-data.yml') }}
+
+      - name: Install R packages (binaires Posit)
+        run: |
+          options(repos = c(POSIT = Sys.getenv("RSPM")))
+          install.packages(c(
+            "arrow", "dplyr", "tidyr", "readr", "stringr", "tibble", "glue",
+            "here", "rlang", "purrr",
+            "sf", "htmlwidgets", "htmltools",
+            "jsonlite", "duckdb", "DBI", "curl"
+          ))
+        shell: Rscript {0}
+
+      - name: Refresh Atmo air (30 j glissants)
+        run: Rscript scripts/04_air_atmo.R
+        continue-on-error: true   # si Atmo down ce mois-ci, on continue
+
+      - name: Refresh sources annuelles
+        run: |
+          Rscript scripts/06_insee_populations.R || true
+          Rscript scripts/07_ssmsi_dgfip.R || true
+          Rscript scripts/08_drees_apl.R || true
+          Rscript scripts/09_esperance_vie.R || true
+          Rscript scripts/10_filosofi_densite_defm.R || true
+          Rscript scripts/11_baac.R || true
+          Rscript scripts/13_energie_carbone.R || true
+          Rscript scripts/15_agriculture_bio.R || true
+        # || true : si une source est temporairement indisponible, on continue
+        # les autres au lieu de tout bloquer.
+
+      - name: Rebuild explorer artifacts (merge + correlations + bivariate)
+        run: Rscript scripts/05_merge_and_explore.R
+        continue-on-error: true
+
+      - name: Commit changed parquets
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # On ne stage QUE les .parquet (pas les CSV raw, gitignorés de toute façon)
+          git add 'data/processed/**/*.parquet' || true
+          if git diff --cached --quiet; then
+            echo "Aucun changement de données ce mois-ci — rien à commiter."
+          else
+            git commit -m "data: monthly refresh ($(date +'%Y-%m-%d'))
+
+            Auto-refresh from refresh-data.yml. Sources updated:
+            $(git diff --cached --stat | tail -n +1)"
+            git push
+          fi
