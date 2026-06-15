@@ -2,6 +2,8 @@
 title: "Agriculture · bio"
 format:
   dashboard:
+    include-after-body:
+      - _includes/after-body.html
     orientation: rows
 execute:
   echo: false

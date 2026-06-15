@@ -88,6 +88,11 @@ format:
     code-copy: true
     fig-responsive: true
     smooth-scroll: true
+    # Partage d'URL par commune (#codeINSEE) — pages index + docs (format html).
+    # Les pages thématiques (format: dashboard) ont le même include dans leur
+    # frontmatter : le format dashboard ne fusionne pas cette clé au niveau projet.
+    include-after-body:
+      - _includes/after-body.html
 
 execute:
   echo: false

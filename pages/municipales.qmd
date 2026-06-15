@@ -2,6 +2,8 @@
 title: "Municipales 2026 · T1 + T2"
 format:
   dashboard:
+    include-after-body:
+      - _includes/after-body.html
     orientation: rows
 execute:
   echo: false
