@@ -44,6 +44,13 @@ jobs:
       - name: Restore R packages from renv.lock
         uses: r-lib/actions/setup-renv@v2
 
+      # Filet de sécurité : si un parquet est cassé (schéma changé, fichier
+      # tronqué, colonne disparue, valeurs aberrantes), on bloque AVANT le
+      # render → jamais de site déployé avec des données corrompues.
+      - name: Validate data integrity
+        run: Rscript scripts/99_validate_data.R
+        shell: bash
+
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
         with:

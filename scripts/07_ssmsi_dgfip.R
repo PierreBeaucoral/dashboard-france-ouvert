@@ -79,6 +79,15 @@ ssmsi_wide <- ssmsi_filt |>
     values_fn    = mean
   )
 
+# Garde : si une nuance n'a pas de libellé court dans `indicators_short`,
+# pivot_wider crée une colonne au nom NA (artefact). On la supprime — elle
+# n'est pas utilisée par la page et fausserait le contrôle qualité.
+na_named <- is.na(names(ssmsi_wide)) | names(ssmsi_wide) == "NA"
+if (any(na_named)) {
+  message(glue::glue("  ⚠ {sum(na_named)} colonne(s) au nom NA supprimée(s) après pivot"))
+  ssmsi_wide <- ssmsi_wide[, !na_named, drop = FALSE]
+}
+
 # Taux global agrégé : somme des taux (vols + violences + dégradations + drogue)
 ssmsi_wide <- ssmsi_wide |>
   dplyr::mutate(
