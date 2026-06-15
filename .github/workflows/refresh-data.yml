@@ -21,6 +21,9 @@ env:
   R_LIBS_USER: ${{ github.workspace }}/Rlib
   RSPM: https://packagemanager.posit.co/cran/__linux__/noble/latest
   TZ: UTC
+  # Désactive l'autoloader renv sur CI : on utilise R_LIBS_USER (binaires Posit),
+  # pas la lib renv du projet. Le .Rprofile reste actif en local.
+  RENV_CONFIG_AUTOLOADER_ENABLED: 'false'
 
 jobs:
   refresh:
@@ -35,21 +38,32 @@ jobs:
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.6'   # matche renv.lock
-          use-public-rspm: true
+          r-version: '4.6'
 
-      - name: System dependencies (sf, leaflet, curl, gdtools)
+      - name: System dependencies (sf, leaflet, curl)
         run: |
           sudo apt-get update
           sudo apt-get install -y libudunits2-dev libgdal-dev libgeos-dev \
-            libproj-dev libcurl4-openssl-dev libxml2-dev libssl-dev \
-            libfontconfig1-dev libfreetype6-dev libcairo2-dev \
-            libharfbuzz-dev libfribidi-dev libtiff-dev libjpeg-dev libpng-dev
+            libproj-dev libcurl4-openssl-dev libxml2-dev libssl-dev
 
-      # Mêmes versions exactes que le déploiement (renv.lock) → un refresh ne
-      # peut pas introduire un changement de comportement dû à un package amont.
-      - name: Restore R packages from renv.lock
-        uses: r-lib/actions/setup-renv@v2
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-refresh-${{ runner.os }}-${{ hashFiles('.github/workflows/refresh-data.yml') }}
+
+      # Binaires Posit figés sur un snapshot daté (cf. deploy.yml) : mêmes
+      # versions que le déploiement, sans compilation source.
+      - name: Install R packages (Posit binaries, pinned snapshot)
+        run: |
+          options(repos = c(POSIT = "https://packagemanager.posit.co/cran/__linux__/noble/2026-06-10"))
+          install.packages(c(
+            "arrow", "dplyr", "tidyr", "readr", "stringr", "tibble", "glue",
+            "here", "rlang", "purrr", "readxl", "janitor",
+            "sf", "htmlwidgets", "htmltools",
+            "jsonlite", "duckdb", "DBI", "curl"
+          ))
+        shell: Rscript {0}
 
       - name: Refresh Atmo air (30 j glissants)
         run: Rscript scripts/04_air_atmo.R

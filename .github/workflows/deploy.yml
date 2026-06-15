@@ -18,6 +18,12 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+# Le projet a un .Rprofile qui active renv (repro locale). Sur CI on installe
+# les binaires Posit dans R_LIBS_USER, donc on désactive l'autoloader renv
+# pour que Rscript / quarto utilisent cette librairie, pas la lib renv (vide).
+env:
+  RENV_CONFIG_AUTOLOADER_ENABLED: 'false'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,24 +34,36 @@ jobs:
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
-          # Doit matcher la version enregistrée dans renv.lock (sinon renv
-          # avertit et certains binaires peuvent manquer). Voir renv.lock → R.
           r-version: '4.6'
-          use-public-rspm: true
 
-      - name: Install system dependencies (sf, leaflet, ggiraph/gdtools)
+      - name: Install system dependencies (sf, leaflet)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libudunits2-dev libgdal-dev libgeos-dev libproj-dev libcurl4-openssl-dev \
-            libfontconfig1-dev libfreetype6-dev libcairo2-dev \
-            libharfbuzz-dev libfribidi-dev libtiff-dev libjpeg-dev libpng-dev libxml2-dev
+            libudunits2-dev libgdal-dev libgeos-dev libproj-dev libcurl4-openssl-dev libxml2-dev
 
-      # renv::restore() installe les versions EXACTES figées dans renv.lock
-      # → build reproductible : une breaking change d'un package amont ne
-      # casse plus le site. Cache + restore gérés par setup-renv.
-      - name: Restore R packages from renv.lock
-        uses: r-lib/actions/setup-renv@v2
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: r-${{ runner.os }}-${{ hashFiles('.github/workflows/deploy.yml') }}
+
+      # Reproductibilité SANS la fragilité de renv-source-build : on installe
+      # les binaires précompilés depuis un SNAPSHOT Posit DATÉ (figé). Même date
+      # → mêmes versions, à chaque build, en ~3-5 min (pas de compilation).
+      # renv.lock reste la référence pour la repro locale exacte (renv::restore).
+      - name: Install R packages (Posit binaries, pinned snapshot)
+        run: |
+          options(repos = c(POSIT = "https://packagemanager.posit.co/cran/__linux__/noble/2026-06-10"))
+          install.packages(c(
+            "rmarkdown", "knitr",
+            "arrow", "dplyr", "tidyr", "readr", "stringr", "tibble", "glue",
+            "here", "rlang", "purrr", "readxl", "janitor",
+            "leaflet", "sf", "htmlwidgets", "htmltools",
+            "ggplot2", "ggiraph", "networkD3",
+            "jsonlite", "duckdb", "DBI", "curl"
+          ))
+        shell: Rscript {0}
 
       # Filet de sécurité : si un parquet est cassé (schéma changé, fichier
       # tronqué, colonne disparue, valeurs aberrantes), on bloque AVANT le
