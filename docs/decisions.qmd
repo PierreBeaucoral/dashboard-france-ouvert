@@ -473,6 +473,46 @@ Choix d'encodage pour les 4 viz dérivées (radar, Sankey, small multiples, scat
 ```
 
 
+## 🔄 Fraîcheur des données & complétions écartées {#fraicheur .cat-section-title}
+
+::: {.cat-section-sub}
+Quelles sources se rafraîchissent automatiquement, lesquelles sont figées par
+une limite amont, et quelles extensions ont été tentées puis **écartées** parce
+qu'elles auraient introduit un indicateur trompeur (principe d'objectivité :
+mieux vaut pas d'indicateur qu'un indicateur faux).
+:::
+
+```{=html}
+<div class="decision cat-data">
+  <h3>Rafraîchissement automatique mensuel</h3>
+  <div class="rule">Le workflow <code>.github/workflows/refresh-data.yml</code> (cron, 1ᵉʳ du mois) re-télécharge les sources à URL stable et recommit les parquets modifiés : Atmo air (30 j glissants — la seule qui change vraiment souvent), SSMSI, DGFiP, APL, BAAC, carbone, FiLoSoFi, populations, bio. Scripts idempotents (cache des bruts).</div>
+  <div class="why">Un dashboard de données publiques se périme ; l'automatisation évite la dérive sans intervention manuelle. Les versions de packages sont figées (<code>renv.lock</code>) pour qu'un refresh ne change jamais le comportement.</div>
+</div>
+
+<div class="decision cat-data">
+  <h3>Sources figées par une limite amont (refresh manuel)</h3>
+  <div class="rule">
+    <ul>
+      <li><strong>DEFM chômage</strong> : la DARES publie le fichier communal sans URL stable réutilisable (export depuis leur portail). Le millésime affiché dépend du CSV déposé manuellement dans <code>data/raw/dares/</code>.</li>
+      <li><strong>MOBPRO mobilité</strong> : dernier <em>fichier détail</em> commune × commune diffusé par l'INSEE = RP 2019 (décalage usuel ~3 ans). Pas de millésime plus récent au format détail à la date du build.</li>
+      <li><strong>Municipales 2026</strong> : scrutin ponctuel, pas de refresh.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="decision cat-data">
+  <h3>✗ Complétions tentées puis écartées</h3>
+  <div class="alt">
+    <ul>
+      <li><strong>Gaz + électricité par commune (bloc G complet)</strong> — Agence ORE publie un CSV de 800 MB ; l'API Tabular data.gouv le rejette et le stream complet est disproportionné pour le gain. Seul le <strong>carbone</strong> (approche conso) est retenu pour le bloc Énergie.</li>
+      <li><strong>% SAU en bio (bloc K)</strong> — deux pistes rejetées : (1) la SAU Agreste RA2020 republiée par ZABAL est en format long multi-millésimes à couverture partielle (~10 k lignes, non national) ; (2) normaliser la surface bio par l'aire communale donne des ratios > 100 % car l'Agence Bio attribue la surface au <strong>siège de l'opérateur</strong>, pas à la localisation des parcelles — dénominateur et numérateur ne portent pas sur le même territoire. On conserve donc la <strong>surface bio brute</strong> (ha) plutôt qu'un ratio trompeur.</li>
+      <li><strong>Espérance de vie — élargir le match au-delà de 81,6 %</strong> — la source INSEE ne publie que ~1 680 communes principales ; améliorer l'appariement de noms ne lèverait pas ce plafond de couverture. Gain marginal, non poursuivi.</li>
+    </ul>
+  </div>
+</div>
+```
+
+
 ## Historique des règles {.cat-section-title}
 
 ```{=html}
