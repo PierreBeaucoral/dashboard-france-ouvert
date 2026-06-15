@@ -28,7 +28,9 @@ jobs:
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
         with:
-          r-version: '4.4'
+          # Doit matcher la version enregistrée dans renv.lock (sinon renv
+          # avertit et certains binaires peuvent manquer). Voir renv.lock → R.
+          r-version: '4.6'
           use-public-rspm: true
 
       - name: Install system dependencies (sf, leaflet)
@@ -36,30 +38,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libudunits2-dev libgdal-dev libgeos-dev libproj-dev libcurl4-openssl-dev
 
-      - name: Cache R packages
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.R_LIBS_USER }}
-          key: r-${{ runner.os }}-${{ hashFiles('.github/workflows/deploy.yml') }}
-
-      - name: Install R packages
-        run: |
-          # Utilise Posit Package Manager (binaires précompilés Ubuntu noble)
-          # → ~5 min vs ~2h en compilation source depuis CRAN.
-          options(repos = c(POSIT = Sys.getenv("RSPM", "https://packagemanager.posit.co/cran/__linux__/noble/latest")))
-          install.packages(c(
-            # Quarto required for .qmd execution
-            "rmarkdown", "knitr",
-            # Tidyverse + data
-            "arrow", "dplyr", "tidyr", "readr", "stringr", "tibble", "glue",
-            "here", "rlang", "purrr",
-            # Geo + viz
-            "leaflet", "sf", "htmlwidgets", "htmltools",
-            "ggplot2", "ggiraph", "networkD3",
-            # I/O
-            "jsonlite", "duckdb", "DBI", "curl"
-          ))
-        shell: Rscript {0}
+      # renv::restore() installe les versions EXACTES figées dans renv.lock
+      # → build reproductible : une breaking change d'un package amont ne
+      # casse plus le site. Cache + restore gérés par setup-renv.
+      - name: Restore R packages from renv.lock
+        uses: r-lib/actions/setup-renv@v2
 
       - name: Setup Quarto
         uses: quarto-dev/quarto-actions/setup@v2
