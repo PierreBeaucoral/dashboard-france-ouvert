@@ -38,11 +38,13 @@ jobs:
           r-version: '4.6'   # matche renv.lock
           use-public-rspm: true
 
-      - name: System dependencies (sf, leaflet, curl)
+      - name: System dependencies (sf, leaflet, curl, gdtools)
         run: |
           sudo apt-get update
           sudo apt-get install -y libudunits2-dev libgdal-dev libgeos-dev \
-            libproj-dev libcurl4-openssl-dev libxml2-dev libssl-dev
+            libproj-dev libcurl4-openssl-dev libxml2-dev libssl-dev \
+            libfontconfig1-dev libfreetype6-dev libcairo2-dev \
+            libharfbuzz-dev libfribidi-dev libtiff-dev libjpeg-dev libpng-dev
 
       # Mêmes versions exactes que le déploiement (renv.lock) → un refresh ne
       # peut pas introduire un changement de comportement dû à un package amont.

@@ -33,10 +33,13 @@ jobs:
           r-version: '4.6'
           use-public-rspm: true
 
-      - name: Install system dependencies (sf, leaflet)
+      - name: Install system dependencies (sf, leaflet, ggiraph/gdtools)
         run: |
           sudo apt-get update
-          sudo apt-get install -y libudunits2-dev libgdal-dev libgeos-dev libproj-dev libcurl4-openssl-dev
+          sudo apt-get install -y \
+            libudunits2-dev libgdal-dev libgeos-dev libproj-dev libcurl4-openssl-dev \
+            libfontconfig1-dev libfreetype6-dev libcairo2-dev \
+            libharfbuzz-dev libfribidi-dev libtiff-dev libjpeg-dev libpng-dev libxml2-dev
 
       # renv::restore() installe les versions EXACTES figées dans renv.lock
       # → build reproductible : une breaking change d'un package amont ne
