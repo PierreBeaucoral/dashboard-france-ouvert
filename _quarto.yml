@@ -5,10 +5,24 @@ project:
     - index.qmd
     - pages/*.qmd
     - docs/*.qmd
+  # assets/ copié tel quel dans _site (image de partage Open Graph)
+  resources:
+    - assets/
 
 website:
   title: "France · Données ouvertes"
-  description: "Tableau de bord exploratoire — Législatives 2024, immobilier, qualité de l'air, sécurité, finances, santé, revenus"
+  description: "Tableau de bord exploratoire — 35 000 communes, 13 sources data.gouv.fr croisées : élections, immobilier, air, sécurité, finances, santé, revenus, démographie, énergie, mobilité, agriculture."
+  # site-url active la génération automatique de sitemap.xml (référencement)
+  site-url: "https://pierrebeaucoral.github.io/dashboard-france-ouvert"
+  # Aperçu riche quand le lien est partagé sur réseaux sociaux / messageries
+  open-graph:
+    locale: fr_FR
+    image: /assets/og-card.png
+    image-width: 1200
+    image-height: 630
+  twitter-card:
+    card-style: summary_large_image
+    image: /assets/og-card.png
   navbar:
     background: light
     pinned: true
