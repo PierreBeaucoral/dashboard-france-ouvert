@@ -61,6 +61,8 @@ website:
             text: Carte bivariée
           - href: pages/explorer.qmd
             text: Explorer · corrélations
+          - href: pages/classements.qmd
+            text: Classements · top / bottom
           - href: pages/profil.qmd
             text: Profil commune · radar 8D
           - href: pages/departements.qmd

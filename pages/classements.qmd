@@ -1,0 +1,180 @@
+---
+title: "Classements · top / bottom communes"
+format:
+  dashboard:
+    include-after-body:
+      - _includes/after-body.html
+    orientation: rows
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+```
+
+```{r}
+#| label: inject-rank-data
+#| results: asis
+#| echo: false
+if (explorer_ready) {
+  # Indicateurs classables (champ → libellé, unité, décimales). On garde un
+  # sous-ensemble parlant ; les valeurs sont arrondies pour alléger le payload.
+  IND <- tibble::tribble(
+    ~field,                  ~label,                       ~unit,       ~dig,
+    "revenu_median",         "Revenu médian",              "€",    0,
+    "gini",                  "Indice de Gini",             "",          3,
+    "pct_imposes",           "% ménages imposés",          "%",         1,
+    "dvf_prix_app",          "Prix m² appartement",        "€/m²", 0,
+    "dvf_prix_mai",          "Prix m² maison",             "€/m²", 0,
+    "elec_pct_rn",           "% RN (légis. 2024)",         "%",         1,
+    "elec_pct_nfp",          "% NFP (légis. 2024)",        "%",         1,
+    "elec_abstention",       "Abstention (légis. 2024)",   "%",         1,
+    "del_total_pour_mille",  "Délinquance",                "‰",    1,
+    "acc_taux_pop",          "Accidents corporels",        "‰",    2,
+    "apl_medecins",          "APL médecins généralistes",  "c/an/hab",  2,
+    "carb_hab_total",        "Empreinte carbone",          "tCO₂/hab", 2,
+    "mob_pct_voiture",       "% voiture (domicile-travail)","%",        1,
+    "mob_pct_emploi_local",  "% emploi local",             "%",         1,
+    "defm_taux_pop",         "Chômage (DEFM)",             "‰",    1,
+    "fin_dette",             "Dette communale",            "€/hab", 0,
+    "fin_recettes",          "Recettes communales",        "€/hab", 0,
+    "bio_surface_ha",        "Surface agricole bio",       "ha",        0,
+    "ctx_pop_latest",        "Population",                 "hab.",      0,
+    "densite_rang",          "Densité INSEE (1→6)",        "",          0
+  )
+  IND <- IND[IND$field %in% names(merged), ]
+
+  # Payload slim : 1 ligne / commune, clés courtes (c,n,d,s + indices i0..iK)
+  pl <- merged |>
+    dplyr::filter(!is.na(code_commune)) |>
+    dplyr::transmute(
+      c = code_commune,
+      n = dplyr::coalesce(nom_commune, code_commune),
+      d = libelle_dept,
+      dc = code_dept,
+      s = as.character(strate_taille)
+    )
+  for (k in seq_len(nrow(IND))) {
+    f <- IND$field[k]
+    v <- merged[[f]]
+    pl[[paste0("i", k - 1L)]] <- ifelse(is.finite(v), round(v, IND$dig[k]), NA_real_)
+  }
+  pl_json  <- jsonlite::toJSON(pl, auto_unbox = TRUE, na = "null", digits = 6)
+  ind_json <- jsonlite::toJSON(IND, auto_unbox = TRUE)
+  # Liste départements triée pour le filtre
+  depts <- merged |>
+    dplyr::filter(!is.na(code_dept)) |>
+    dplyr::distinct(code_dept, libelle_dept) |>
+    dplyr::arrange(code_dept)
+  depts_json <- jsonlite::toJSON(depts, auto_unbox = TRUE)
+
+  cat('<script>\n',
+      'window.rkData = ', as.character(pl_json), ';\n',
+      'window.rkInd  = ', as.character(ind_json), ';\n',
+      'window.rkDepts = ', as.character(depts_json), ';\n',
+      'window.rkFmt = function(v, k) {\n',
+      "  if (v == null) return '\\u2014';\n",
+      '  var m = window.rkInd[k];\n',
+      "  var s = Number(v).toLocaleString('fr-FR', {minimumFractionDigits: m.dig, maximumFractionDigits: m.dig});\n",
+      "  return s + (m.unit ? ('\\u00A0' + m.unit) : '');\n",
+      '};\n',
+
+      'window.rkRender = function() {\n',
+      "  var k = +document.getElementById('rk-ind').value;\n",
+      "  var dept = document.getElementById('rk-dept').value;\n",
+      "  var strate = document.getElementById('rk-strate').value;\n",
+      "  var order = document.querySelector('input[name=rk-order]:checked').value;\n",
+      "  var N = 20;\n",
+      "  var key = 'i' + k;\n",
+      '  var rows = window.rkData.filter(function(r){\n',
+      '    if (r[key] == null) return false;\n',
+      "    if (dept !== '*' && r.dc !== dept) return false;\n",
+      "    if (strate !== '*' && r.s !== strate) return false;\n",
+      '    return true;\n',
+      '  });\n',
+      "  rows.sort(function(a,b){ return order === 'top' ? b[key]-a[key] : a[key]-b[key]; });\n",
+      '  var top = rows.slice(0, N);\n',
+      '  var maxV = top.length ? Math.abs(top[0][key]) : 1;\n',
+      "  var meta = window.rkInd[k];\n",
+      "  var accent = order === 'top' ? '#A4243B' : '#2A6F97';\n",
+      "  var html = '<div style=\"font-size:0.8rem;color:#7A7A7A;margin:4px 0 10px 0;\">' + rows.length.toLocaleString('fr-FR') + ' communes correspondent au filtre \\u00b7 ' + (order==='top'?'plus \\u00e9lev\\u00e9es':'plus faibles') + ' pour <strong style=\"color:#1A1A1A;\">' + meta.label + '</strong></div>';\n",
+      "  html += '<table style=\"width:100%;border-collapse:collapse;font-family:Inter,sans-serif;\">';\n",
+      '  top.forEach(function(r, i){\n',
+      '    var w = maxV > 0 ? Math.max(2, Math.abs(r[key]) / maxV * 100) : 0;\n',
+      "    html += '<tr style=\"border-bottom:1px solid #F0EDE6;\">' +\n",
+      "      '<td style=\"padding:5px 8px;width:30px;text-align:right;color:#7A7A7A;font-family:IBM Plex Mono,monospace;font-size:0.8rem;\">' + (i+1) + '</td>' +\n",
+      "      '<td style=\"padding:5px 8px;\"><a href=\"profil.html#' + r.c + '\" style=\"color:#1A1A1A;text-decoration:none;\">' + r.n + '</a> <span style=\"color:#7A7A7A;font-size:0.75rem;\">(' + r.dc + ')</span></td>' +\n",
+      "      '<td style=\"padding:5px 8px;width:36%;\"><div style=\"display:flex;align-items:center;gap:8px;\"><div style=\"flex:1;height:7px;background:#F0EDE6;border-radius:4px;overflow:hidden;\"><div style=\"height:100%;width:' + w.toFixed(0) + '%;background:' + accent + ';\"></div></div><span style=\"font-family:IBM Plex Mono,monospace;font-size:0.82rem;white-space:nowrap;\">' + window.rkFmt(r[key], k) + '</span></div></td>' +\n",
+      "      '</tr>';\n",
+      '  });\n',
+      "  html += '</table>';\n",
+      "  if (!top.length) html = '<p style=\"padding:1.5rem;color:#7A7A7A;\">Aucune commune ne correspond \\u00e0 ce filtre (donn\\u00e9e non publi\\u00e9e pour cette strate / ce d\\u00e9partement).</p>';\n",
+      "  document.getElementById('rk-table').innerHTML = html;\n",
+      '};\n',
+
+      'window.rkInit = function() {\n',
+      "  var sel = document.getElementById('rk-ind');\n",
+      '  window.rkInd.forEach(function(m, i){\n',
+      "    var o = document.createElement('option'); o.value = i; o.textContent = m.label; sel.appendChild(o);\n",
+      '  });\n',
+      "  var ds = document.getElementById('rk-dept');\n",
+      '  window.rkDepts.forEach(function(dd){\n',
+      "    var o = document.createElement('option'); o.value = dd.code_dept; o.textContent = dd.code_dept + ' \\u00b7 ' + dd.libelle_dept; ds.appendChild(o);\n",
+      '  });\n',
+      "  ['rk-ind','rk-dept','rk-strate'].forEach(function(id){ document.getElementById(id).addEventListener('change', window.rkRender); });\n",
+      "  document.querySelectorAll('input[name=rk-order]').forEach(function(r){ r.addEventListener('change', window.rkRender); });\n",
+      '  window.rkRender();\n',
+      '};\n',
+      "if (document.readyState === 'complete') { setTimeout(window.rkInit, 150); }\n",
+      "else { window.addEventListener('load', function(){ setTimeout(window.rkInit, 150); }); }\n",
+      '</script>\n',
+      sep = ""
+  )
+}
+```
+
+## Row {height="26%"}
+
+::: {.card title="Classements communaux"}
+```{=html}
+<div style="padding:8px 14px;font-size:0.88rem;line-height:1.5;color:#2A2A2A;">
+Top 20 des communes pour l'indicateur choisi, filtrable par département et par
+taille de commune. Cliquez un nom pour ouvrir son <strong>profil radar</strong>.
+Les communes sans donnée publiée pour l'indicateur (secret statistique, source
+partielle) sont exclues du classement.
+</div>
+<div style="padding:4px 14px 10px 14px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;">
+  <label style="display:flex;flex-direction:column;font-size:0.72rem;color:#7A7A7A;gap:3px;">INDICATEUR
+    <select id="rk-ind" class="biv-select" style="min-width:230px;"></select></label>
+  <label style="display:flex;flex-direction:column;font-size:0.72rem;color:#7A7A7A;gap:3px;">DÉPARTEMENT
+    <select id="rk-dept" class="biv-select" style="min-width:180px;"><option value="*">Tous</option></select></label>
+  <label style="display:flex;flex-direction:column;font-size:0.72rem;color:#7A7A7A;gap:3px;">TAILLE COMMUNE
+    <select id="rk-strate" class="biv-select" style="min-width:200px;">
+      <option value="*">Toutes</option>
+      <option value="Très petite (&lt; 500 hab.)">Très petite (&lt; 500)</option>
+      <option value="Rurale (500-2 000)">Rurale (500-2 000)</option>
+      <option value="Bourg / périurbain (2 000-10 000)">Bourg / périurbain</option>
+      <option value="Ville moyenne (10 000-50 000)">Ville moyenne</option>
+      <option value="Grande ville (≥ 50 000)">Grande ville (≥ 50 000)</option>
+    </select></label>
+  <div style="display:flex;flex-direction:column;font-size:0.72rem;color:#7A7A7A;gap:3px;">SENS
+    <div class="dvf-ctrl-radios" style="display:flex;gap:10px;">
+      <label style="font-size:0.85rem;color:#1A1A1A;"><input type="radio" name="rk-order" value="top" checked> Plus élevées</label>
+      <label style="font-size:0.85rem;color:#1A1A1A;"><input type="radio" name="rk-order" value="bottom"> Plus faibles</label>
+    </div>
+  </div>
+</div>
+```
+:::
+
+## Row {height="74%"}
+
+::: {.card title="Top 20"}
+```{=html}
+<div id="rk-table" style="padding:8px 12px;height:100%;overflow:auto;"></div>
+```
+:::
