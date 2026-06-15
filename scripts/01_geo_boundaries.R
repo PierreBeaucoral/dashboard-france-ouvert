@@ -140,9 +140,15 @@ dep_simpl <- rmapshaper::ms_simplify(
 )
 
 # ---- Écriture ----
+#
+# COORDINATE_PRECISION=5 → 5 décimales ≈ 1 m de précision au sol, largement
+# suffisant pour une choroplèthe nationale. Sans cette option, GDAL écrit
+# 13 décimales (précision 0,1 micron, absurde) qui gonflent inutilement le
+# poids embarqué dans chaque page leaflet. Gain ~30-45 % par fichier.
 
 out_path <- file.path(out_dir, "departements.geojson")
-sf::write_sf(dep_simpl, out_path, delete_dsn = TRUE, quiet = TRUE)
+sf::write_sf(dep_simpl, out_path, delete_dsn = TRUE, quiet = TRUE,
+             layer_options = "COORDINATE_PRECISION=5")
 
 # Sous-extraction DROM seuls (utile pour les cartouches)
 drom_path <- file.path(out_dir, "drom_departements.geojson")
@@ -150,7 +156,8 @@ sf::write_sf(
   dep_simpl |> filter(is_drom),
   drom_path,
   delete_dsn = TRUE,
-  quiet = TRUE
+  quiet = TRUE,
+  layer_options = "COORDINATE_PRECISION=5"
 )
 
 # ---- Rapport ----
@@ -234,9 +241,11 @@ com_simpl <- rmapshaper::ms_simplify(
   method      = "vis"
 )
 
-# 5) Écriture
+# 5) Écriture — précision 5 décimales (cf. note plus haut). Sur les 35 000
+# polygones communaux c'est le plus gros gain de poids du pipeline.
 com_out <- file.path(out_dir, "communes.geojson")
-sf::write_sf(com_simpl, com_out, delete_dsn = TRUE, quiet = TRUE)
+sf::write_sf(com_simpl, com_out, delete_dsn = TRUE, quiet = TRUE,
+             layer_options = "COORDINATE_PRECISION=5")
 
 cat(glue::glue("
 
