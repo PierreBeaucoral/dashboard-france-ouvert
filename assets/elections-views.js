@@ -52,7 +52,7 @@
       var city = /^751\d\d$/.test(c) ? "75056" : /^693\d\d$/.test(c) ? "69123" : /^132\d\d$/.test(c) ? "13055" : null;
       var ctr = map._cmapLayers[c].getBounds().getCenter();
       if (city) {                                        // une seule bulle pour la ville PLM
-        var g = groups[city] || (groups[city] = { d: d, la: 0, ln: 0, n: 0 });
+        var g = groups[city] || (groups[city] = { d: lk[city] || d, la: 0, ln: 0, n: 0 });
         g.la += ctr.lat; g.ln += ctr.lng; g.n++;
       } else items.push({ d: d, ll: ctr });
     });

@@ -234,8 +234,10 @@ build_constellation <- function() {
 #' assets/data/elections_lookup.json, téléchargé au premier clic. GÉNÉRÉ ICI (pré-rendu) et
 #' non dans la page : Quarto fige la liste des `resources:` avant de rendre les pages, donc un
 #' fichier écrit pendant le rendu n'arrivait jamais dans _site (404 sur Pages, audit C5).
-#' Une ligne par code de la géométrie métropolitaine (arrondissements PLM compris, qui
-#' reprennent la ligne de leur ville), communes avec famille gagnante seulement.
+#' Une ligne par code de la géométrie métropolitaine, communes avec famille gagnante seulement.
+#' Paris, Lyon, Marseille : une ligne PAR ARRONDISSEMENT (résultat propre, fichier
+#' legislatives_2024_arrondissements.parquet) + une ligne VILLE (somme, code 75056/69123/13055 : bulle
+#' de la vue « Électeurs »). La série de participation 2002-2026 reste celle de la ville.
 build_elections_lookup <- function() {
   ep <- file.path("data", "processed", "elections", "legislatives_2024_t2.parquet")
   pp <- file.path("data", "processed", "elections", "participation_long.parquet")
@@ -247,6 +249,10 @@ build_elections_lookup <- function() {
   out <- file.path("assets", "data", "elections_lookup.json")
   dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
   elec <- arrow::read_parquet(ep)
+  ap <- file.path("data", "processed", "elections", "legislatives_2024_arrondissements.parquet")
+  elec_arr <- if (file.exists(ap)) arrow::read_parquet(ap) else elec[0, ]
+  elec <- rbind(elec, elec_arr[, names(elec)])
+  stopifnot(!anyDuplicated(elec$code_insee))
   pop  <- arrow::read_parquet(pop_p, col_select = c("code_commune", "pop_latest", "strate_pop"))
   elec <- merge(elec, data.frame(code_insee = pop$code_commune, pop_latest = pop$pop_latest,
                                  strate_pop = as.character(pop$strate_pop)), by = "code_insee", all.x = TRUE)
@@ -269,17 +275,19 @@ build_elections_lookup <- function() {
   plm_city <- c(setNames(rep("75056", 20), sprintf("751%02d", 1:20)),
                 setNames(rep("69123", 9), sprintf("693%02d", 81:89)),
                 setNames(rep("13055", 16), sprintf("132%02d", 1:16)))
-  g$join_code <- ifelse(g$code %in% names(plm_city), plm_city[g$code], g$code)
+  g <- rbind(g, data.frame(code = unique(plm_city), nom = NA_character_))   # lignes ville (somme)
+  g$join_code <- g$code                                     # résultat : propre à chaque code
+  g$part_code <- ifelse(g$code %in% names(plm_city), plm_city[g$code], g$code)   # participation : ville
   d <- merge(g, elec, by.x = "join_code", by.y = "code_insee", all.x = TRUE, sort = FALSE)
   d <- d[!is.na(d$famille_vainqueur), ]
-  d <- merge(d, part, by.x = "join_code", by.y = "code_commune", all.x = TRUE, sort = FALSE)
+  d <- merge(d, part, by.x = "part_code", by.y = "code_commune", all.x = TRUE, sort = FALSE)
   d <- d[order(d$code), ]
   r2 <- c("pct_vainqueur", "marge_vainqueur", "pct_abstention", paste0("pct_", c("NFP", "ENS", "RN", "LR", "Divers")),
           paste0("pct_", c("NFP", "ENS", "RN", "LR", "Divers"), "_t1"), "pct_abstention_t1")
   d[r2] <- lapply(d[r2], round, 2)
-  d$couverture_inscrits <- round(d$couverture_inscrits, 3)   # PLM : valeur de la ville
+  d$couverture_inscrits <- round(d$couverture_inscrits, 3)
   d$nom_commune <- ifelse(is.na(d$nom_commune), d$nom, d$nom_commune)
-  keep <- c("nom_commune", "libelle_dept", "code_dept", "tour", "famille_vainqueur", "nuance_vainqueur", r2,
+  keep <- c("nom_commune", "libelle_dept", "code_dept", "tour", "repli_t1", "famille_vainqueur", "nuance_vainqueur", r2,
             "couverture_inscrits", "voix_vainqueur", "voix_second", "inscrits", "exprimes", "abstentions", "pop_latest", "strate_pop",
             setdiff(names(part), "code_commune"))
   lk <- c(list(c = d$code), as.list(d[keep]))

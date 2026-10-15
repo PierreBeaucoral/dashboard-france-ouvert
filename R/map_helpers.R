@@ -255,8 +255,8 @@ cmap_inset_empty <- function(label = "Non couvert") {
 
 .famille_colors <- palette_pol
 .famille_labels <- c(
-  NFP = "NFP (UG, FI, SOC)", ENS = "Ensemble (ENS + HOR)", RN = "RN / UXD / EXD",
-  LR = "LR / UDI", Divers = "Divers (DV*, REG, ECO)"
+  NFP = "NFP (UG, FI, SOC, COM, VEC)", ENS = "Ensemble (ENS + HOR)", RN = "RN / UXD / EXD",
+  LR = "LR / UDI / UDR", Divers = "Divers (DV*, REG, ECO, EXG, DSV, DIV, REC, RDG)"
 )
 
 #' Opacité = marge de victoire (faible marge -> couleur plus pâle).
@@ -267,7 +267,7 @@ cmap_inset_empty <- function(label = "Non couvert") {
 # Couverture des inscrits (audit r3 A) : hachure sous .COV_HATCH ; mention dans l'infobulle sous
 # .COV_NOTE. Depuis la reconstruction au bureau de vote (scripts/02_elections.R) tous les bureaux sont
 # couverts : couverture >= 0,859 partout, l'écart (jusqu'à 14 % dans des communes d'un seul bureau de
-# 30-400 inscrits) est la révision des listes entre les deux dimanches, pas un trou. Seuil 0,8 : le
+# 30-400 inscrits) est la différence observée d'inscrits publiés entre les deux tours, pas un trou. Seuil 0,8 : le
 # mécanisme reste actif si une source future perdait une circonscription (validé par 99_validate_data.R).
 .COV_HATCH <- 0.8  # = .COV_NOTE ; aucune commune hachurée aujourd'hui
 .COV_NOTE  <- 0.8
@@ -280,6 +280,7 @@ cmap_elections <- function(com_sf, dep_sf) {
                  paste0(ifelse(is.na(com_sf$nuance_vainqueur), fam, com_sf$nuance_vainqueur),
                         " · ", cmap_num(com_sf$pct_vainqueur, 1), " %",
                         " · abstention ", cmap_num(com_sf$pct_abstention, 1), " %",
+                        ifelse(!is.na(com_sf$tour) & com_sf$tour == "mixte", " · tours mêlés (1er et 2nd)", ""),
                         ifelse(!is.na(cov) & cov < .COV_NOTE,
                                paste0(" · résultat sur ", cmap_num(100 * cov, 0), " % des inscrits"), "")))
   cmap_widget(com_sf, dep_sf, fill = fill, op = .margin_opacity(com_sf$marge_vainqueur),
