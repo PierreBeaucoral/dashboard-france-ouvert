@@ -152,7 +152,8 @@ if (apl_ready) {
   </div>
   <div class="cp-source">
     <strong>Sources</strong> · DREES · APL `r apl_millesime` (5 pros). INSEE · Espérance de vie 2025, niveau département.<br>
-    APL médecins en c/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab. Espérance de vie en années, valeur du département (pas de mesure communale).
+    APL médecins en c/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab. Espérance de vie en années, valeur du département (pas de mesure communale).<br>
+    Changement de définition : « Médecins ≤ 65 ans » est la variante « 65 ans ou moins » de la DREES ; jusqu'au 2026-10-15 le site affichait par erreur la variante « 62 ans et moins » (édition 2023).
   </div>
 </div>
 ```

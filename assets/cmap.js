@@ -399,7 +399,13 @@
     var naFill = css("--na-fill", "#E9EBED");
     var fg = L.featureGroup();
     var byCode = {};
-    for (var k = 0; k < s.codes.length; k++) {
+    // Ordre de dessin = ordre de la géométrie (aire décroissante, cf. build_web_assets.R) : les petites
+    // communes incluses dans le tracé d'une voisine (Chêne-Sec) sont dessinées par-dessus.
+    var ord = [];
+    for (var o = 0; o < s.codes.length; o++) ord.push(o);
+    ord.sort(function (a, b) { return (geo.idx[s.codes[a]] == null ? 1e9 : geo.idx[s.codes[a]]) - (geo.idx[s.codes[b]] == null ? 1e9 : geo.idx[s.codes[b]]); });
+    for (var oi = 0; oi < ord.length; oi++) {
+      var k = ord[oi];
       var gi = geo.idx[s.codes[k]];
       if (gi == null) continue;
       var na = s.fill[k] == null;

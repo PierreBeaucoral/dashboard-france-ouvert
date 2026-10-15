@@ -52,6 +52,13 @@ build_geometry <- function() {
     return(invisible())
   }
   x <- sf::read_sf(geo_src, quiet = TRUE)
+  # Ordre de dessin = ordre des entités : les grandes communes d'abord, les petites par-dessus.
+  # Sinon une commune contenue dans le tracé généralisé d'une voisine (Chêne-Sec 39140 sous
+  # Beauvernois 71028) est recouverte, donc invisible et non cliquable (audit 2026-10-15, mineur 1).
+  # Aire planaire en degrés² (CRS retiré : s2/lwgeom inutiles), corrigée de cos(latitude).
+  xp  <- sf::st_set_crs(x, NA)
+  lat <- vapply(sf::st_geometry(xp), function(g) mean(sf::st_bbox(g)[c(2, 4)]), numeric(1))
+  x <- x[order(-as.numeric(sf::st_area(xp)) * cos(lat * pi / 180)), ]
   g <- sf::st_geometry(x)
   enc <- lapply(g, function(mp) {                       # mp : MULTIPOLYGON
     lapply(unclass(mp), function(poly) lapply(poly, encode_ring))
@@ -108,8 +115,8 @@ build_columns <- function() {
     v <- m[[f]]
     v[!is.finite(v)] <- NA_real_
     # Exception : la population est stockée en log10 et ré-affichée en habitants par les pages
-    # Profil/Semblables (10^v arrondi) ; 3 décimales affichaient 2 133 111 pour Paris
-    # au lieu de la population réelle (ctx_pop_latest). 8 décimales -> erreur < 0,05 hab. : l'arrondi rend l'effectif exact.
+    # Profil/Semblables (10^v arrondi) ; 3 décimales affichaient 2 133 045 pour Paris
+    # au lieu de la population réelle 2 133 111 (ctx_pop_latest). 8 décimales -> erreur < 0,05 hab. : l'arrondi rend l'effectif exact.
     writeLines(jsonlite::toJSON(round(v, if (f == "ctx_log_pop") 8L else 3L), na = "null", digits = NA),
                file.path("assets", "data", "col", paste0(f, ".json")), useBytes = TRUE)
   }
