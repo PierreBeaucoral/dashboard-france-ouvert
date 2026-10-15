@@ -81,9 +81,7 @@ bio   <- if (file.exists(bio_path))   arrow::read_parquet(bio_path)   else NULL
 # sont déjà sommés dans les scripts amont (cog_helpers.R, 06, 11, 19-26).
 # Si le code COG 2026 a déjà sa propre ligne dans la source, c'est elle qui est conservée.
 source(here::here("scripts", "cog_helpers.R"))
-ren_map <- cog_map("2015-01-01",
-                   fus = arrow::read_parquet(here::here("data", "processed", "insee", "commune_fusions.parquet")) |>
-                     dplyr::filter(as.character(type_mvt) %in% c("41", "50")))
+ren_map <- cog_map_renamed()
 cog_rename <- function(df) {
   if (is.null(df)) return(df)
   new <- to_cog2026(df$code_commune, ren_map)
@@ -93,30 +91,10 @@ cog_rename <- function(df) {
   df$code_commune <- new
   df[!clash, , drop = FALSE]
 }
-# DVF (plusieurs lignes par commune : annee x type_local) : geo-dvf bascule de l'ancien au nouveau
-# code EN COURS DE SÉRIE (Orée d'Anjou : 49069 en 2021-2025, 49126 en 2025 seulement), donc la règle
-# « la ligne du code 2026 gagne » faisait perdre toutes les lignes de l'ancien code (116 ventes de
-# maisons 2024 pour 49126, round 3 m-R1). On renomme, puis on fusionne par clé (code, annee,
-# type_local) : n_transactions sommé ; prix médian/q25/q75 = moyenne pondérée par n_transactions
-# (APPROXIMATION documentée, comme pour PLM : la médiane d'un territoire réuni n'est pas connue) ;
-# estimation_insuffisante recalculé sur le n fusionné (règle de 03 : n < 5). Ne touche que les
-# couples (année, type) présents sous les DEUX codes.
-dvf_combine_renamed <- function(df) {
-  df$code_commune <- to_cog2026(df$code_commune, ren_map)
-  key <- c("code_commune", "annee", "type_local")
-  dup <- duplicated(df[key]) | duplicated(df[key], fromLast = TRUE)
-  if (!any(dup)) return(df)
-  comb <- df[dup, , drop = FALSE] |>
-    dplyr::group_by(dplyr::across(dplyr::all_of(key))) |>
-    dplyr::summarise(
-      dplyr::across(c(prix_m2_median, prix_m2_q25, prix_m2_q75),
-                    ~ stats::weighted.mean(.x, n_transactions)),
-      n_transactions = sum(n_transactions),
-      .groups = "drop") |>
-    dplyr::mutate(estimation_insuffisante = n_transactions < 5)
-  dplyr::bind_rows(df[!dup, , drop = FALSE], comb[names(df)])
-}
-dvf <- dvf_combine_renamed(dvf); air <- cog_rename(air); ssmsi <- cog_rename(ssmsi)
+# DVF : déjà harmonisé en COG 2026 en amont (03_dvf_aggregate.R, dvf_combine_renamed dans
+# cog_helpers.R) pour que l'Immobilier, le Profil et l'Explorer lisent les mêmes valeurs. L'appel
+# ci-dessous est un garde-fou idempotent (no-op si 03 a tourné avec les mêmes fusions).
+dvf <- dvf_combine_renamed(dvf, ren_map); air <- cog_rename(air); ssmsi <- cog_rename(ssmsi)
 dgfip <- cog_rename(dgfip); filo <- cog_rename(filo); dens <- cog_rename(dens)
 defm <- cog_rename(defm); apl <- cog_rename(apl); baac <- cog_rename(baac)
 carb <- cog_rename(carb); mob <- cog_rename(mob); bio <- cog_rename(bio)
@@ -439,7 +417,9 @@ merged <- join_new(merged, rd(filo23_path), c("rev_median_2023", "taux_pauvrete_
 merged <- merged |>
   dplyr::mutate(
     ctx_log_inscrits = log10(pmax(ctx_inscrits, 1)),
-    ctx_log_pop      = log10(pmax(ctx_pop_latest, 1)),
+    # population nulle (6 communes de la Meuse « mortes pour la France ») : log indéfini -> NA
+    # (affichait « 1 hab. » avec pmax(., 1)) ; les pages montrent alors « n.d. ».
+    ctx_log_pop      = ifelse(ctx_pop_latest > 0, log10(ctx_pop_latest), NA_real_),
     # Strate "taille commune" : INSEE pop si dispo, sinon proxy inscrits
     strate_taille = dplyr::case_when(
       !is.na(ctx_strate_pop)         ~ as.character(ctx_strate_pop),
