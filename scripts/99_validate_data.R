@@ -444,23 +444,29 @@ tryCatch({
       paste0("élections : famille_vainqueur != famille de part maximale (", sum(best[tops == 1L] != el$famille_vainqueur[tops == 1L]), " communes)"))
   chk(!anyNA(el$pct_vainqueur) && all(el$pct_vainqueur >= el$pct_second - 1e-9, na.rm = TRUE), "élections : part du vainqueur < part du second")
 
-  # Audit r3 A : couverture des inscrits du résultat affiché, dans (0, 1], et Paris recalculé depuis
-  # les fichiers bruts du ministère (inscrits du fichier T2 / inscrits du fichier T1 ; pas de constante).
+  # Audit r3 A (reconstruit au bureau de vote) : couverture = inscrits du résultat affiché / inscrits au 1er
+  # tour. Désormais ~1 partout ; l'écart résiduel (min observé 0,859 ; 173 communes < 0,99, toutes décidées
+  # au T2) est la révision des listes entre les deux dimanches (communes à 1 bureau de 30-400 inscrits).
+  # Plancher 0,8 = garde-fou de régression : en dessous, ce serait un vrai trou (circonscription absente).
   chk(!anyNA(el$couverture_inscrits) && all(el$couverture_inscrits > 0 & el$couverture_inscrits <= 1), "élections : couverture_inscrits hors de (0, 1]")
+  chk(all(el$couverture_inscrits >= 0.8), paste0("élections : ", sum(el$couverture_inscrits < 0.8), " communes avec couverture < 0,8 (circonscription manquante ?)"))
+  chk(all(el$tour %in% c("T1", "T2", "mixte")), "élections : tour hors de T1/T2/mixte")
   chk(isTRUE(all.equal(mg$elec_couverture_inscrits[match(el$code_insee, mg$code_commune)], el$couverture_inscrits)), "commune_merged : elec_couverture_inscrits != parquet élections")
-  cat(sprintf("  élections : %d communes avec couverture < 1 (%d < 0,99 ; %d < 0,5)\n", sum(el$couverture_inscrits < 1),
-              sum(el$couverture_inscrits < 0.99), sum(el$couverture_inscrits < 0.5)))
-  rt1 <- here::here("data", "raw", "elections", "resultats-2024-t1-par-commune.csv")
-  rt2 <- here::here("data", "raw", "elections", "resultats-2024-t2-par-commune.csv")
-  if (file.exists(rt1) && file.exists(rt2)) {
-    insc <- function(f) { r <- readr::read_delim(f, delim = ";", col_types = readr::cols(.default = "c"),
-                                                 col_select = c(`Code commune`, Inscrits), progress = FALSE)
-                          as.numeric(r$Inscrits[r$`Code commune` == "75056"]) }
-    i1 <- insc(rt1); i2 <- insc(rt2)
-    chk(length(i1) == 1 && length(i2) == 1 && abs(el$couverture_inscrits[el$code_insee == "75056"] - i2 / i1) < 1e-4,
-        "Paris : couverture != inscrits T2 / inscrits T1 des fichiers bruts")
-    cat(sprintf("  Paris : couverture %.4f = %s / %s inscrits (fichiers bruts)\n", i2 / i1, format(i2, big.mark = " "), format(i1, big.mark = " ")))
-  } else cat("  [ignoré] Paris couverture vs fichiers bruts : data/raw absent (CI de déploiement)\n")
+  cat(sprintf("  élections : %d communes avec couverture < 1 (%d < 0,99 ; min %.3f) ; tours : %s\n", sum(el$couverture_inscrits < 1),
+              sum(el$couverture_inscrits < 0.99), min(el$couverture_inscrits),
+              paste(names(table(el$tour)), table(el$tour), collapse = ", ")))
+  # PLM : la ligne ville = somme des arrondissements du fichier par arrondissement (même source, même règle) ;
+  # Lyon à un bureau près (code BV 0001, 386 inscrits, sans arrondissement identifiable ; cf. scripts/02_elections.R).
+  ea <- rd("elections/legislatives_2024_arrondissements.parquet")
+  chk(nrow(ea) == 45L && !anyDuplicated(ea$code_insee), "élections : arrondissements != 45 lignes uniques")
+  for (cty in c("75056", "69123", "13055")) {
+    a_ <- ea[substr(ea$code_insee, 1, 3) == c(`75056` = "751", `69123` = "693", `13055` = "132")[[cty]], ]
+    chk(el$inscrits[el$code_insee == cty] - sum(a_$inscrits) == (if (cty == "69123") 386L else 0L),
+        paste0("élections : ", cty, " inscrits != somme des arrondissements"))
+  }
+  cat(sprintf("  élections : Paris %s (%s, couverture %.3f), Marseille %s, Lyon %s\n", el$famille_vainqueur[el$code_insee == "75056"],
+              el$tour[el$code_insee == "75056"], el$couverture_inscrits[el$code_insee == "75056"],
+              el$famille_vainqueur[el$code_insee == "13055"], el$famille_vainqueur[el$code_insee == "69123"]))
 
   # N3 : accidents BAAC remappés au COG 2026 : Σ des communes du cadre = accidents bruts dont le code
   # (remappé) est une commune ou un arrondissement du cadre (comparaison même périmètre, même fichier).
