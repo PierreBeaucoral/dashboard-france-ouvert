@@ -102,6 +102,7 @@ if (elec_ready) {
   apl_path  <- here::here("data", "processed", "drees", "apl_medecins.parquet")
   apl_ready <- file.exists(apl_path)
   if (apl_ready) apl_data <- arrow::read_parquet(apl_path)
+  apl_millesime <- if (apl_ready) max(apl_data$apl_millesime, na.rm = TRUE) else NA_integer_
 
   # FiLoSoFi (Bloc 1 — revenus INSEE)
   filo_path_d <- here::here("data", "processed", "filosofi",
@@ -1604,7 +1605,7 @@ if (apl_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · DREES · APL 2023 · 5 professions.<br>
+    <strong>Source</strong> · DREES · APL `r apl_millesime` · 5 professions.<br>
     APL médecins en consultations/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab.
   </div>
 </div>
