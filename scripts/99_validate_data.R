@@ -367,9 +367,11 @@ tryCatch({
   # officiel INSEE, Populations légales 2021 = 67 408 052 hab. (https://www.insee.fr/fr/statistiques/7728826).
   chk(sum(cogc$pop_2021, na.rm = TRUE) == 67408052, paste0("population 2021 hors Mayotte = ",
       sum(cogc$pop_2021, na.rm = TRUE), " != 67 408 052 (INSEE popleg 2021)"))
-  # (b) Mayotte : recensement 2017, 256 500 hab. arrondis (https://www.insee.fr/fr/statistiques/3286558)
+  # (b) Mayotte : recensement 2017, 256 518 hab. = total INSEE Focus 105 (https://www.insee.fr/fr/statistiques/3286558),
+  # lu par 06_ dans le fichier INSEE lui-même (somme des 17 communes == ligne « Ensemble » du fichier).
   my <- cogc[substr(cogc$code_commune, 1, 3) == "976", ]
-  chk(nrow(my) == 17 && abs(sum(my$pop_latest) - 256500) < 100, "Mayotte : 17 communes, ~256 500 hab. (RP 2017) attendues")
+  chk(nrow(my) == 17 && sum(my$pop_latest) == 256518 && all(my$pop_millesime == 2017L),
+      "Mayotte : 17 communes, 256 518 hab. (RP 2017, INSEE Focus 105) attendues")
   # (c) sommation des communes absorbées (sinon le total (a) ne change pas !) : lecture du brut RP
   rawp <- here::here("data", "raw", "insee", "populations_2017_2021.parquet")
   if (file.exists(rawp)) {
@@ -377,9 +379,17 @@ tryCatch({
     v <- function(c) sum(rp$pmun[rp$codgeo %in% c])
     sd <- cogc$pop_2021[cogc$code_commune == "93066"]
     chk(sd == v(c("93066", "93059")), "Saint-Denis 93066 : pop 2021 != Saint-Denis + Pierrefitte-sur-Seine (fusion 2025)")
-  }
-  # Seules les communes rétablies / sans habitants peuvent avoir pop_latest NA ou 0 (liste fermée)
-  chk(sum(is.na(cogc$pop_latest)) <= 10, paste0("populations : ", sum(is.na(cogc$pop_latest)), " communes sans population (<= 10 attendues : rétablies 2026)"))
+  } else cat("  [ignoré] Saint-Denis vs brut RP : data/raw absent (CI de déploiement)\n")
+  # Populations : TOUTES les communes COG 2026 ont une population (RP 2017-2021 sommé, Mayotte RP 2017,
+  # rétablies 2024-2025 = populations légales 2023). Aucun NA toléré : 0 observé le 2026-10-15
+  # après N4 ; un NA signalerait une commune du COG sans source de population.
+  chk(!anyNA(cogc$pop_latest), paste0("populations : ", sum(is.na(cogc$pop_latest)), " communes sans population : ",
+      paste(head(cogc$code_commune[is.na(cogc$pop_latest)], 10), collapse = ",")))
+  # N4 : les 10 communes rétablies 2024-2025 (parents compris) portent le millésime 2023
+  chk(all(cogc$pop_millesime[cogc$code_commune %in% c("85084", "85165", "85212", "60054", "60694",
+        "15141", "15031", "15035", "15047", "15171")] == 2023L), "rétablies 2024-2025 : pop_millesime != 2023")
+  # N9 : PLM = somme des arrondissements, millésime 2021 (et non une somme de colonnes pop_*)
+  chk(all(cogc$pop_millesime[cogc$code_commune %in% c("75056", "69123", "13055")] == 2021L), "PLM : pop_millesime != 2021")
 
   # C3 : PLM : valeur ville = ligne OFFICIELLE de la source lorsqu'elle la publie (FiLoSoFi)
   fl <- rd("filosofi/revenus_communes.parquet")
@@ -402,7 +412,52 @@ tryCatch({
       "SSMSI cambriolages : taux identique à effectif / habitants (dénominateur logements perdu ?)")
   tt <- ss[!is.na(ss$del_total_pour_mille), ]
   chk(max(abs(tt$del_total_pour_mille - tt$del_n_total / tt$ssmsi_pop_ref * 1000)) < 1e-6, "SSMSI total != Σ effectifs / population x 1000")
-  chk(ss$del_cambriolages_n[ss$code_commune == "75056"] == 7072, "Paris : 7 072 cambriolages attendus (SSMSI 2025)")
+  # Effectif publié de Paris = ligne brute SSMSI de la même édition (pas une constante figée)
+  rawss <- here::here("data", "raw", "ssmsi", "base_communale.parquet")
+  if (file.exists(rawss)) {
+    rs <- arrow::read_parquet(rawss)
+    cg <- grep("^CODGEO", names(rs), value = TRUE)[1]
+    rs <- rs[rs$annee == max(rs$annee) & rs[[cg]] == "75056" & rs$indicateur == "Cambriolages de logement" &
+               rs$est_diffuse == "diff", ]
+    chk(nrow(rs) == 1 && ss$del_cambriolages_n[ss$code_commune == "75056"] == rs$nombre,
+        "Paris : cambriolages != ligne brute SSMSI")
+  } else cat("  [ignoré] Paris cambriolages vs brut SSMSI : data/raw absent (CI de déploiement)\n")
+
+  # N2 : le « vainqueur » d'une commune = famille aux voix cumulées les plus élevées, donc de part maximale
+  # (une seule définition, y compris communes coupées entre circonscriptions et communes fusionnées).
+  fams <- c("NFP", "ENS", "LR", "RN", "Divers")
+  pm_ <- as.matrix(el[, paste0("pct_", fams)]); pm_[is.na(pm_)] <- -1
+  tops <- apply(pm_, 1, function(r) sum(r == max(r)))
+  best <- fams[max.col(pm_, ties.method = "first")]
+  chk(all(best[tops == 1L] == el$famille_vainqueur[tops == 1L]),
+      paste0("élections : famille_vainqueur != famille de part maximale (", sum(best[tops == 1L] != el$famille_vainqueur[tops == 1L]), " communes)"))
+  chk(!anyNA(el$pct_vainqueur) && all(el$pct_vainqueur >= el$pct_second - 1e-9, na.rm = TRUE), "élections : part du vainqueur < part du second")
+
+  # N3 : accidents BAAC remappés au COG 2026 : Σ des communes du cadre = accidents bruts dont le code
+  # (remappé) est une commune ou un arrondissement du cadre (comparaison même périmètre, même fichier).
+  rawb <- here::here("data", "raw", "baac", "caract_2024.csv")
+  if (file.exists(rawb)) {
+    source(here::here("scripts", "cog_helpers.R"))
+    cb_ <- utils::read.csv2(rawb, colClasses = "character")
+    cb_ <- cb_$com[!is.na(cb_$com) & nchar(cb_$com) == 5]
+    cb_ <- to_cog2026(cb_, cog_map("2024-01-01"))
+    chk(sum(ba$n_accidents_2024[ba$code_commune %in% cogc$code_commune]) == sum(cb_ %in% pop$code_commune),
+        "BAAC : accidents des communes du cadre != accidents bruts remappés (absorbées/renumérotées perdues ?)")
+  } else cat("  [ignoré] BAAC vs brut : data/raw absent (CI de déploiement)\n")
+
+  # N6 : (a) chaque commune COG 2026 a un polygone (villes PLM représentées par leurs arrondissements) ;
+  # (b) une commune renumérotée (MOD 50 : Orée d'Anjou 49126...) a autant de données qu'une commune
+  # comparable : >= 40 indicateurs renseignés (47 avant le changement de cadre du 2026-10-15, cf. audit R2 N6).
+  gl <- readLines(here::here("data", "processed", "geo", "communes.geojson"), warn = FALSE)
+  gl <- gl[grepl('"code": ?"', gl, fixed = FALSE)]          # 1 entité par ligne (GDAL)
+  gcodes <- sub('.*"code": ?"([0-9AB]{5})".*', "\\1", gl)
+  need <- setdiff(pop$code_commune, c("75056", "69123", "13055"))
+  chk(length(setdiff(need, gcodes)) == 0L, paste0("géométrie : ", length(setdiff(need, gcodes)), " communes COG 2026 sans polygone : ",
+      paste(head(setdiff(need, gcodes), 8), collapse = ",")))
+  chk(length(setdiff(gcodes, pop$code_commune)) == 0L, paste0("géométrie : ", length(setdiff(gcodes, pop$code_commune)), " polygones hors COG 2026"))
+  ind <- meta$var
+  for (cc in c("49126", "12218"))
+    chk(sum(!is.na(unlist(mg[mg$code_commune == cc, ind]))) >= 40, paste0(cc, " : renumérotée mais < 40 indicateurs (jointures sur l'ancien code ?)"))
 
   # C1 : libellés de densité du JS = ordre des rangs des données
   js <- paste(readLines(here::here("assets", "cmap.js"), warn = FALSE), collapse = " ")

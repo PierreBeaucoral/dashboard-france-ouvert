@@ -23,6 +23,7 @@ suppressPackageStartupMessages({
   library(here)
   library(glue)
   library(stringr)
+  library(curl)
 })
 
 # ---- Chemins ----
@@ -30,6 +31,24 @@ suppressPackageStartupMessages({
 ssmsi_raw <- here::here("data", "raw", "ssmsi", "base_communale.parquet")
 dgfip_raw <- here::here("data", "raw", "dgfip", "comptes_communes_2023_2024.csv")
 out_dir   <- here::here("data", "processed")
+
+# Téléchargement (audit N1) : le refresh mensuel part d'un data/raw/ vide. URLs
+# « latest » data.gouv.fr (stables, redirigent vers la dernière édition publiée) ;
+# fichiers mis en cache sous data/raw/ (idempotent : supprimer le fichier pour forcer).
+#   SSMSI : ressource « COM - Base statistique communale ... » (parquet, 16 Mo)
+#   DGFiP : export CSV du fichier global 2023-2024 (data.economie.gouv.fr, ~100 Mo)
+URL_SSMSI <- "https://www.data.gouv.fr/api/1/datasets/r/604d71b8-337d-4869-9226-49e01bae87df"
+URL_DGFIP <- "https://www.data.gouv.fr/api/1/datasets/r/6adb3821-1324-4ba8-a5e9-e805c08b9c7c"
+dl_if_missing <- function(url, dest, min_bytes) {
+  dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
+  if (file.exists(dest) && file.size(dest) >= min_bytes) { message("  Cache : ", basename(dest)); return(invisible(NULL)) }
+  message("  Télécharge : ", url)
+  curl::curl_download(url, paste0(dest, ".part"), quiet = TRUE,
+                      handle = curl::new_handle(useragent = "Mozilla/5.0", timeout = 1800))
+  file.rename(paste0(dest, ".part"), dest)
+}
+dl_if_missing(URL_SSMSI, ssmsi_raw, 1e7)
+dl_if_missing(URL_DGFIP, dgfip_raw, 5e7)
 dir.create(file.path(out_dir, "ssmsi"), recursive = TRUE, showWarnings = FALSE)
 dir.create(file.path(out_dir, "dgfip"), recursive = TRUE, showWarnings = FALSE)
 

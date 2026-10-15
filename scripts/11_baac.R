@@ -23,9 +23,18 @@ suppressPackageStartupMessages({
   library(stringr)
   library(glue)
   library(tidyr)
+  library(curl)
 })
 
 raw_path <- here::here("data", "raw", "baac", "caract_2024.csv")
+# Téléchargement (audit N1) : ressource « Caract_2024.csv » du jeu ONISR 53698f4ca3a729239d2036df
+# (URL « latest » data.gouv.fr, stable), mise en cache ; le refresh part d'un data/raw/ vide.
+URL_BAAC <- "https://www.data.gouv.fr/api/1/datasets/r/83f0fb0e-e0ef-47fe-93dd-9aaee851674a"
+dir.create(dirname(raw_path), recursive = TRUE, showWarnings = FALSE)
+if (!file.exists(raw_path) || file.size(raw_path) < 1e6) {
+  message("  Télécharge : ", URL_BAAC)
+  curl::curl_download(URL_BAAC, raw_path, quiet = TRUE, handle = curl::new_handle(useragent = "Mozilla/5.0"))
+}
 out_dir  <- here::here("data", "processed", "baac")
 out_path <- file.path(out_dir, "accidents_commune.parquet")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
@@ -42,6 +51,15 @@ message(glue::glue("BAAC caract 2024 : {nrow(caract)} accidents, ",
 caract <- caract |>
   dplyr::filter(!is.na(com), nchar(as.character(com)) == 5) |>
   dplyr::mutate(code_commune = as.character(com))
+
+# Harmonisation COG 2026 (audit N3) : le BAAC 2024 est au COG 2024, alors que le dénominateur
+# (populations.parquet) est sommé sur le COG 2026. Sans remappage, les accidents d'une commune
+# absorbée ou renumérotée (Saint-Denis 93066 + Pierrefitte, Orée d'Anjou 49069 -> 49126...)
+# étaient écartés « hors cadre » et la commune affichait 0 accident pour une population réelle.
+# On somme les effectifs vers le code 2026 (jamais de taux) avant l'agrégation.
+source(here::here("scripts", "cog_helpers.R"))
+caract <- caract |>
+  dplyr::mutate(code_commune = to_cog2026(code_commune, cog_map("2024-01-01")))
 
 # Compte par commune (communes avec >= 1 accident)
 agg <- caract |>

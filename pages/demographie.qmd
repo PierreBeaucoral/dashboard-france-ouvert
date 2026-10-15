@@ -177,7 +177,7 @@ if (demo_ready) {
   </div>
   <div class="cp-source">
     <strong>Source</strong> · INSEE (population, grille communale de densité) · DARES (DEFM cat. A+B+C, 2024-T4).<br>
-    Population : recensement le plus récent. Croissance : RP 2017 à RP 2021, taux annuel moyen. Densité : classification INSEE (6 niveaux de la grille communale). DEFM ‰ : demandeurs d'emploi rapportés à la population, masqué sous 100 habitants (effectifs DARES arrondis à 5).
+    Population : recensement le plus récent. Croissance : RP 2017 à RP 2021, taux annuel moyen. Densité : classification INSEE (6 niveaux de la grille communale). DEFM ‰ : demandeurs d'emploi rapportés à la population, masqué sous 100 habitants (effectifs DARES arrondis à 5). Mayotte : population de référence = recensement 2017 (INSEE, 256 518 hab.), plus ancienne que les effectifs 2024-2025 : les taux de Mayotte sont surestimés (la population 2024 est estimée environ 25 % plus haute).
   </div>
 </div>
 ```

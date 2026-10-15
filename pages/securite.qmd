@@ -189,7 +189,7 @@ if (ssmsi_ready) {
   </div>
   <div class="cp-source">
     <strong>Source</strong> · SSMSI 2025 (délinquance) + BAAC 2024 (accidents) · Min. Intérieur.<br>
-    Taux ‰ habitants, sauf cambriolages (‰ logements, dénominateur SSMSI). Secret stat : valeur non publiée en dessous du seuil de diffusion (hachures). Le total (somme des effectifs des 13 postes / population × 1 000, unités de compte mixtes : victimes, infractions, mis en cause) n'est calculé que si les 13 postes sont publiés (685 communes) : les indicateurs individuels couvrent bien plus de communes. Échelle log sur la carte. Lissage : Poisson-gamma, prior par classe de densité INSEE.
+    Taux ‰ habitants, sauf cambriolages (‰ logements, dénominateur SSMSI). Secret stat : valeur non publiée en dessous du seuil de diffusion (hachures). Le total (somme des effectifs des 13 postes / population × 1 000, unités de compte mixtes : victimes, infractions, mis en cause) n'est calculé que si les 13 postes sont publiés (685 communes) : les indicateurs individuels couvrent bien plus de communes. Échelle log sur la carte. Lissage : Poisson-gamma, prior par classe de densité INSEE. Accidents BAAC (‰ habitants) : Mayotte : population de référence = recensement 2017 (INSEE, 256 518 hab.), plus ancienne que les effectifs 2024-2025 : les taux de Mayotte sont surestimés (la population 2024 est estimée environ 25 % plus haute).
   </div>
 </div>
 ```

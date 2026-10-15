@@ -71,6 +71,32 @@ carb  <- if (file.exists(carb_path))  arrow::read_parquet(carb_path)  else NULL
 mob   <- if (file.exists(mob_path))   arrow::read_parquet(mob_path)   else NULL
 bio   <- if (file.exists(bio_path))   arrow::read_parquet(bio_path)   else NULL
 
+# ---- Codes renommés du COG (audit N6) : UN SEUL endroit pour toutes les sources ----
+# Un changement de code SANS changement de territoire (MOD 41 changement de département,
+# MOD 50 changement de code : Orée d'Anjou 49069 -> 49126, Conques-en-Rouergue 12076 -> 12218,
+# Aurseulles 14011 -> 14581, Porte des Pierres Dorées 69159 -> 69114...) est sans perte pour
+# des niveaux (prix, taux, indices) : on renomme la ligne vers le code COG 2026. Les FUSIONS
+# (plusieurs codes -> un) ne sont pas traitées ici : un niveau ne se somme pas ; les effectifs
+# sont déjà sommés dans les scripts amont (cog_helpers.R, 06, 11, 19-26).
+# Si le code COG 2026 a déjà sa propre ligne dans la source, c'est elle qui est conservée.
+source(here::here("scripts", "cog_helpers.R"))
+ren_map <- cog_map("2015-01-01",
+                   fus = arrow::read_parquet(here::here("data", "processed", "insee", "commune_fusions.parquet")) |>
+                     dplyr::filter(as.character(type_mvt) %in% c("41", "50")))
+cog_rename <- function(df) {
+  if (is.null(df)) return(df)
+  new <- to_cog2026(df$code_commune, ren_map)
+  moved <- new != df$code_commune
+  if (!any(moved)) return(df)
+  clash <- moved & new %in% df$code_commune[!moved]
+  df$code_commune <- new
+  df[!clash, , drop = FALSE]
+}
+dvf <- cog_rename(dvf); air <- cog_rename(air); ssmsi <- cog_rename(ssmsi)
+dgfip <- cog_rename(dgfip); filo <- cog_rename(filo); dens <- cog_rename(dens)
+defm <- cog_rename(defm); apl <- cog_rename(apl); baac <- cog_rename(baac)
+carb <- cog_rename(carb); mob <- cog_rename(mob); bio <- cog_rename(bio)
+
 
 # ---- PLM : sources publiées à l'ARRONDISSEMENT (751xx/693xx/132xx) ----
 # commune_merged est indexée sur le code VILLE (75056/69123/13055, clé des
@@ -314,7 +340,7 @@ if ("defm_abc" %in% names(merged) && "ctx_pop_latest" %in% names(merged)) {
 #   Filosofi 2023 : niveau seul, NON comparable à Filosofi 2021 (jamais de delta)
 # Seuls des taux / parts / densités sont ajoutés : aucun total brut (tautologie de taille).
 # ============================================================
-rd <- function(p) if (file.exists(p)) arrow::read_parquet(p) else NULL
+rd <- function(p) if (file.exists(p)) cog_rename(arrow::read_parquet(p)) else NULL
 join_new <- function(merged, df, cols) {
   if (is.null(df)) return(merged)
   stopifnot(!anyDuplicated(df$code_commune))
@@ -393,7 +419,8 @@ merged <- merged |>
       ctx_inscrits < 200             ~ "Très petite (< 500 hab.)",
       ctx_inscrits < 1000            ~ "Rurale (500-2 000)",
       ctx_inscrits < 5000            ~ "Bourg / périurbain (2 000-10 000)",
-      TRUE                            ~ "Ville moyenne (10 000-50 000)"
+      ctx_inscrits >= 5000           ~ "Ville moyenne (10 000-50 000)",
+      TRUE                           ~ NA_character_   # ni population ni inscrits : pas de strate inventée (audit N7)
     ),
     strate_taille = factor(strate_taille,
       levels = c("Très petite (< 500 hab.)", "Rurale (500-2 000)",

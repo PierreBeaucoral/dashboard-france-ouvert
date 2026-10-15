@@ -1,6 +1,6 @@
 # 🇫🇷 Dashboard France · Données ouvertes
 
-> Tableau de bord exploratoire — **35 232 communes**, **26 jeux de données ouverts** croisés, **80 indicateurs** disponibles (chiffres calculés par `R/site_numbers.R`).
+> Tableau de bord exploratoire — **34 875 communes**, **26 jeux de données ouverts** croisés, **80 indicateurs** disponibles (chiffres calculés par `R/site_numbers.R`).
 
 [![Built with Quarto](https://img.shields.io/badge/built%20with-Quarto-2A6F97)](https://quarto.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-A4243B)](LICENSE)

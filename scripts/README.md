@@ -117,8 +117,17 @@ Colonnes dont le sens change (MOBPRO RP 2022 vs RP 2019) :
 ## Mise à jour 2026-10-15 — corrections de l'audit Referee 2
 
 - **Ordre** : `06_insee_populations.R` AVANT `02_elections.R` (les élections sont harmonisées au COG 2026 avec `cog_helpers.R`) et avant 19-28 ; `05_merge_and_explore.R` en dernier, puis `99_validate_data.R`.
-- `06_` : populations légales RP 2017-2021 **sommées** vers le COG 2026 (codes absorbés), Mayotte = recensement 2017 (`pop_millesime`), source INSEE reprise du champ `insee_pop` de la base SSMSI brute (`data/raw/ssmsi/`).
+- `06_` : populations légales RP 2017-2021 **sommées** vers le COG 2026 (codes absorbés). Mayotte = recensement 2017, téléchargé par `06_` lui-même (INSEE Focus 105, `if105.xls`, appariement par libellé, total 256 518 vérifié) ; 10 communes rétablies 2024-2025 = populations légales 2023 (`ensemble.zip`, INSEE 8680726), `pop_millesime` 2017 / 2023 / 2021 selon le cas (audit N4, N9).
 - `02_elections.R` : sortie au COG 2026 (communes COG seulement, 34 865) ; codes consulaires/COM écartés.
 - `05_` : table des communes = COG 2026 (34 875) ; villes PLM : ligne officielle conservée si la source la publie.
 - `07_` : cambriolages en ‰ logements (`ssmsi_log_ref`, `del_cambriolages_n`), `del_total_pour_mille` = Σ effectifs / population × 1 000, `del_n_total`.
 - `19_` : « abstention attendue 24,7 % » supprimée (non sourcée) ; l'abstention 2022 T1 de 24,7 % hors étranger est une valeur observée, pas un contrôle.
+
+## Mise à jour 2026-10-15 (tour 2) — autonomie du refresh et COG 2026 complet
+
+- **Refresh depuis un `data/raw/` vide (N1)** : `06_`, `07_` (SSMSI + DGFiP) et `11_` (BAAC) téléchargent eux-mêmes leurs fichiers (URL « latest » data.gouv.fr ou INSEE, cache idempotent). `08_drees_apl.R` n'est **pas** dans la boucle automatique (XLSX DREES sans URL stable, mise en page de la nouvelle édition différente) : il s'arrête sans écrire s'il n'a aucun fichier. `01_geo_boundaries.R` n'y est pas non plus (change avec l'édition du COG). `15_agriculture_bio.R` non plus (URL datées Agence Bio en 404 depuis la republication de septembre 2026 ; nouvelle édition 2025 à migrer à la main). Boucle : `06 07 09 10 11 13 02 19 20 21 22 23 24 25 26 27 28`, puis `05`, puis `99`.
+- `01_geo_boundaries.R` : contours communaux Etalab édition 2026 (COG 2026, 34 917 polygones : communes + 45 arrondissements PLM) ; lit `populations.parquet` (lancer `06_` avant). Départements inchangés (gregoiredavid).
+- `02_elections.R` : vainqueur = famille aux voix cumulées de la commune (une seule règle, N2) ; remappage depuis 2015 ; un code non communal inconnu fait échouer le script (N5).
+- `05_` : `cog_rename()` applique les changements de code (MOD 41/50) à toutes les sources avant les jointures (N6) ; strate NA si ni population ni inscrits (N7).
+- `11_` : accidents remappés au COG 2026 avant agrégation (N3).
+- `99_validate_data.R` : plus de constante figée (Paris = ligne brute SSMSI) ; contrôles de vainqueur, BAAC, couverture géométrique, indicateurs des communes renumérotées ; les comparaisons au brut sont ignorées avec un message quand `data/raw/` est absent.

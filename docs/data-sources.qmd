@@ -219,7 +219,12 @@ Polygones IGN/OSM simplifiés pour les cartes leaflet.
 
 <div class="src-card cat-geo">
   <h3>Contours communes</h3>
-  <div class="org">IGN / OpenStreetMap (dépôt gregoiredavid)</div>
+  <div class="org">IGN Admin Express (COG 2026), diffusé par Etalab</div>
+  <div class="field"><span class="field-label">URL</span><span class="field-value"><a href="https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/2026/geojson/communes-1000m.geojson">etalab-datasets.geo.data.gouv.fr/contours-administratifs/2026/geojson/communes-1000m.geojson</a> (~10 MB, simplifié à 1 000 m)</span></div>
+  <div class="field"><span class="field-label">Format</span><span class="field-value">GeoJSON, EPSG:4326</span></div>
+  <div class="field"><span class="field-label">Traitement</span><span class="field-value">Filtré sur le cadre COG 2026 (communes + 45 arrondissements PLM ; villes PLM, COM 975-989 écartés) → 34 917 polygones, ~10,7 MB. Remplace le dépôt gregoiredavid (géographie antérieure : 5 communes COG sans polygone, 1 015 polygones à d'anciens codes).</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/01_geo_boundaries.R</code> (changer l'année pour une nouvelle édition du COG)</span></div>
+</div>
   <div class="field"><span class="field-label">URL</span><span class="field-value"><a href="https://france-geojson.gregoiredavid.fr/repo/communes.geojson">france-geojson.gregoiredavid.fr/repo/communes.geojson</a> (~23 MB) + DROM séparés</span></div>
   <div class="field"><span class="field-label">Format</span><span class="field-value">GeoJSON, EPSG:4326</span></div>
   <div class="field"><span class="field-label">Traitement</span><span class="field-value"><code>rmapshaper::ms_simplify(keep = 0.04)</code> → 35 927 polygones, ~16 MB (vs 23 MB en entrée).</span></div>

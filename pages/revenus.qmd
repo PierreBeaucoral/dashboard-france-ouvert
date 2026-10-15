@@ -134,7 +134,7 @@ if (rv_ready) {
   <div class="cp-source">
     <strong>Sources</strong> · INSEE FiLoSoFi 2021 et FiLoSoFi 2023 (« Filosofi 2 », publié le 2026-08-06) ; CNAF, allocataires de décembre 2024.<br>
     <strong>Les niveaux 2021 et 2023 ne sont pas comparables</strong> (changement de méthode, INSEE : comparaison « à proscrire ») : aucune évolution n'est calculée. 2023 couvre la métropole et La Réunion ; le taux de pauvreté n'est publié que pour ~5 200 communes.
-    CAF : régime général (MSA exclue), personnes couvertes rapportées à la population, communes d'au moins 1 000 habitants ; Guyane : taux parfois très élevés (sous-estimation de la population au recensement).
+    CAF : régime général (MSA exclue), personnes couvertes rapportées à la population, communes d'au moins 1 000 habitants ; Guyane : taux parfois très élevés (sous-estimation de la population au recensement). Mayotte : population de référence = recensement 2017 (INSEE, 256 518 hab.), plus ancienne que les effectifs 2024-2025 : les taux de Mayotte sont surestimés (la population 2024 est estimée environ 25 % plus haute).
   </div>
 </div>
 ```

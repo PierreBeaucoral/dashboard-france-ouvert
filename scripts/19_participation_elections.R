@@ -115,6 +115,11 @@ print(long |> filter(id_election %in% pick) |> count(id_election))
 print(summary(wide$abst_pres22_t1))
 
 # ---- Contrôles ----
+DBI::dbWriteTable(con, "valid", tibble::tibble(code = valid))
+n_src_kept_2022 <- DBI::dbGetQuery(con, glue("
+  SELECT SUM(inscrits) AS n FROM read_parquet('{pq_path}')
+  WHERE id_election = '2022_pres_t1' AND code_commune IS NOT NULL
+    AND (code_commune IN (SELECT code FROM valid) OR code_commune IN (SELECT code_avant FROM cmap))"))$n
 n22 <- sum(long$id_election == "2022_pres_t1")
 stopifnot(
   !anyDuplicated(long[c("code_commune", "id_election")]),
@@ -125,8 +130,10 @@ stopifnot(
   abs(n22 / 34900 - 1) < 0.05,
   all(c("75056", "69123", "13055") %in% wide$code_commune),
   all(wide$abst_pres22_t1 >= 0 & wide$abst_pres22_t1 <= 100, na.rm = TRUE),
-  # Conservation (même périmètre, même fichier) : le remappage COG 2026 ne perd ni ne crée
-  # d'inscrits (somme avant mapping = somme après, tous codes confondus).
-  abs(n_src_2022 - sum(raw$inscrits[raw$id_election == "2022_pres_t1"])) < 0.5
+  # Conservation (même fichier, calcul INDÉPENDANT de la jointure ci-dessus) : les inscrits 2022 T1
+  # conservés = ceux des lignes sources dont le code est un code COG 2026 vivant OU remappable vers
+  # un code vivant ; seuls les codes ni l'un ni l'autre (étranger ZZ, COM 975-988...) sont écartés.
+  # Échoue si la jointure perd, double-compte ou mal remappe des inscrits.
+  abs(n_src_kept_2022 - sum(long$inscrits[long$id_election == "2022_pres_t1"])) < 0.5
 )
 cat("\n✔ stopifnot() OK\n")

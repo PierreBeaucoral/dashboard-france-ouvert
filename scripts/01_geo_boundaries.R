@@ -15,6 +15,7 @@ suppressPackageStartupMessages({
   library(curl)
   library(here)
   library(glue)
+  library(arrow)
 })
 
 # ---- Paramètres ----
@@ -176,80 +177,51 @@ cat(glue::glue("
 # ============================================================
 # Partie 2 — Contours communaux (pour le choroplèthe Étape 2)
 #
-# Source : même dépôt gregoiredavid (métropole en un fichier, DROM en
-# 5 fichiers séparés à fusionner). Simplification agressive
-# (keep = 0.04) parce qu'on embarque 35 000 polygones dans la page.
+# Source (audit N6) : Etalab « contours-administratifs », édition 2026 (Admin Express COG
+# Carto de l'IGN, géographie COG 2026 = celle du cadre de communes, simplifiée à 1 000 m) :
+#   https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/2026/geojson/communes-1000m.geojson
+# Avant : gregoiredavid/france-geojson, géographie antérieure (1 015 polygones à d'anciens
+# codes, 5 communes COG 2026 sans polygone : Orée d'Anjou, Conques-en-Rouergue, Saint-Lucien,
+# L'Oie, Sainte-Florence). Le polygone d'une commune absorbée n'était alors jamais celui de la
+# commune qui porte les données -> trous gris sur toutes les cartes.
+# Contrat conservé : colonnes (nom, code, is_drom) ; Paris/Lyon/Marseille représentées par leurs
+# 45 arrondissements (le polygone « ville » est écarté : il recouvrirait les arrondissements).
+# Prérequis : scripts/06_insee_populations.R (cadre COG 2026 dans populations.parquet).
+# Lors d'une nouvelle édition du COG : changer l'année dans l'URL ci-dessous.
 # ============================================================
 
-# 1) Métropole
-url_com_metro <- file.path(base_url, "communes.geojson")
-metro_com_path <- file.path(raw_dir, "communes_metropole.geojson")
-message("\n→ Téléchargement communes métropole (~23 MB)")
-download_if_missing(url_com_metro, metro_com_path, min_bytes = 1e7)
+COM_GEO_YEAR <- 2026L
+url_com <- sprintf("https://etalab-datasets.geo.data.gouv.fr/contours-administratifs/%d/geojson/communes-1000m.geojson",
+                   COM_GEO_YEAR)
+com_path <- file.path(raw_dir, sprintf("communes_etalab_%d.geojson", COM_GEO_YEAR))
+message("\n→ Téléchargement contours communaux Etalab ", COM_GEO_YEAR, " (~10 MB)")
+download_if_missing(url_com, com_path, min_bytes = 5e6)
 
-# 2) DROM : pour chaque département, un fichier `communes-<code>-<name>.geojson`
-message("→ Téléchargement communes DROM")
-drom_com_paths <- character()
-for (code in names(drom_files)) {
-  slug <- drom_files[[code]]$slug
-  url  <- file.path(base_url, "departements", slug,
-                    sprintf("communes-%s.geojson", slug))
-  dest <- file.path(raw_dir, sprintf("communes_%s.geojson", code))
-  download_if_missing(url, dest, min_bytes = 5000L)
-  drom_com_paths[code] <- dest
-}
+com_raw <- sf::read_sf(com_path)
+if (sf::st_crs(com_raw)$epsg != 4326L) com_raw <- sf::st_transform(com_raw, 4326L)
 
-# 3) Lecture
-message("  Lecture métropole…")
-com_metro <- sf::read_sf(metro_com_path)
+# Cadre attendu = COM + ARM du COG 2026 moins les 3 villes PLM (représentées par arrondissements)
+frame <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet"))
+plm_city <- c("75056", "69123", "13055")
+frame_codes <- setdiff(frame$code_commune, plm_city)
 
-message("  Lecture DROM…")
-com_drom_list <- lapply(names(drom_com_paths), function(code) {
-  sf::read_sf(drom_com_paths[[code]])
-})
+com_out_sf <- com_raw |>
+  dplyr::filter(code %in% frame_codes) |>
+  dplyr::transmute(nom = as.character(nom), code = as.character(code),
+                   is_drom = substr(code, 1, 3) %in% DROM_CODES)
+manquants <- setdiff(frame_codes, com_out_sf$code)
+stopifnot(length(manquants) == 0L, !anyDuplicated(com_out_sf$code))   # chaque commune COG 2026 a un polygone
+message(glue::glue("Communes : {nrow(com_out_sf)} polygones (dont {sum(com_out_sf$is_drom)} DROM), ",
+                   "{nrow(com_raw) - nrow(com_out_sf)} entités hors cadre écartées (villes PLM, COM 975-989)"))
 
-# Harmoniser les colonnes (chaque fichier expose au minimum nom + code)
-keep_cols <- function(x) {
-  cols <- intersect(c("nom", "code"), names(x))
-  x[, cols, drop = FALSE]
-}
-com_metro <- keep_cols(com_metro)
-com_drom_list <- lapply(com_drom_list, keep_cols)
-com_drom <- do.call(rbind, com_drom_list)
-
-# Fusion
-com_raw <- rbind(com_metro, com_drom) |>
-  mutate(
-    is_drom = substr(code, 1, 3) %in% DROM_CODES,
-    nom     = as.character(nom),
-    code    = as.character(code)
-  )
-
-# Reprojection WGS84 si besoin
-if (sf::st_crs(com_raw)$epsg != 4326L) {
-  com_raw <- sf::st_transform(com_raw, 4326L)
-}
-
-message(glue::glue("Communes totales : {nrow(com_raw)} (dont {sum(com_raw$is_drom)} DROM)"))
-
-# 4) Simplification agressive (le poids final compte pour l'embed leaflet)
-message(glue::glue("Simplification communes (keep = {KEEP_COMMUNES})…"))
-com_simpl <- rmapshaper::ms_simplify(
-  com_raw,
-  keep        = KEEP_COMMUNES,
-  keep_shapes = TRUE,
-  method      = "vis"
-)
-
-# 5) Écriture — précision 5 décimales (cf. note plus haut). Sur les 35 000
-# polygones communaux c'est le plus gros gain de poids du pipeline.
+# Écriture — précision 5 décimales (cf. note plus haut)
 com_out <- file.path(out_dir, "communes.geojson")
-sf::write_sf(com_simpl, com_out, delete_dsn = TRUE, quiet = TRUE,
+sf::write_sf(com_out_sf, com_out, delete_dsn = TRUE, quiet = TRUE,
              layer_options = "COORDINATE_PRECISION=5")
 
 cat(glue::glue("
 
-  ✔ Communes : {nrow(com_simpl)} entités → {com_out} ({size_kb(com_out)} KB)
-    (dont {sum(com_simpl$is_drom)} DROM)
+  ✔ Communes : {nrow(com_out_sf)} entités → {com_out} ({size_kb(com_out)} KB)
+    (dont {sum(com_out_sf$is_drom)} DROM)
 
 "))

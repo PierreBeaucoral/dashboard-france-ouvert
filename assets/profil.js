@@ -215,9 +215,14 @@
       inputs.forEach(function (i) { i.disabled = false; });
       wire("prof-search", "prof-suggest", function (c) { render(c); });
       wire("prof-cmp-search", "prof-cmp-suggest", function (c) { S.compare = c; render(S.primary || c); });
-      var h = (location.hash || "").replace("#", "").split(","), a = (h[0] || "").toUpperCase(), b = (h[1] || "").toUpperCase();
-      if (b && S.row[b] != null) S.compare = b;
-      render(a && S.row[a] != null ? a : "75056");
+      // Lit l'URL au chargement et sur hashchange (lien collé dans la même page, retour arrière) : audit m24.
+      function applyHash() {
+        var h = (location.hash || "").replace("#", "").split(","), a = (h[0] || "").toUpperCase(), b = (h[1] || "").toUpperCase();
+        S.compare = (b && S.row[b] != null) ? b : null;
+        render(a && S.row[a] != null ? a : "75056");
+      }
+      applyHash();
+      window.addEventListener("hashchange", applyHash);
     }).catch(function (e) { console.error(e); cv.innerHTML = '<p class="js-loading">Données indisponibles.</p>'; });
   }
   if (document.readyState === "complete") boot(); else window.addEventListener("load", boot);

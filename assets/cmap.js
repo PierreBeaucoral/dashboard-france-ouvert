@@ -236,12 +236,12 @@
             '<span class="lgd-label">' + esc(st.naLabel || "Non publié (secret statistique)") + "</span>" +
             (hasSt ? '<span class="lgd-pc">' + pct(sh.naC) + '</span><span class="lgd-pp">' + pct(sh.naP) + "</span>" : "") + "</div>";
     var head = hasSt ? '<div class="lgd-head"><span class="lgd-label"></span><span class="lgd-pc" title="Part des communes de la classe">% comm.</span>' +
-               '<span class="lgd-pp" title="Part de la population française vivant dans ces communes">% pop.</span></div>' : "";
+               '<span class="lgd-pp" title="Part de la population de France métropolitaine vivant dans ces communes">% pop.</span></div>' : "";
     var open = el.querySelector("details") ? el.querySelector("details").open : true;
     el.innerHTML = '<details class="lgd-box' + (hasSt ? " lgd-wide" : "") + '"' + (open ? " open" : "") + '><summary class="lgd-title">' +
       esc(st.title) + "</summary>" + (st.sub ? '<div class="lgd-sub">' + esc(st.sub) + "</div>" : "") +
       (hasSt && st.stats.hist ? histSVG(st.stats.hist, st) : "") + head + rows +
-      (hasSt ? '<div class="lgd-note">Parts sur ' + fmt(sh.n, 0) + " communes (France entière), somme = 100 %.</div>" : "") +
+      (hasSt ? '<div class="lgd-note">Parts sur ' + fmt(sh.n, 0) + " communes de France métropolitaine (hors DROM), somme = 100 %.</div>" : "") +
       (st.note ? '<div class="lgd-note">' + esc(st.note) + "</div>" : "") + "</details>";
     el._lgdState = st;
     bindBrush(el, st);
