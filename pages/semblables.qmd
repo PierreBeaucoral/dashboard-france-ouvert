@@ -1,0 +1,107 @@
+---
+title: "Les communes qui vous ressemblent"
+subtitle: "Des communes comparables à la vôtre, selon les critères que vous choisissez"
+format:
+  dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
+    include-after-body:
+      - _includes/after-body.html
+    orientation: rows
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+```
+
+```{r}
+#| label: peers-config
+#| results: asis
+#| echo: false
+# Critères de similarité. Libellés, unités et décimales viennent du registre
+# (explorer/indicator_meta.parquet, source unique) ; ce tableau ajoute seulement ce que le registre
+# ignore : le millésime de la source, la transformation de l'axe (lin | log | cat), l'abréviation
+# des phrases « pourquoi elle vous ressemble », et le rôle (critère par défaut, ligne de distribution).
+meta <- arrow::read_parquet(here::here("data", "processed", "explorer", "indicator_meta.parquet"))
+crit <- tibble::tribble(
+  ~id,    ~field,            ~short,       ~yr,    ~src,                              ~tf,   ~def,   ~row,
+  "pop",  "ctx_log_pop",     "Pop.",       "2021", "INSEE, recensement 2021",         "lin", TRUE,   FALSE,
+  "dens", "densite_rang",    "Densité",    "2024", "INSEE, grille de densité 2024",   "cat", TRUE,   FALSE,
+  "rev",  "revenu_median",   "Revenu",     "2021", "INSEE, FiLoSoFi 2021",            "lin", FALSE,  TRUE,
+  "pmai", "dvf_prix_mai",    "Maison",     "2024", "DVF 2024 (médiane)",              "log", FALSE,  TRUE,
+  "papp", "dvf_prix_app",    "Appart.",    "2024", "DVF 2024 (médiane)",              "log", FALSE,  TRUE,
+  "apl",  "apl_medecins",    "APL",        "2023", "DREES, APL 2023",                 "lin", FALSE,  TRUE,
+  "car",  "mob_pct_voiture", "Voiture",    "2022", "INSEE MOBPRO, RP 2022",           "lin", FALSE,  TRUE,
+  "vac",  "pct_vacants",     "Vacants",    "2022", "INSEE, RP 2022",                  "lin", FALSE,  TRUE,
+  "prop", "pct_proprietaires", "Propriét.", "2022", "INSEE, RP 2022",                 "lin", FALSE,  FALSE,
+  "ftth", "arcep_pct_ftth",  "Fibre",      "2026", "ARCEP, 2026 T2",                  "lin", FALSE,  TRUE,
+  "bpe",  "bpe_panier_score","Services",   "2025", "INSEE, BPE 2025",                 "lin", FALSE,  TRUE
+)
+crit <- dplyr::left_join(crit, meta[, c("var", "label", "unit", "dig")], by = c("field" = "var"))
+crit$label[crit$id == "pop"]  <- "Population"
+crit$unit[crit$id == "pop"]   <- "hab."
+crit$label[crit$id == "dens"] <- "Densité INSEE"
+crit$log10 <- crit$id == "pop"
+crit$d <- ifelse(is.na(crit$dig), 0L, as.integer(crit$dig))
+crit$d[crit$id == "pop"] <- 0L
+cat("<script>window.PEERS_CRIT = ", as.character(jsonlite::toJSON(crit[, c("id", "field", "label", "short", "yr", "src", "tf", "def", "row", "unit", "d", "log10")], auto_unbox = TRUE, na = "null")), ";</script>\n", sep = "")
+```
+
+## Row {height="12%"}
+
+::: {.card title="Rechercher une commune"}
+```{=html}
+<div class="prof-search-bar">
+  <div class="prof-field">
+    <label for="sm-search" class="dvf-ctrl-label">Commune de référence</label>
+    <input id="sm-search" class="prof-input" type="text" placeholder="Clermont-Ferrand, Brest, Paris…" autocomplete="off" disabled />
+    <ul id="sm-suggest" class="prof-suggest" role="listbox" hidden></ul>
+  </div>
+  <div id="sm-status" class="prof-info sm-status" aria-live="polite"></div>
+</div>
+```
+:::
+
+## Row {height="88%"}
+
+::: {.card title="Communes semblables"}
+```{=html}
+<div id="sm" class="portrait sm">
+  <fieldset class="sm-ctl">
+    <legend class="dvf-ctrl-label">Ce qui définit « semblable »</legend>
+    <div id="sm-chips" class="sm-chips" role="group" aria-label="Critères de similarité"></div>
+    <div class="sm-opts">
+      <label class="sm-k">Taille du groupe <input id="sm-k" type="range" min="5" max="30" step="1" value="15" /> <b id="sm-kv">15</b></label>
+      <label class="sm-chk"><input id="sm-dept" type="checkbox" /> même département</label>
+      <label class="sm-chk"><input id="sm-cls" type="checkbox" /> même classe de densité</label>
+    </div>
+  </fieldset>
+  <div class="sm-grid">
+    <div class="sm-left"><div id="sm-rows" class="pt-rows"><p class="js-loading">Chargement des communes…</p></div></div>
+    <div class="sm-right">
+      <div class="sm-id">
+        <canvas id="sm-canvas" class="pt-canvas" role="img" aria-label="Carte de situation de la commune et de ses semblables"></canvas>
+        <div id="sm-ident" class="pt-id"></div>
+      </div>
+      <div id="sm-list" class="sm-list" role="list" aria-label="Communes semblables"></div>
+      <div id="sm-detail" class="sm-detail" aria-live="polite"></div>
+    </div>
+  </div>
+  <p class="pt-note">
+    <strong>Lecture.</strong> Sur chaque ligne, la forme grise est la distribution de toutes les communes publiées
+    (axe fixe, du 1<sup>er</sup> au 99<sup>e</sup> centile) ; le point plein est la commune de référence, les traits
+    sont ses semblables, le losange creux la commune épinglée. La proximité est <em>descriptive</em> : elle dépend
+    des critères cochés, ne dit rien d'une cause, et deux communes proches sur ces critères peuvent différer sur tout le reste.
+    Distance = racine de la moyenne des carrés des écarts, en écarts-types nationaux, sur les critères actifs.
+  </p>
+</div>
+<script src="/assets/portrait-kit.js"></script>
+<script src="/assets/peers-core.js"></script>
+<script src="/assets/semblables.js"></script>
+```
+:::

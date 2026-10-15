@@ -1,0 +1,126 @@
+---
+title: "Constellation"
+subtitle: "Les mêmes points, quatre dispositions : carte, population, nuage de deux indicateurs, classement"
+format:
+  dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
+    include-after-body:
+      - _includes/after-body.html
+    orientation: rows
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+source(here::here("R", "indicator_sources.R"))
+```
+
+```{r}
+#| label: constellation-config
+#| results: asis
+#| echo: false
+# Registre unique indicator_meta.parquet (libellé, groupe, unité, décimales) + source et
+# millésime (R/indicator_sources.R). Les colonnes sont chargées à la demande par
+# assets/constellation.js ; seules celles affichées sont téléchargées.
+if (explorer_ready) {
+  ind <- ind_meta |>
+    dplyr::transmute(var, label, group, unit, dig = as.integer(dig), src = indicator_source(var))
+  grp_pal <- list(`Sécurité` = "red", Finances = "blue", `Énergie` = "ochre",
+                  `Risques et sols` = "ochre", `Élections` = "ochre")
+  cfg <- list(ind = ind, pal = PAL[c("green", "red", "blue", "ochre")], groupPal = grp_pal)
+  cat("<script>window.CONSTELL = ", as.character(jsonlite::toJSON(cfg, auto_unbox = TRUE, dataframe = "rows")), ";</script>\n", sep = "")
+}
+```
+
+## Row {height="180px"}
+
+::: {.card title="Disposition et filtres"}
+```{=html}
+<div class="cs-controls" id="cs-controls">
+  <fieldset class="cs-fs">
+    <legend class="dvf-ctrl-label">Disposition</legend>
+    <div class="dvf-ctrl-radios">
+      <label><input type="radio" name="cs-arr" value="geo" checked> Carte</label>
+      <label><input type="radio" name="cs-arr" value="pop"> Population</label>
+      <label><input type="radio" name="cs-arr" value="scatter"> Nuage</label>
+      <label><input type="radio" name="cs-arr" value="rank"> Classement</label>
+    </div>
+  </fieldset>
+  <div class="cs-field"><label for="cs-c" class="dvf-ctrl-label">Couleur</label><select id="cs-c" class="biv-select"></select></div>
+  <div class="cs-field cs-xy"><label for="cs-x" class="dvf-ctrl-label">Abscisse</label><select id="cs-x" class="biv-select"></select></div>
+  <div class="cs-field cs-xy"><label for="cs-y" class="dvf-ctrl-label">Ordonnée</label><select id="cs-y" class="biv-select"></select></div>
+  <fieldset class="cs-fs">
+    <legend class="dvf-ctrl-label">Points</legend>
+    <div class="dvf-ctrl-radios">
+      <label><input type="radio" name="cs-lvl" value="dept" checked> Départements</label>
+      <label><input type="radio" name="cs-lvl" value="com"> Communes</label>
+    </div>
+  </fieldset>
+  <div class="cs-field"><label for="cs-dept" class="dvf-ctrl-label">Département</label><select id="cs-dept" class="biv-select"></select></div>
+  <div class="cs-field"><label for="cs-dens" class="dvf-ctrl-label">Densité INSEE</label><select id="cs-dens" class="biv-select"></select></div>
+  <div class="cs-field cs-search"><label for="cs-search" class="dvf-ctrl-label">Commune</label>
+    <input id="cs-search" class="prof-input" type="text" placeholder="Lyon, Rennes, Brest…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="cs-suggest">
+    <ul id="cs-suggest" class="prof-suggest" role="listbox" hidden></ul></div>
+  <div class="cs-presets">
+    <span class="dvf-ctrl-label">Exemples</span>
+    <button type="button" class="cs-btn" data-preset="scatter">Revenu × médecins</button>
+    <button type="button" class="cs-btn" data-preset="pop">France à hauteur d’habitants</button>
+    <button type="button" class="cs-btn" data-preset="affordable">Maisons peu chères, accès aux médecins</button>
+    <button type="button" class="cs-btn" id="cs-reset">Réinitialiser</button>
+  </div>
+</div>
+```
+:::
+
+## Row {height="880px"}
+
+::: {.card title="Constellation" width="64%"}
+```{=html}
+<div class="cs-wrap">
+  <div class="cs-stage">
+    <canvas id="cs-canvas" role="img" aria-label="Graphique de points en cours de chargement"></canvas>
+    <div id="cs-tip" class="cs-tip" hidden></div>
+    <p class="cs-loading js-loading">Chargement des communes…</p>
+  </div>
+  <p id="cs-caption" class="cs-caption"></p>
+  <div class="cs-histbox">
+    <svg id="cs-hist" class="cs-hist" viewBox="0 0 560 92" role="img" aria-label="Histogramme"></svg>
+    <div class="cs-brushrow">
+      <label for="cs-b0">De</label><input id="cs-b0" class="prof-input cs-num" inputmode="decimal" placeholder="min.">
+      <label for="cs-b1">à</label><input id="cs-b1" class="prof-input cs-num" inputmode="decimal" placeholder="max.">
+      <button type="button" class="cs-btn" id="cs-bclear">Effacer la plage</button>
+    </div>
+    <p id="cs-bread" class="cs-bread" aria-live="polite"></p>
+  </div>
+  <p id="cs-status" class="cs-status" role="status" aria-live="polite"></p>
+</div>
+<script src="/assets/constellation-core.js"></script>
+<script src="/assets/constellation.js"></script>
+```
+:::
+
+::: {.card title="Détail" width="36%"}
+```{=html}
+<div class="cs-panel">
+  <div id="cs-detail" class="cs-detail" aria-live="polite"></div>
+  <h4 class="cs-h">Deuxième indicateur dans la plage</h4>
+  <div class="cs-field"><label for="cs-v" class="dvf-ctrl-label">Indicateur</label><select id="cs-v" class="biv-select"></select></div>
+  <svg id="cs-h2" class="cs-h2" viewBox="0 0 320 70" role="img" aria-label="Distribution du deuxième indicateur : toutes les communes du filtre en gris, plage choisie en trait plein"></svg>
+  <p class="cs-legend2"><i class="cs-sw-all"></i> communes du filtre <i class="cs-sw-sel"></i> plage choisie (parts de chaque groupe)</p>
+  <p id="cs-h2read" class="cs-bread" aria-live="polite"></p>
+  <p id="cs-stats" class="cs-stats" hidden></p>
+  <details class="cs-det" open>
+    <summary>Tableau : 20 premières communes de la sélection</summary>
+    <table id="cs-top" class="cs-top"></table>
+  </details>
+  <p class="cs-note"><strong>Lecture.</strong> Les points ne sont pas déplacés au hasard : en vue Carte ils sont à la commune (projection des cartes du site,
+  outre-mer en encarts à échelle propre) ; en vue Population la surface d’un cercle est proportionnelle aux habitants (même échelle partout, outre-mer compris) ;
+  en vue Nuage et Classement la position vient des valeurs et les axes sont fixes (1<sup>er</sup> au 99<sup>e</sup> centile ; au-delà, les points sont posés sur le bord). Descriptif, sans lecture causale.</p>
+</div>
+```
+:::
