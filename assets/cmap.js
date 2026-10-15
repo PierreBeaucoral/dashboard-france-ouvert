@@ -476,6 +476,8 @@
     var l = map._cmapLayers && map._cmapLayers[code];
     if (map._cmapSel && map._cmapSel !== l) {
       map._cmapSel.setStyle(map._cmapSel._b0);
+      // retour derrière : sinon une grande commune sélectionnée masque ses enclaves
+      if (map._cmapSel.bringToBack) map._cmapSel.bringToBack();
     }
     if (l) {
       map._cmapSel = l;

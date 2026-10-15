@@ -36,7 +36,7 @@ Dépendance : lancer `06_insee_populations.R` avant.
 
 | Script | Changement | Notes |
 |---|---|---|
-| `03_dvf_aggregate.R` | `YEARS` = 2021-2025 | geo-dvf `latest/csv/2025/full.csv.gz` (98 MB). Même schéma : `code_commune, annee, type_local, n_transactions, prix_m2_median, prix_m2_q25, prix_m2_q75, estimation_insuffisante`. 184 309 lignes. 2025 = année en cours à la date d'extraction (déclarations tardives possibles). |
+| `03_dvf_aggregate.R` | `YEARS` = 2021-2025 | geo-dvf `latest/csv/2025/full.csv.gz` (98 MB). Même schéma : `code_commune, annee, type_local, n_transactions, prix_m2_median, prix_m2_q25, prix_m2_q75, estimation_insuffisante`. 184 305 lignes (codes renommés fusionnés au COG 2026). 2025 = année en cours à la date d'extraction (déclarations tardives possibles). |
 | `14_mobilite.R` | MOBPRO RP 2019 -> **RP 2022** | https://www.insee.fr/fr/statistiques/8589904 `RP2022_mobpro.parquet` (66 MB, 7 388 023 lignes, géographie COG 2024, remappée COG 2026). Même schéma `mobilite_commune.parquet`. Codes TRANS vérifiés contre `varmod_mobpro_2022.csv` (1 pas de transport, 2 marche, 3 vélo y c. VAE, 4 2RM, 5 voiture, 6 TC) : inchangés, garde-fou `stopifnot` ajouté. |
 | `16_mobilite_flows.R`, `17_flows_per_commune.R` | idem, lisent le parquet RP 2022 | schémas inchangés. |
 

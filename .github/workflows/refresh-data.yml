@@ -79,6 +79,8 @@ jobs:
       #   - 15 (Agence Bio) : la republication de septembre 2026 masque (« NC », secret statistique) ~60 % des
       #     surfaces communales ; le script s'arrête volontairement tant que c'est le cas (parquet 2024 commité
       #     conservé, cf. docs/decisions.qmd) : dans cette boucle `set -e`, il ferait échouer tout le job.
+      #   ATTENTION : 03 (DVF) dépend de 06 (table COG 2026 des codes renommés). Après une nouvelle édition du
+      #   COG, relancer 01 et 03 à la main : sinon le validateur (codes DVF non fusionnés) bloque le refresh.
       # 08 (APL DREES) est dans la boucle : URL d'attachement DREES stables, vérifié depuis un data/raw vide.
       # -> workflow_dispatch / exécution locale.
       - name: Refresh sources annuelles (ordre des dépendances)
