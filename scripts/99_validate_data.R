@@ -71,8 +71,10 @@ SPEC <- list(
   ),
   "drees/apl_medecins.parquet" = list(
     min_rows = 30000, max_rows = 36000,
-    cols = c("code_commune", "apl_medecins"),
-    ranges = list(apl_medecins = c(0, 60))
+    cols = c("code_commune", "apl_medecins", "apl_medecins_jeunes", "apl_infirmieres", "apl_sagefemmes",
+             "apl_dentistes", "apl_kines", "apl_millesime"),
+    ranges = list(apl_medecins = c(0, 60), apl_millesime = c(2022, 2035)),
+    unique_key = "code_commune"
   ),
   "filosofi/revenus_communes.parquet" = list(
     min_rows = 30000, max_rows = 36000,
@@ -487,6 +489,26 @@ tryCatch({
   ind <- meta$var
   for (cc in c("49126", "12218"))
     chk(sum(!is.na(unlist(mg[mg$code_commune == cc, ind]))) >= 40, paste0(cc, " : renumérotée mais < 40 indicateurs (jointures sur l'ancien code ?)"))
+
+  # Round 3 m-R1 : conservation des ventes DVF à travers cog_rename. Pour chaque commune renumérotée,
+  # les ventes de maisons 2024 publiées (commune_merged) = ventes brutes de l'ancien code + du nouveau
+  # (dvf_aggregated.parquet), sous réserve du seuil n >= 5 (règle de 03). Mêmes communes, même année, même type.
+  dvf_raw <- arrow::read_parquet(here::here("data", "processed", "dvf", "dvf_aggregated.parquet"))
+  for (pr in list(c("49069", "49126"), c("12076", "12218"), c("14011", "14581"), c("69159", "69114"))) {
+    nraw <- sum(dvf_raw$n_transactions[dvf_raw$code_commune %in% pr & dvf_raw$annee == 2024 & dvf_raw$type_local == "Maison"])
+    nmg  <- mg$dvf_n_mai[mg$code_commune == pr[2]]
+    chk(if (nraw >= 5) isTRUE(nmg == nraw) else is.na(nmg),
+        paste0("DVF renumérotée ", pr[2], " : ventes de maisons 2024 publiées (", nmg, ") != brutes ancien + nouveau code (", nraw, ")"))
+  }
+
+  # Round 3 : tous les polygones communaux sont valides (planaire), 1 par commune du cadre, MULTIPOLYGON.
+  if (requireNamespace("sf", quietly = TRUE)) {
+    suppressMessages(sf::sf_use_s2(FALSE))
+    gsf <- sf::read_sf(here::here("data", "processed", "geo", "communes.geojson"), quiet = TRUE)
+    chk(all(sf::st_is_valid(gsf)), paste0("géométrie : ", sum(!sf::st_is_valid(gsf)), " polygones invalides"))
+    chk(!any(sf::st_is_empty(gsf)), "géométrie : polygones vides")
+    chk(nrow(gsf) == length(need) && !anyDuplicated(gsf$code), "géométrie : nombre de polygones != cadre COG 2026 - 3 villes PLM")
+  } else cat("  [ignoré] validité des polygones : package sf absent\n")
 
   # C1 : libellés de densité du JS = ordre des rangs des données
   js <- paste(readLines(here::here("assets", "cmap.js"), warn = FALSE), collapse = " ")

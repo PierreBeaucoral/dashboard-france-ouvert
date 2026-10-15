@@ -119,7 +119,7 @@ if (explorer_ready) {
     <table id="cs-top" class="cs-top"></table>
   </details>
   <p class="cs-note"><strong>Lecture.</strong> Les points ne sont pas déplacés au hasard : en vue Carte ils sont à la commune (projection des cartes du site,
-  outre-mer en encarts à échelle propre) ; en vue Population la surface d’un cercle est proportionnelle aux habitants (même échelle partout, outre-mer compris) <em>au-dessus de 480 habitants environ</em> : en dessous, tous les cercles ont le même rayon minimal pour rester visibles (51 % des communes, 6 % de la population), donc leur taille ne se lit pas ; les communes sans population (7) sont au rayon minimal ;
+  outre-mer en encarts à échelle propre) ; en vue Population la surface d’un cercle est proportionnelle aux habitants (même échelle partout, outre-mer compris) <em>au-dessus de <span id="cs-lec-seuil">…</span> habitants environ</em> : en dessous, tous les cercles ont le même rayon minimal pour rester visibles (<span id="cs-lec-pc">…</span> % des communes, <span id="cs-lec-pp">…</span> % de la population), donc leur taille ne se lit pas ; les communes sans population (<span id="cs-lec-n">…</span>) sont au rayon minimal ;
   en vue Nuage et Classement la position vient des valeurs et les axes sont fixes (1<sup>er</sup> au 99<sup>e</sup> centile ; au-delà, les points sont posés sur le bord). Descriptif, sans lecture causale.</p>
 </div>
 ```

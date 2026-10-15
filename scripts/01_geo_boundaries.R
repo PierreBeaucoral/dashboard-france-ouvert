@@ -214,6 +214,53 @@ stopifnot(length(manquants) == 0L, !anyDuplicated(com_out_sf$code))   # chaque c
 message(glue::glue("Communes : {nrow(com_out_sf)} polygones (dont {sum(com_out_sf$is_drom)} DROM), ",
                    "{nrow(com_raw) - nrow(com_out_sf)} entités hors cadre écartées (villes PLM, COM 975-989)"))
 
+# ---- Validité des polygones (round 3, m N6) -------------------------------------------------
+# communes-1000m est simplifié à 3 décimales : 20 communes y sont INVALIDES (auto-intersections) et 2
+# (Chêne-Sec 39140, Villeneuve-Frouville 41284) s'y effondrent en un anneau d'aire nulle. On répare
+# en deux temps : (1) les polygones effondrés sont repris de communes-100m (téléchargé seulement si
+# besoin) ; (2) tout est ramené sur la grille d'écriture (1e-5 deg) puis st_make_valid(), réduit à ses
+# polygones et recasté en MULTIPOLYGON (format attendu par R/build_web_assets.R). Sans effet sur les
+# polygones déjà valides.
+sf::sf_use_s2(FALSE)                       # validité planaire, comme le lecteur de géométrie du navigateur
+n_invalid_before <- sum(!sf::st_is_valid(com_out_sf))
+# polygone effondré = la réparation ne laisse aucun polygone (ligne ou point)
+rep_try <- sf::st_make_valid(com_out_sf[!sf::st_is_valid(com_out_sf), ])
+# Part polygonale de chaque géométrie, à longueur constante (st_collection_extract écarte les
+# éléments sans polygone : MULTIPOLYGON vide à la place). Seuls les non-polygones sont traités.
+polys_only <- function(g) {
+  ty <- as.character(sf::st_geometry_type(g))
+  res <- unclass(g)
+  for (k in which(!ty %in% c("POLYGON", "MULTIPOLYGON"))) {
+    e <- if (ty[k] == "GEOMETRYCOLLECTION") sf::st_collection_extract(g[k], "POLYGON", warn = FALSE) else list()
+    res[[k]] <- if (length(e)) e[[1]] else sf::st_multipolygon()
+  }
+  sf::st_sfc(res, crs = sf::st_crs(g))
+}
+collapsed_codes <- rep_try$code[sf::st_is_empty(polys_only(sf::st_geometry(rep_try)))]
+if (length(collapsed_codes)) {
+  hi_path <- file.path(raw_dir, sprintf("communes_etalab_%d_100m.geojson", COM_GEO_YEAR))
+  message("→ ", length(collapsed_codes), " polygone(s) effondré(s) à 1000 m (", paste(collapsed_codes, collapse = ", "),
+          ") : repris de communes-100m")
+  download_if_missing(sub("1000m", "100m", url_com), hi_path, min_bytes = 5e6)
+  hi <- sf::read_sf(hi_path)
+  hi <- hi[match(collapsed_codes, hi$code), ]
+  stopifnot(!anyNA(hi$code))
+  hi <- sf::st_cast(sf::st_transform(sf::st_geometry(hi), 4326L), "MULTIPOLYGON")
+  i <- match(collapsed_codes, com_out_sf$code)
+  g_all <- sf::st_geometry(com_out_sf)
+  g_all[i] <- hi
+  com_out_sf <- sf::st_set_geometry(com_out_sf, g_all)
+}
+com_out_sf <- com_out_sf |>
+  sf::st_set_precision(1e5) |>
+  sf::st_make_valid()
+geom_fixed <- polys_only(sf::st_geometry(com_out_sf))
+com_out_sf <- sf::st_set_geometry(com_out_sf, sf::st_cast(geom_fixed, "MULTIPOLYGON"))
+stopifnot(all(sf::st_is_valid(com_out_sf)),
+          all(sf::st_geometry_type(com_out_sf) == "MULTIPOLYGON"),
+          !anyNA(match(frame_codes, com_out_sf$code)), !anyDuplicated(com_out_sf$code))
+message(glue::glue("Validité : {n_invalid_before} polygone(s) invalide(s) réparé(s) ; {nrow(com_out_sf)} polygones, 0 invalide"))
+
 # Écriture — précision 5 décimales (cf. note plus haut)
 com_out <- file.path(out_dir, "communes.geojson")
 sf::write_sf(com_out_sf, com_out, delete_dsn = TRUE, quiet = TRUE,

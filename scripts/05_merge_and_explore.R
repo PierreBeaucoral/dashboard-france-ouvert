@@ -22,6 +22,7 @@ suppressPackageStartupMessages({
   library(arrow)
   library(here)
   library(glue)
+  library(purrr)
 })
 
 # ---- Chemins ----
@@ -92,7 +93,30 @@ cog_rename <- function(df) {
   df$code_commune <- new
   df[!clash, , drop = FALSE]
 }
-dvf <- cog_rename(dvf); air <- cog_rename(air); ssmsi <- cog_rename(ssmsi)
+# DVF (plusieurs lignes par commune : annee x type_local) : geo-dvf bascule de l'ancien au nouveau
+# code EN COURS DE SÉRIE (Orée d'Anjou : 49069 en 2021-2025, 49126 en 2025 seulement), donc la règle
+# « la ligne du code 2026 gagne » faisait perdre toutes les lignes de l'ancien code (116 ventes de
+# maisons 2024 pour 49126, round 3 m-R1). On renomme, puis on fusionne par clé (code, annee,
+# type_local) : n_transactions sommé ; prix médian/q25/q75 = moyenne pondérée par n_transactions
+# (APPROXIMATION documentée, comme pour PLM : la médiane d'un territoire réuni n'est pas connue) ;
+# estimation_insuffisante recalculé sur le n fusionné (règle de 03 : n < 5). Ne touche que les
+# couples (année, type) présents sous les DEUX codes.
+dvf_combine_renamed <- function(df) {
+  df$code_commune <- to_cog2026(df$code_commune, ren_map)
+  key <- c("code_commune", "annee", "type_local")
+  dup <- duplicated(df[key]) | duplicated(df[key], fromLast = TRUE)
+  if (!any(dup)) return(df)
+  comb <- df[dup, , drop = FALSE] |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(key))) |>
+    dplyr::summarise(
+      dplyr::across(c(prix_m2_median, prix_m2_q25, prix_m2_q75),
+                    ~ stats::weighted.mean(.x, n_transactions)),
+      n_transactions = sum(n_transactions),
+      .groups = "drop") |>
+    dplyr::mutate(estimation_insuffisante = n_transactions < 5)
+  dplyr::bind_rows(df[!dup, , drop = FALSE], comb[names(df)])
+}
+dvf <- dvf_combine_renamed(dvf); air <- cog_rename(air); ssmsi <- cog_rename(ssmsi)
 dgfip <- cog_rename(dgfip); filo <- cog_rename(filo); dens <- cog_rename(dens)
 defm <- cog_rename(defm); apl <- cog_rename(apl); baac <- cog_rename(baac)
 carb <- cog_rename(carb); mob <- cog_rename(mob); bio <- cog_rename(bio)
@@ -572,7 +596,6 @@ corr_long <- function(df, method, strate_label = "Toutes") {
 }
 
 message("Calcul des matrices de corrélation (Spearman + Pearson, global + 4 strates)...")
-library(purrr)
 corr_list <- list(
   corr_long(merged, "spearman", "Toutes"),
   corr_long(merged, "pearson",  "Toutes")
