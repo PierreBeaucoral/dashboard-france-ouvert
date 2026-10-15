@@ -1,6 +1,11 @@
 project:
   type: website
   output-dir: _site
+  # Génère assets/geo/communes.json + assets/data/** (géométrie et colonnes
+  # mises en cache par le navigateur) à partir de data/processed/.
+  pre-render:
+    - R/build_web_assets.R
+    - R/build_thumbnails.R
   render:
     - index.qmd
     - pages/*.qmd
@@ -11,7 +16,8 @@ project:
 
 website:
   title: "France · Données ouvertes"
-  description: "Tableau de bord exploratoire — 35 000 communes, 13 sources data.gouv.fr croisées : élections, immobilier, air, sécurité, finances, santé, revenus, démographie, énergie, mobilité, agriculture."
+  description: "Tableau de bord exploratoire des communes françaises : sources data.gouv.fr croisées (élections, immobilier, air, sécurité, finances, santé, revenus, démographie, énergie, mobilité, agriculture, logement, risques, services)."
+  favicon: assets/favicon.svg
   # site-url active la génération automatique de sitemap.xml (référencement)
   site-url: "https://pierrebeaucoral.github.io/dashboard-france-ouvert"
   # Aperçu riche quand le lien est partagé sur réseaux sociaux / messageries
@@ -55,6 +61,12 @@ website:
             text: Mobilité
           - href: pages/agriculture.qmd
             text: Agriculture bio
+          - href: pages/logement.qmd
+            text: Logement
+          - href: pages/risques.qmd
+            text: Risques et sols
+          - href: pages/services.qmd
+            text: Services et numérique
       - text: Analyse
         menu:
           - href: pages/bivariate.qmd
@@ -65,8 +77,12 @@ website:
             text: Classements · top / bottom
           - href: pages/profil.qmd
             text: Profil commune · radar 8D
+          - href: pages/semblables.qmd
+            text: Communes semblables
           - href: pages/departements.qmd
             text: Départements · small multiples
+          - href: pages/constellation.qmd
+            text: Constellation · carte, population, nuage
       - text: Méthodologie
         menu:
           - href: docs/data-sources.qmd
@@ -81,9 +97,12 @@ website:
 
 format:
   html:
+    # tokens.scss (couleurs, source unique, lue aussi par R/theme.R). Quarto empile les
+    # couches `defaults` en ordre inverse : tokens.scss, listé en dernier, passe donc en premier.
     theme:
       - cosmo
       - styles/custom.scss
+      - styles/tokens.scss
     toc: false
     code-fold: true
     code-tools: false
@@ -92,7 +111,11 @@ format:
     smooth-scroll: true
     # Partage d'URL par commune (#codeINSEE) — pages index + docs (format html).
     # Les pages thématiques (format: dashboard) ont le même include dans leur
-    # frontmatter : le format dashboard ne fusionne pas cette clé au niveau projet.
+    # frontmatter : le format dashboard ne fusionne pas cette clé au niveau projet (et une clé
+    # `dashboard:` ici ferait rendre index/docs une 2e fois en dashboard, d'où une collision).
+    # Applique le thème mémorisé (clé fo-theme, cf. assets/theme.js) avant le premier rendu : pas de flash.
+    include-in-header:
+      - _includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
 

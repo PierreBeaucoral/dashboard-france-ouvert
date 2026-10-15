@@ -1,7 +1,10 @@
 ---
-title: "Agriculture · bio"
+title: "Agriculture biologique"
+subtitle: "Surfaces et exploitations, Agence Bio 2024"
 format:
   dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
     orientation: rows
@@ -17,13 +20,6 @@ source(here::here("R", "setup_dashboard.R"))
 ```
 
 ```{r}
-#| label: inject-commune-names
-#| results: asis
-#| echo: false
-emit_commune_names_js()
-```
-
-```{r}
 #| label: inject-bio-data
 #| results: asis
 #| echo: false
@@ -36,41 +32,15 @@ if (bio_ready) {
       nex    = bio_n_exploit,
       nop    = bio_n_operateurs
     )
-  bio_json <- jsonlite::toJSON(bio_for_js, auto_unbox = TRUE, na = "null")
-  pal_js   <- jsonlite::toJSON(c("#F5F2EC", "#D9E0B4", "#A8B870",
-                                 "#7A8740", "#3D4A1F"))
+  emit_table("bioData", bio_for_js)
   cat('<script>\n',
-      'window.bioRaw = ', as.character(bio_json), ';\n',
-      'window.bioPalette = ', as.character(pal_js), ';\n',
-      'window.bioData = {};\n',
-      'window.bioRaw.forEach(function(r) { window.bioData[r.code] = r; });\n',
-      'window.bioFieldMap = { bio_surface_ha:"surf", bio_n_operateurs:"nop", bio_n_exploit:"nex" };\n',
-      'window.bioBreaks = {};\n',
-      'Object.keys(window.bioFieldMap).forEach(function(field) {\n',
-      '  var key = window.bioFieldMap[field];\n',
-      '  var vals = window.bioRaw.map(function(r) { return r[key]; })\n',
-      '             .filter(function(v) { return v != null && isFinite(v) && v >= 0; })\n',
-      '             .sort(function(a,b){return a-b;});\n',
-      '  var logVals = vals.map(function(v) { return Math.log1p(v); });\n',
-      '  var n = logVals.length;\n',
-      '  var qLog = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return logVals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
-      '  window.bioBreaks[field] = qLog.map(function(q) { return Math.expm1(q); });\n',
-      '});\n',
-      'window.bioColorFor = function(v, field) {\n',
-      '  if (v == null) return "#E8E4DC";\n',
-      '  var br = window.bioBreaks[field];\n',
-      '  for (var i = 1; i < 5; i++) { if (v < br[i]) return window.bioPalette[i-1]; }\n',
-      '  return window.bioPalette[4];\n',
-      '};\n',
+      'window.bioPalette = ', as.character(jsonlite::toJSON(PAL$green)), ';\n',
+      'window.bioFields = ', '{"bio_surface_ha": {"key": "surf", "title": "Surface bio, ha (échelle log)", "unit": "ha", "digits": 0, "scale": "log_quantile", "na": "Aucune surface bio déclarée"}, "bio_n_operateurs": {"key": "nop", "title": "Opérateurs bio (échelle log)", "unit": "", "digits": 0, "scale": "log_quantile", "na": "Aucun opérateur"}, "bio_n_exploit": {"key": "nex", "title": "Exploitations bio (échelle log)", "unit": "", "digits": 0, "scale": "log_quantile", "na": "Aucune exploitation"}}', ';\n',
       'window.bioRecolor = function(field) {\n',
-      '  if (!window.bioMap) return;\n',
-      '  var key = window.bioFieldMap[field];\n',
-      '  window.bioMap.eachLayer(function(layer) {\n',
-      '    if (!layer.options || !layer.options.layerId) return;\n',
-      '    var ent = window.bioData[layer.options.layerId];\n',
-      '    var v = ent ? ent[key] : null;\n',
-      '    layer.setStyle({ fillColor: window.bioColorFor(v, field), fillOpacity: (v != null ? 0.85 : 0.25) });\n',
-      '  });\n',
+      '  var f = window.bioFields[field];\n',
+      '  CMap.recolor({ get: function (c) { var r = window.bioData[c]; return r ? r[f.key] : null; },\n',
+      '    scale: f.scale, palette: window.bioPalette,\n',
+      '    legend: { title: f.title, unit: f.unit, digits: f.digits, naLabel: f.na } });\n',
       '};\n',
       'window.updateBioPanel = function(code) {\n',
       '  var el = document.getElementById("bio-content");\n',
@@ -98,9 +68,9 @@ if (bio_ready) {
 ```
 
 
-## Row {height="82%"}
+## Row {height="77%"}
 
-::: {.card title="Agriculture biologique · surface, opérateurs, exploitations" width="72%"}
+::: {.card title="Agriculture biologique par commune" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
@@ -117,52 +87,17 @@ if (bio_ready) {
 ```{r}
 #| label: map-bio
 if (bio_ready) {
-  vals0 <- bio_data |>
-    dplyr::transmute(code_commune, value = bio_surface_ha)
-  m <- choropleth_socio(com_metro_only, dep_metro, vals0,
-                        palette = c("#F5F2EC", "#D9E0B4", "#A8B870",
-                                    "#7A8740", "#3D4A1F"),
-                        legend_title = "Surface bio (ha, échelle log)",
-                        value_unit   = "ha",
-                        value_fmt    = function(x) format(round(x), big.mark = " "),
-                        scale        = "log_quantile")
-  m |>
-    htmlwidgets::onRender(
-      "function(el, x) {
-         window.bioMap = this;
-         var self = this;
-         this.on('click', function(e) {
-           if (e.layer && e.layer.options && e.layer.options.layerId) {
-             if (window.updateBioPanel) window.updateBioPanel(e.layer.options.layerId);
-           }
-         });
-         function attach() {
-           self.eachLayer(function(layer) {
-             if (layer.options && layer.options.layerId && !layer._bioClickOn) {
-               layer._bioClickOn = true;
-               layer.on('click', function(e) {
-                 if (window.updateBioPanel) window.updateBioPanel(e.target.options.layerId);
-               });
-             }
-           });
-         }
-         setTimeout(attach, 60);
-         setTimeout(attach, 500);
-         setTimeout(attach, 2000);
-         self.on('layeradd', function() { setTimeout(attach, 0); });
-         function onChange() {
-           var sel = document.querySelector('input[name=bio-ind]:checked');
-           if (sel && window.bioRecolor) window.bioRecolor(sel.value);
-         }
-         setTimeout(function() {
-           document.querySelectorAll('input[name=bio-ind]').forEach(function(r) {
-             r.addEventListener('change', onChange);
-           });
-         }, 300);
-       }"
-    )
+  vals0 <- bio_data |> dplyr::transmute(code_commune, value = bio_surface_ha)
+  st_bio <- cmap_breaks(vals0$value[vals0$code_commune %in% com_metro_only$code], "log_quantile")
+  m <- cmap_choropleth(com_metro_only, dep_metro, vals0, palette = PAL$green,
+                       legend_title = "Surface bio, ha (échelle log)", unit = "ha", digits = 0L,
+                       scale = "log_quantile", breaks = st_bio, na_label = "Aucune surface bio déclarée")
+  cmap_on_render(m, cmap_page_hooks(
+    "bio", "updateBioPanel", "bio-content", "bio-ind", "bioRecolor", "bio_surface_ha",
+    ctx = list(ctx_spec("bio_surface_ha", "Surface bio", "ha", 0L), ctx_spec("bio_n_operateurs", "Opérateurs bio", "", 0L),
+               ctx_spec("bio_n_exploit", "Exploitations bio", "", 0L))))
 } else {
-  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>Agence Bio non chargée.</p>")
+  htmltools::HTML("<p class='js-loading'>Agence Bio non chargé.</p>")
 }
 ```
 :::
@@ -184,44 +119,42 @@ if (bio_ready) {
 ```
 :::
 
-## Row {height="18%" .fill}
+## Row {height="23%" .drom-row}
 
 ```{r}
-#| label: drom-bio-prep
+#| label: drom-prep
 #| include: false
 if (bio_ready) {
-  bio_drom_vals <- bio_data |>
-    dplyr::transmute(code_commune, value = bio_surface_ha)
-  .bio_drom_palette <- c("#F5F2EC", "#D9E0B4", "#A8B870", "#7A8740", "#3D4A1F")
+  drom_vals <- bio_data |> dplyr::transmute(code_commune, value = bio_surface_ha)
 }
 ```
 
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
-if (bio_ready) choropleth_drom_socio_inset(com_drom_only, "971", bio_drom_vals, palette = .bio_drom_palette, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "971")
+if (bio_ready) cmap_inset(com_drom_only, "971", drom_vals, PAL$green, st_bio) else if (data_ready) drom_inset(dep_drom, "971")
 ```
 :::
 
 ::: {.card title="Martinique (972)"}
 ```{r}
-if (bio_ready) choropleth_drom_socio_inset(com_drom_only, "972", bio_drom_vals, palette = .bio_drom_palette, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "972")
+if (bio_ready) cmap_inset(com_drom_only, "972", drom_vals, PAL$green, st_bio) else if (data_ready) drom_inset(dep_drom, "972")
 ```
 :::
 
 ::: {.card title="Guyane (973)"}
 ```{r}
-if (bio_ready) choropleth_drom_socio_inset(com_drom_only, "973", bio_drom_vals, palette = .bio_drom_palette, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "973")
+if (bio_ready) cmap_inset(com_drom_only, "973", drom_vals, PAL$green, st_bio) else if (data_ready) drom_inset(dep_drom, "973")
 ```
 :::
 
 ::: {.card title="La Réunion (974)"}
 ```{r}
-if (bio_ready) choropleth_drom_socio_inset(com_drom_only, "974", bio_drom_vals, palette = .bio_drom_palette, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "974")
+if (bio_ready) cmap_inset(com_drom_only, "974", drom_vals, PAL$green, st_bio) else if (data_ready) drom_inset(dep_drom, "974")
 ```
 :::
 
 ::: {.card title="Mayotte (976)"}
 ```{r}
-if (bio_ready) choropleth_drom_socio_inset(com_drom_only, "976", bio_drom_vals, palette = .bio_drom_palette, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "976")
+if (bio_ready) cmap_inset(com_drom_only, "976", drom_vals, PAL$green, st_bio) else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::

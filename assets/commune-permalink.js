@@ -20,7 +20,8 @@
   var PANEL_FNS = [
     "updateSecPanel", "updateRevPanel", "updateFinPanel", "updateSantePanel",
     "updateDemoPanel", "updateCarbPanel", "updateMobPanel", "updateBioPanel",
-    "updateDvfPanel", "updateAirPanel", "updateMunPanel", "updateCommunePanel"
+    "updateDvfPanel", "updateAirPanel", "updateMunPanel", "updateCommunePanel",
+    "updateLogPanel", "updateRiskPanel", "updateSvcPanel"
   ];
 
   // Code INSEE : 5 caractères, dépt 01-95 / 2A-2B / 97x, ex. 69123, 2A004, 97411.
@@ -57,6 +58,15 @@
     var name = panelFnName();
     if (!name) return;
     try { window[name](code); } catch (e) {}
+    // Surbrillance + centrage sur la carte principale (cmap.js), si présente.
+    try {
+      var m = window.CMap && CMap.main;
+      if (m && m._cmapLayers && m._cmapLayers[code]) {
+        CMap.select(m, code, false);
+        m._userMoved = true;
+        m.fitBounds(m._cmapLayers[code].getBounds().pad(4), { maxZoom: 10, animate: false });
+      }
+    } catch (e) {}
   }
 
   function boot() {

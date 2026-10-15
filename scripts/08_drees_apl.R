@@ -87,6 +87,13 @@ parse_apl <- function(spec) {
 message("→ Lecture des 5 fichiers APL 2023...")
 parsed_list <- purrr::map(pros, parse_apl)
 
+# Garde (audit N1) : ces 5 XLSX (feuille « APL 2023 ») ne sont PAS téléchargés par ce script ; les
+# anciennes ressources data.gouv n'existent plus et la nouvelle édition (juillet 2026) a une autre
+# mise en page. Sans fichier, on s'arrête AVANT d'écrire, plutôt que d'écraser apl_medecins.parquet.
+# Script hors du refresh automatique : à relancer à la main quand les fichiers sont déposés dans data/raw/drees/.
+if (length(purrr::compact(parsed_list)) == 0L)
+  stop("08_drees_apl.R : aucun fichier APL dans ", raw_dir, " (source non téléchargeable automatiquement)")
+
 # Réduit par left_join sur code_commune
 combined <- purrr::reduce(
   purrr::compact(parsed_list),

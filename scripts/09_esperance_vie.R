@@ -1,107 +1,71 @@
 # ============================================================
 # scripts/09_esperance_vie.R
 #
-# Bloc F (Santé suite) — Espérance de vie à la naissance par commune.
+# Bloc F (Santé suite) — Espérance de vie à la naissance, NIVEAU DÉPARTEMENT.
 #
-# Source : data.gouv.fr "2024 : Espérance de vie par régions,
-# départements et villes" — INSEE.
+# Source : INSEE, "Espérance de vie en 2025 — comparaisons régionales et
+# départementales" (https://www.insee.fr/fr/statistiques/2012749,
+# fichier TCRD_050.xlsx ; État civil + estimations de population, provisoire).
+# Hommes et femmes séparément, par département (96 + 5 DROM).
 #
-# Format source : 1 col "Région-Département-Ville" + 1 col valeur années.
-# 1 680 communes (principales). Pas de code INSEE → join par (nom_commune,
-# libelle_dept) normalisé contre le référentiel des populations INSEE.
+# REMPLACE l'ancienne source (jeu data.gouv "Espérance de vie par régions,
+# départements et villes", 1 371 communes) : ses valeurs allaient de 11 à
+# 105 ans (ce n'était pas une espérance de vie) -> abandonnée (2026-10-14).
 #
-# Caveat : médiane nationale ~83 ans cohérente, mais variance brute par
-# commune (1-2 décès dominent une petite commune). À interpréter avec
-# prudence sur les très petites populations.
+# L'INSEE ne publie PAS d'espérance de vie communale fiable. Chaque commune
+# reçoit donc la valeur de son département ; la colonne `esperance_vie_niveau`
+# = "departement" l'indique. Les cartes montrent donc un aplat départemental.
 #
-# Sortie : data/processed/insee_extra/esperance_vie.parquet
-#   (code_commune, esperance_vie, nom_commune, libelle_dept)
+# esperance_vie = moyenne simple hommes/femmes (approximation de l'ensemble
+# des sexes : l'INSEE ne publie que H et F ; écart < 0,1 an vs pondérée).
+#
+# Sorties (data/processed/insee_extra/) :
+#   esperance_vie_dept.parquet : 1 ligne / département
+#   esperance_vie.parquet      : 1 ligne / commune (valeur du département)
 # ============================================================
 
 suppressPackageStartupMessages({
-  library(dplyr)
-  library(tidyr)
-  library(arrow)
-  library(here)
-  library(readr)
-  library(stringr)
-  library(glue)
+  library(dplyr); library(arrow); library(here); library(readxl)
+  library(curl); library(glue)
 })
 
-raw_path  <- here::here("data", "raw", "insee_extra", "esperance_vie.csv")
-out_dir   <- here::here("data", "processed", "insee_extra")
-out_path  <- file.path(out_dir, "esperance_vie.parquet")
+URL <- "https://www.insee.fr/fr/statistiques/fichier/2012749/TCRD_050.xlsx"
+raw_path <- here::here("data", "raw", "insee_extra", "TCRD_050.xlsx")
+out_dir  <- here::here("data", "processed", "insee_extra")
+dir.create(dirname(raw_path), recursive = TRUE, showWarnings = FALSE)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
-
-ev <- readr::read_csv(raw_path, show_col_types = FALSE)
-names(ev) <- c("hierarchie", "esperance_vie")
-
-# Parser "Région - Département - Ville"
-ev_parsed <- ev |>
-  tidyr::separate(hierarchie, into = c("region", "dept", "ville"),
-                  sep = " - ", fill = "right", remove = FALSE) |>
-  dplyr::mutate(
-    niveau = dplyr::case_when(
-      is.na(dept)  ~ "region",
-      is.na(ville) ~ "departement",
-      TRUE         ~ "commune"
-    )
-  )
-
-# Garde commune-level pour le join
-ev_commune <- ev_parsed |>
-  dplyr::filter(niveau == "commune") |>
-  dplyr::select(region, dept_src = dept, nom_src = ville, esperance_vie)
-
-# ---- Normalisation pour join (case + accents + espaces) ----
-normalize <- function(s) {
-  s |>
-    stringr::str_to_lower() |>
-    stringr::str_trim() |>
-    iconv(to = "ASCII//TRANSLIT", from = "UTF-8") |>
-    stringr::str_remove_all("[\\'\\\"^]") |>
-    stringr::str_replace_all("\\s+", " ")
+if (!file.exists(raw_path)) {
+  h <- curl::new_handle(useragent = "Mozilla/5.0")
+  curl::curl_download(URL, raw_path, handle = h, quiet = TRUE)
 }
 
-# Référentiel : combinaison nom commune + nom dept depuis les élections
-# (= seule source qui a les deux noms harmonisés à l'INSEE et code_insee)
-elec_path <- here::here("data", "processed", "elections",
-                        "legislatives_2024_t2.parquet")
-ref <- arrow::read_parquet(elec_path) |>
-  dplyr::transmute(
-    code_commune = code_insee,
-    key = paste(normalize(nom_commune), normalize(libelle_dept), sep = "|")
-  ) |>
-  dplyr::distinct(key, .keep_all = TRUE)
+# Feuille 1 = départements : col1 code, col2 libellé, col3 H, col4 F
+raw <- readxl::read_excel(raw_path, sheet = 1, col_names = FALSE,
+                          .name_repair = "minimal")
+dept <- as.data.frame(raw)[, 1:4] |>
+  stats::setNames(c("code_dept", "libelle_dept", "ev_h", "ev_f")) |>
+  dplyr::filter(grepl("^(\\d{2}|2A|2B|\\d{3})$", code_dept)) |>
+  dplyr::mutate(
+    ev_h = as.numeric(ev_h), ev_f = as.numeric(ev_f),
+    esperance_vie = (ev_h + ev_f) / 2,
+    esperance_vie_niveau = "departement",
+    annee_ev = 2025L
+  )
+stopifnot(nrow(dept) >= 100, !anyNA(dept$esperance_vie),
+          all(dept$esperance_vie > 70 & dept$esperance_vie < 95))
+arrow::write_parquet(dept, file.path(out_dir, "esperance_vie_dept.parquet"))
 
-ev_commune <- ev_commune |>
-  dplyr::mutate(key = paste(normalize(nom_src), normalize(dept_src), sep = "|"))
+# Attribution aux communes via le département (grille densité INSEE, 1 ligne / commune)
+com <- arrow::read_parquet(here::here("data", "processed", "insee_densite",
+                                      "grille_densite.parquet")) |>
+  dplyr::select(code_commune, code_dept)
+out <- com |>
+  dplyr::inner_join(dplyr::select(dept, code_dept, esperance_vie,
+                                  esperance_vie_h = ev_h, esperance_vie_f = ev_f,
+                                  esperance_vie_niveau, annee_ev),
+                    by = "code_dept")
+arrow::write_parquet(out, file.path(out_dir, "esperance_vie.parquet"))
 
-joined <- ev_commune |>
-  dplyr::left_join(ref, by = "key")
-
-match_rate <- sum(!is.na(joined$code_commune)) / nrow(joined)
-message(glue::glue("Match : {sum(!is.na(joined$code_commune))} / {nrow(joined)} ",
-                   "({round(match_rate*100,1)}%)"))
-
-# Sortie : 1 ligne / commune matchée
-out <- joined |>
-  dplyr::filter(!is.na(code_commune)) |>
-  dplyr::transmute(
-    code_commune,
-    esperance_vie = as.numeric(esperance_vie),
-    nom_src,
-    dept_src,
-    region
-  ) |>
-  dplyr::distinct(code_commune, .keep_all = TRUE)
-
-arrow::write_parquet(out, out_path)
-
-cat(glue::glue("
-
-  ✔ {nrow(out)} communes matchées sur {nrow(ev_commune)} ({round(100*nrow(out)/nrow(ev_commune),1)}%) → {out_path}
-
-  Distribution espérance de vie (années) :
-"))
-print(summary(out$esperance_vie))
+message(glue::glue("✔ {nrow(dept)} départements ; {nrow(out)}/{nrow(com)} communes ",
+                   "(valeur du département)"))
+print(summary(dept$esperance_vie))

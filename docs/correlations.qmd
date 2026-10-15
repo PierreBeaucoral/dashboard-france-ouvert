@@ -2,6 +2,12 @@
 title: "Note sur les corrélations"
 ---
 
+```{r}
+#| include: false
+source(here::here("R", "site_numbers.R"))
+```
+
+
 ::: {.callout-warning}
 **Corrélation n'est pas causalité.** Ce dashboard montre des associations
 descriptives au niveau communal. Aucun lien causal n'est établi.
@@ -9,11 +15,11 @@ descriptives au niveau communal. Aucun lien causal n'est établi.
 
 ## Le constat
 
-49 indicateurs croisables × 35 000 communes = environ 1 200 paires possibles,
+`r site$indicateurs` indicateurs croisables × `r site$communes` communes = `r site$paires` paires possibles,
 soit autant de coefficients de corrélation calculés. La page **Explorer**
 affiche ces paires sous trois angles :
 
-- Une **heatmap 49 × 49** triée par thématique (vue d'ensemble).
+- Une **heatmap** de tous les indicateurs, triée par thématique (vue d'ensemble).
 - Un **top 25 inter-thématiques** ordonné par |ρ| (vue ranking).
 - Un **scatter interactif** avec courbe LOESS et ρ live (vue zoom).
 
@@ -24,25 +30,29 @@ choroplèthe 3 × 3 terciles** (Stevens 2015) — 9 classes par paire,
 
 ## Granularité par source
 
-Les 13 sources n'ont pas la même maille native :
+Les `r site$sources` sources n'ont pas la même maille native :
 
 | Sujet | Maille native | Couverture | Date |
 |---|---|---|---|
-| Élections législatives | Commune (~35 000) | Quasi-totale | 2024 T2 (+ T1 fallback) |
+| Élections législatives | Commune (~35 000) | Quasi-totale ; parts de vote = 1er tour (% exprimés, RN = RN + UXD + EXD) | 2024 T1 (vainqueur : T2) |
 | Municipales 2026 | Commune ≥ 1 000 hab. (~3 300) | Scrutin liste uniquement | 2026 T1+T2 |
 | DVF immobilier | Commune (~35 000) | Variable selon N transactions | 2021-2024 |
 | Atmo qualité air | **Station** (~700) → commune | Inégale, urbaine | 30 j glissants |
-| SSMSI sécurité | Commune (~18 000 après secret) | Secret stat < 5 faits / 3 ans | 2025 |
-| BAAC accidents | Commune (~11 000) | Communes avec ≥ 1 accident | 2024 |
+| SSMSI sécurité | Commune (11 000 à 31 000 selon indicateur ; total : ~700) | Secret stat : 1 à 4 faits non diffusés | 2025 |
+| BAAC accidents | Commune (~35 000) | Toutes ; 0 = aucun accident | 2024 |
 | DGFiP finances | Commune (~35 000) | Quasi-totale | 2024 |
 | APL DREES santé | Commune (~35 000) | Quasi-totale | 2023 |
-| Espérance de vie INSEE | Commune (~28 000) | 81,6% match nom + dept | 2024 |
+| Espérance de vie INSEE | **Département** (101), recopié sur les communes | Aplat départemental | 2025 |
 | FiLoSoFi revenus | Commune (~30 000) | Secret stat | 2021 |
 | INSEE populations | Commune (~35 000) | Quasi-totale | 2017-2021 |
 | INSEE grille densité | Commune (~35 000) | Quasi-totale | 2024 |
-| DARES DEFM chômage | Commune (~7 400) | Limitée | 1 trimestre |
+| DARES DEFM chômage | Commune (~34 900) | Quasi complète | 2024-T4 |
 | RARE/CITEPA carbone | Commune (~34 800) | Quasi-totale | 2018 (EXIOBASE) |
-| INSEE MOBPRO mobilité | Commune (~34 800) | Quasi-totale | RP 2019 |
+| INSEE MOBPRO mobilité | Commune (~34 800) | Quasi-totale | RP 2022 |
+| ORE énergie résidentielle | Commune (~34 800) ; gaz ~9 300 | Cellules masquées (secret) | 2024 |
+| CAF RSA et aides au logement | Commune (~10 000 affichées) | Population ≥ 1 000 | 2024-12 |
+| DPE (part F/G) | Commune (~22 400) | ≥ 30 diagnostics, non représentatif | depuis 07/2021 |
+| FiLoSoFi 2023 | Commune (~30 800 ; pauvreté ~5 200) | Secret stat | 2023 (non comparable à 2021) |
 | Agence Bio agriculture | Commune (~23 000) | Communes avec bio uniquement | 2024 |
 
 **Conséquence pratique.** Une corrélation entre deux variables de couvertures
@@ -173,7 +183,7 @@ forte délinquance que 99% des communes", pas "plus dangereuse".
 
 - **Snapshot temporel décalé.** Les croisements impliquent une comparaison
   *dernière observation contre dernière observation*. Sources les plus
-  anciennes : MOBPRO 2019 et carbone EXIOBASE 2018.
+  anciennes : carbone EXIOBASE 2018 et FiLoSoFi 2021.
 - **Couverture air très inégale** géographiquement (urbain surdoté, rural
   sous-couvert).
 - **Petites communes** : les médianes DVF avec N < 5 sont grisées ; les

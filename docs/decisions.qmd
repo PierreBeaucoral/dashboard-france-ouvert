@@ -3,6 +3,12 @@ title: "Décisions méthodologiques"
 subtitle: "Toutes les règles structurantes du dashboard, classées par catégorie."
 ---
 
+```{r}
+#| include: false
+source(here::here("R", "site_numbers.R"))
+```
+
+
 ```{=html}
 <style>
 .cat-bar {
@@ -120,7 +126,7 @@ subtitle: "Toutes les règles structurantes du dashboard, classées par catégor
 <div class="cat-bar">
   <a href="#architecture"><span class="ico">🏗️</span><span class="lbl">Architecture</span><span class="cnt">stack, hébergement, layout</span></a>
   <a href="#cartographie"><span class="ico">🗺️</span><span class="lbl">Cartographie</span><span class="cnt">palettes, DROM, PLM, légendes</span></a>
-  <a href="#donnees"><span class="ico">📊</span><span class="lbl">Données par source</span><span class="cnt">13 sources, filtres métier</span></a>
+  <a href="#donnees"><span class="ico">📊</span><span class="lbl">Données par source</span><span class="cnt">sources, filtres métier, vague 2</span></a>
   <a href="#analyse"><span class="ico">🔬</span><span class="lbl">Analyse</span><span class="cnt">stratification, métriques</span></a>
   <a href="#visualisations"><span class="ico">📈</span><span class="lbl">Visualisations</span><span class="cnt">radar, Sankey, multiples</span></a>
 </div>
@@ -214,7 +220,7 @@ Palettes, encodages, gestion des cas particuliers (PLM, DROM, légendes dynamiqu
 ## 📊 Données par source {#donnees .cat-section-title}
 
 ::: {.cat-section-sub}
-Une décision par source : règles métier, filtres, snapshots. 13 sources au total.
+Une décision par source : règles métier, filtres, snapshots. `r site$sources` sources au total.
 :::
 
 ```{=html}
@@ -242,7 +248,7 @@ Une décision par source : règles métier, filtres, snapshots. 13 sources au to
 
 <div class="decision cat-data">
   <h3>📥 DVF Immobilier — filtres standards</h3>
-  <div class="meta">DGFiP · 655 000 ventes 2021-2024</div>
+  <div class="meta">DGFiP · 3,98 M ventes mono-locaux agrégées, 2021-2025 (2025 provisoire)</div>
   <div class="rule"><strong>Filtres</strong> :
     <ul>
       <li><code>nature_mutation = "Vente"</code></li>
@@ -268,15 +274,16 @@ Une décision par source : règles métier, filtres, snapshots. 13 sources au to
 
 <div class="decision cat-data">
   <h3>📥 SSMSI Délinquance — secret statistique</h3>
-  <div class="meta">SSMSI 2025 · ~18 000 communes après secret</div>
-  <div class="rule">8 indicateurs ‰ habitants : cambriolages, vols personnes, vols véhicules, violences sexuelles, dégradations, trafic stup, usage stup, total.</div>
-  <div class="rule">Secret stat : taux non publié si &lt; 5 faits cumulés sur 3 ans → ~17 000 communes (les plus petites) sont en gris "non publié". Échelle log_quantile sur la carte (distribution très skewée).</div>
+  <div class="meta">SSMSI 2025 · 11 000 à 31 000 communes selon l'indicateur · 685 pour le total</div>
+  <div class="rule">13 indicateurs (‰ habitants, sauf <strong>cambriolages : ‰ logements</strong>, dénominateur <code>insee_log</code> de la base SSMSI) (violences intra/hors famille, sexuelles, vols avec armes / violents / sans violence, cambriolages, vols de véhicules / dans / accessoires, dégradations, trafic, usage de stupéfiants) + total.</div>
+  <div class="rule">Secret statistique (règle SSMSI) : un décompte n'est diffusé que s'il vaut <strong>0 ou ≥ 5</strong> ; 1 à 4 faits = « non diffusé » = <strong>NA</strong> (jamais 0). Un 0 diffusé est un vrai zéro, mais dans les petites communes seuls les zéros sont visibles (biais de sélection : l'absence de valeur n'est pas « peu de délinquance »).</div>
+  <div class="rule"><strong>Total ‰ habitants</strong> = Σ des <em>effectifs</em> des 13 composantes ÷ population × 1 000 (les taux ne sont pas additionnés : le dénominateur des cambriolages diffère ; unités de compte mixtes : victimes, infractions, mis en cause), <strong>NA dès qu'une composante est non diffusée</strong> (<code>del_n_publies</code> donne le nombre de composantes publiées). Il n'existe donc que pour ~685 communes, les plus grandes.</div>
 </div>
 
 <div class="decision cat-data">
   <h3>📥 BAAC Accidents — taux ‰ habitants</h3>
-  <div class="meta">Min. Intérieur · 11 099 communes · 2024</div>
-  <div class="rule">Compte d'accidents corporels par commune, normalisé en ‰ habitants (joint avec <code>pop_latest</code>).</div>
+  <div class="meta">Min. Intérieur · 34 920 communes (dont ~11 200 avec ≥ 1 accident) · 2024</div>
+  <div class="rule">Compte d'accidents corporels par commune, normalisé en ‰ habitants (<code>acc_taux_pop</code> = accidents / <code>pop_latest</code> × 1000, seule définition). Les communes sans accident valent <strong>0</strong>, pas NA.</div>
 </div>
 
 <div class="decision cat-data">
@@ -294,8 +301,8 @@ Une décision par source : règles métier, filtres, snapshots. 13 sources au to
 
 <div class="decision cat-data">
   <h3>📥 Espérance de vie INSEE — join par nom</h3>
-  <div class="meta">INSEE · ~28 000 communes · 2024</div>
-  <div class="rule">INSEE-EV ne publie pas le code commune. Join par nom commune + département normalisé → 81,6% taux de match. Ajouté à la page Santé.</div>
+  <div class="meta">INSEE · niveau DÉPARTEMENT (101 départements) · 2025 provisoire</div>
+  <div class="rule">L'INSEE ne publie pas d'espérance de vie communale. La variable <code>esperance_vie</code> est celle du département, recopiée sur chaque commune (<code>esperance_vie_niveau</code> = « departement »). Moyenne simple hommes/femmes (74,7 à 85,4 ans).</div>
 </div>
 
 <div class="decision cat-data">
@@ -328,20 +335,20 @@ Une décision par source : règles métier, filtres, snapshots. 13 sources au to
     <ol>
       <li>Rural non périurbain</li>
       <li>Rural périurbain</li>
+      <li>Ceintures urbaines</li>
       <li>Petites villes</li>
       <li>Centres urbains intermédiaires</li>
-      <li>Ceintures urbaines</li>
       <li>Grands centres urbains</li>
     </ol>
   </div>
-  <div class="rule">Mappée en palette catégorielle (page Démographie). Sert aussi de variable continue <code>densite_rang</code> (1-6) dans Explorer + Bivariée.</div>
+  <div class="rule">Mappée en palette catégorielle (page Démographie). Sert aussi de variable continue <code>densite_rang</code> (1 = rural non périurbain … 6 = grands centres urbains) dans Explorer + Bivariée. Les deux classes intermédiaires sont ordonnées par population médiane croissante ; le test monotone est dans <code>scripts/99_validate_data.R</code>.</div>
 </div>
 
 <div class="decision cat-data">
   <h3>📥 DARES Chômage DEFM A+B+C</h3>
-  <div class="meta">DARES · ~7 400 communes · 1 trimestre</div>
+  <div class="meta">DARES · 34 910 communes · 2024-T4 (moyenne trimestrielle, données brutes)</div>
   <div class="rule">Demandeurs d'Emploi en Fin de Mois cat. A+B+C. Normalisé en taux ‰ habitants via <code>defm_abc / pop_latest * 1000</code>.</div>
-  <div class="rule">Couverture limitée : ~7 400 communes seulement (DARES ne publie pas pour toutes les petites).</div>
+  <div class="rule">[2026-10-15] Decision : passage du fichier 2020-T4 déposé à la main (7 439 communes) au jeu officiel « Inscrits à France Travail, données communales » 2024-T4. Lignes agrégées (« Total France »…) et lignes ville PLM (= somme des arrondissements) écartées ; codes ramenés au COG 2026. Contrôles : somme des communes 5 563 980 vs ligne « Total France » 5 565 440 (−0,03 %) ; départements vs notes DREETS 2024-T4 (Marne +0,3 %, Moselle −0,3 %, Hauts-de-France +0,5 %, Bourgogne-Franche-Comté +0,5 %). Effectifs arrondis à 5 par la DARES : taux masqué sous 100 habitants (erreur d'arrondi ≥ ±25 ‰ pour une médiane de ~60 ‰ ; 3 382 communes), effectif conservé. Alternatives rejetées : garder 2020-T4 (couverture 21 %, millésime ancien) ; lissage bayésien (pas d'erreur de sondage ici, seulement de l'arrondi).</div>
 </div>
 
 <div class="decision cat-data">
@@ -353,8 +360,8 @@ Une décision par source : règles métier, filtres, snapshots. 13 sources au to
 </div>
 
 <div class="decision cat-data">
-  <h3>📥 INSEE MOBPRO — codes TRANS RP 2019</h3>
-  <div class="meta">INSEE · ~34 800 communes · RP 2019</div>
+  <h3>📥 INSEE MOBPRO — codes TRANS (RP 2019 puis RP 2022)</h3>
+  <div class="meta">INSEE · ~34 800 communes · RP 2022 (codes TRANS identiques au RP 2019)</div>
   <div class="rule">⚠️ <strong>INSEE a révisé le codage TRANS au RP 2017+</strong>. Codes actuels :
     <ul>
       <li><code>1</code> Pas de transport</li>
@@ -493,8 +500,8 @@ mieux vaut pas d'indicateur qu'un indicateur faux).
   <h3>Sources figées par une limite amont (refresh manuel)</h3>
   <div class="rule">
     <ul>
-      <li><strong>DEFM chômage</strong> : la DARES publie le fichier communal sans URL stable réutilisable (export depuis leur portail). Le millésime affiché dépend du CSV déposé manuellement dans <code>data/raw/dares/</code>.</li>
-      <li><strong>MOBPRO mobilité</strong> : dernier <em>fichier détail</em> commune × commune diffusé par l'INSEE = RP 2019 (décalage usuel ~3 ans). Pas de millésime plus récent au format détail à la date du build.</li>
+      <li><strong>DEFM chômage</strong> : le script 10 télécharge désormais le jeu officiel DARES (« Inscrits à France Travail, données communales », data.gouv.fr). Ce jeu donne 2024-T4 sur 34 917 communes (valeurs arrondies à 5) ; adopté le 2026-10-15 (voir la carte DARES ci-dessus), lignes agrégées écartées.</li>
+      <li><strong>MOBPRO mobilité</strong> : le <em>fichier détail</em> commune × commune est passé au RP 2022 le 2026-10-14 (voir « Vague 2 » ci-dessous). Décalage usuel de ~4 ans ; refresh manuel à chaque nouveau millésime INSEE.</li>
       <li><strong>Municipales 2026</strong> : scrutin ponctuel, pas de refresh.</li>
     </ul>
   </div>
@@ -504,9 +511,9 @@ mieux vaut pas d'indicateur qu'un indicateur faux).
   <h3>✗ Complétions tentées puis écartées</h3>
   <div class="alt">
     <ul>
-      <li><strong>Gaz + électricité par commune (bloc G complet)</strong> — Agence ORE publie un CSV de 800 MB ; l'API Tabular data.gouv le rejette et le stream complet est disproportionné pour le gain. Seul le <strong>carbone</strong> (approche conso) est retenu pour le bloc Énergie.</li>
+      <li><strong>Gaz + électricité par commune (bloc G complet)</strong> — <em>rouvert le 2026-10-14</em>, voir « Vague 2 » : les exports agrégés côté serveur de l'Agence ORE suppriment le téléchargement de 800 MB.</li>
       <li><strong>% SAU en bio (bloc K)</strong> — deux pistes rejetées : (1) la SAU Agreste RA2020 republiée par ZABAL est en format long multi-millésimes à couverture partielle (~10 k lignes, non national) ; (2) normaliser la surface bio par l'aire communale donne des ratios > 100 % car l'Agence Bio attribue la surface au <strong>siège de l'opérateur</strong>, pas à la localisation des parcelles — dénominateur et numérateur ne portent pas sur le même territoire. On conserve donc la <strong>surface bio brute</strong> (ha) plutôt qu'un ratio trompeur.</li>
-      <li><strong>Espérance de vie — élargir le match au-delà de 81,6 %</strong> — la source INSEE ne publie que ~1 680 communes principales ; améliorer l'appariement de noms ne lèverait pas ce plafond de couverture. Gain marginal, non poursuivi.</li>
+      <li><strong>Espérance de vie communale (jeu data.gouv « régions, départements et villes », 1 371 communes appariées par nom)</strong> — abandonné le 2026-10-14 : les valeurs allaient de 11 à 105 ans, ce n'était pas une espérance de vie. Remplacé par le niveau département (INSEE).</li>
     </ul>
   </div>
 </div>
@@ -517,8 +524,188 @@ mieux vaut pas d'indicateur qu'un indicateur faux).
 
 ```{=html}
 <ul style="font-size:0.88rem;line-height:1.55;color:#4A4A4A;">
+  <li><strong>2026-10-14 (soir)</strong> — Vague 2 : 10 nouvelles sources, ORE rouvert, Filosofi 2023, DVF 2025 provisoire, MOBPRO 2022 ; pages Logement, Risques et sols, Services et numérique. Détail en fin de page.</li>
+  <li><strong>2026-10-14</strong> — Correctifs de justesse des données (audit dataviz C1-C11), détail ci-dessous.</li>
   <li><strong>2026-05-25</strong> — Décisions initiales : Quarto + leaflet, périmètre métropole+DROM, élections 2024 T2 + T1 fallback, DVF filtres standard, Atmo WFS + EPCI expansion, stratification 4 strates pop INSEE.</li>
   <li><strong>2026-05-26 matin</strong> — Multi-page split GitHub Pages, ajout SSMSI + BAAC, DGFiP, APL 5 pros + EV INSEE, FiLoSoFi, grille densité INSEE 6 levels, DEFM, Municipales 2026 T1+T2. Passage 4 → 5 strates pop INSEE.</li>
   <li><strong>2026-05-26 après-midi</strong> — Blocs G (carbone RARE/CITEPA), I (mobilité MOBPRO 2019), K (Agence Bio). Helper municipales dédié. Fix démographie click+legend, fix DROM resize fitBounds. Viz radar profil, Sankey mobilité, small multiples départements. Codes TRANS RP 2019 documentés post-bug.</li>
 </ul>
+```
+
+## Correctifs de données du 2026-10-14 {.cat-section-title}
+
+```{=html}
+<div class="decision cat-data"><h3>[2026-10-14] C1 · <code>densite_rang</code></h3>
+  <div class="rule"><strong>Decision :</strong> table de correspondance explicite sur les 6 libellés INSEE, 1 = rural non périurbain → 6 = grands centres urbains (ordre intermédiaire fixé par la population médiane).</div>
+  <div class="why"><strong>Rationale :</strong> l'ancienne cascade de regex envoyait « Rural (non) périurbain » vers « urbain » (3) et « Petites villes » vers 7 ; ρ(rang, log pop) = −0,12, désormais +0,47.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> sens inverse (1 = urbain) ; densité de population continue (non disponible dans la grille).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] C2 · Finances DGFiP en €/hab</h3>
+  <div class="rule"><strong>Decision :</strong> <code>fin_recettes/charges/dette/caf/invest/emprunt</code> = colonnes DGFiP préfixées « f » (euros par habitant, vérifié = montant × 1000 / population). Les totaux en k€ sont conservés sous <code>fin_*_total_keur</code>.</div>
+  <div class="why"><strong>Rationale :</strong> l'ancien code lisait les totaux (Paris : 7 745 164 k€) en les étiquetant €/hab ; ρ(recettes, population) = 0,95. Paris = 3 604 €/hab, médiane nationale 921 €/hab.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> recalculer total × 1000 / pop1 (identique, mais redondant avec la colonne source).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] C3 · SSMSI : secret statistique et total</h3>
+  <div class="rule"><strong>Decision :</strong> cellule non diffusée = NA ; total = somme des 13 composantes uniquement si toutes sont diffusées, sinon NA ; colonne <code>del_n_publies</code>. Libellé « Vols de véhicule » (édition 2025) ajouté à la table.</div>
+  <div class="why"><strong>Rationale :</strong> <code>rowSums(na.rm = TRUE)</code> sommait des sous-ensembles différents par commune. Correction du constat de l'audit : les zéros « diffusés » sont de vrais zéros (règle 0 ou ≥ 5) ; le biais vient de la sélection, pas d'un zéro codé à la place d'un NA. Bug supplémentaire corrigé : <code>indicateur</code> est un facteur, l'indexation par ses codes entiers permutait les colonnes (ex. Paris <code>del_vols_pers</code> 5,3 → 45,1 ‰).</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> total sur composantes disponibles (biaisé) ; imputation par la valeur de groupe <code>complement_info</code> (valeur unique pour tous les non-diffusés).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] C4 · BAAC : zéro accident</h3>
+  <div class="rule"><strong>Decision :</strong> le fichier est écrit sur toutes les communes INSEE (COM + arrondissements) ; absence d'accident = 0. Ville PLM = ville + arrondissements. Une seule définition : <code>acc_taux_pop</code>.</div>
+  <div class="why"><strong>Rationale :</strong> les ~23 700 communes sans accident étaient NA, donc le taux ne portait que sur les communes avec ≥ 1 accident (plancher 1/pop).</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> taux lissé bayésien (reporté).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] C5 · Espérance de vie : réparée au niveau département</h3>
+  <div class="rule"><strong>Decision :</strong> source INSEE « Espérance de vie en 2025 » (TCRD_050), département, hommes et femmes ; valeur départementale attribuée à chaque commune avec <code>esperance_vie_niveau</code>.</div>
+  <div class="why"><strong>Rationale :</strong> l'ancienne série (11 à 105 ans) n'était pas une espérance de vie. Les cartes affichent des aplats départementaux : ne pas interpréter les différences intra-départementales.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> retirer la variable (décision de Pierre : réparer) ; inventer des valeurs communales (aucune source INSEE fiable).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] C7 · Paris, Lyon, Marseille</h3>
+  <div class="rule"><strong>Decision :</strong> la géométrie est à l'arrondissement. <code>choropleth_socio*</code> duplique la valeur « ville » (75056, 69123, 13055) sur les arrondissements absents (<code>.plm_expand</code>, affichage seulement). Les populations des 3 villes sont la somme de leurs arrondissements ; DVF, APL, FiLoSoFi, DEFM, publiés par arrondissement, sont consolidés vers la ville dans <code>commune_merged</code> (moyenne pondérée, approximation).</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> fusionner les polygones en 3 villes (ferait perdre le détail des sources par arrondissement).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] C8 · Doublons de population</h3>
+  <div class="rule"><strong>Decision :</strong> pivot sur <code>codgeo</code> seul, libellé de l'année la plus récente. 492 codes dupliqués (communes renommées) → 0 ; <code>commune_merged</code> : 35 232 lignes à l'époque, 34 875 depuis le cadre COG 2026 (audit M1), 1 par commune.</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-14] C10 · Mesure du vote dans l'Explorer</h3>
+  <div class="rule"><strong>Decision :</strong> <code>elec_pct_rn/nfp/ens/lr/divers</code> et l'abstention = parts du <strong>1er tour</strong> (% des exprimés ; famille RN = RN + UXD + EXD). <code>elec_marge</code> reste celle du T2.</div>
+  <div class="why"><strong>Rationale :</strong> les parts T2 dépendent de la configuration du duel et ne sont définies que là où la famille est qualifiée.</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-14] C11 · Départements pondérés</h3>
+  <div class="rule"><strong>Decision :</strong> <code>explorer/departements_agg.parquet</code> : médiane pondérée par la population (prix, revenu, APL, chômage, carbone, voiture), accidents = Σ accidents / Σ population, délinquance = moyenne pondérée sur les communes où le total est publié (<code>delinq_pop_couverte</code> donne la part de population couverte).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] Air : fenêtre d'observation</h3>
+  <div class="rule"><strong>Decision :</strong> le snapshot Atmo porte <code>date_debut</code>, <code>date_fin</code>, <code>date_fenetre</code> (la colonne <code>date_ech</code> lue auparavant n'existait pas).</div></div>
+```
+
+## Vague 2 : nouvelles sources du 2026-10-14 {.cat-section-title}
+
+```{=html}
+<div class="decision cat-data"><h3>[2026-10-14] ORE rouvert : électricité et gaz résidentiels par commune</h3>
+  <div class="rule"><strong>Decision :</strong> rouvrir l'entrée « Agence ORE » classée comme écartée. Les exports agrégés côté serveur (script 27) remplacent le CSV de 800 MB. Indicateurs affichés : électricité et gaz <em>résidentiels</em> par habitant (INSEE 2021) et par point de livraison, part du gaz (communes raccordées seulement), évolution 2019 à 2024. Le total ORE n'est pas cartographié : il inclut ~57 TWh de clients industriels RTE.</div>
+  <div class="why"><strong>Rationale :</strong> le blocage (volume) est levé ; les totaux nationaux sont à −1,5 % (Enedis) et −3,0 % (GRDF) des chiffres publiés. <strong>Rupture de série en 2018</strong> : aucune comparaison avant 2019. Une évolution n'est publiée que si <em>aucune cellule résidentielle</em> n'est masquée en 2019 et en 2024 (sinon borne basse) ; la règle porte sur le secteur résidentiel et non sur <code>secret_tot</code>, qui agrège tous les secteurs et écartait des communes au résidentiel intact (6 800 communes contre 33 600).</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> garder le bloc écarté ; filtrer sur <code>secret_tot</code> (trop restrictif) ; afficher la borne basse avec un avertissement (une carte ne porte pas l'avertissement).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] Filosofi 2023 ajouté en niveau, Filosofi 2021 conservé</h3>
+  <div class="rule"><strong>Decision :</strong> garder Filosofi 2021 (composition du revenu) et ajouter Filosofi 2023 comme niveau de vie courant (médiane, et taux de pauvreté là où il est publié). Badge permanent « Filosofi 2 · série non comparable avec 2021 » et <strong>aucune comparaison 2021 à 2023</strong> (ni graphique, ni écart).</div>
+  <div class="why"><strong>Rationale :</strong> Filosofi 2 est une nouvelle méthode (INSEE : comparaison « à proscrire ») ; composition et déciles ne sont publiés qu'à partir du département en 2023.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> remplacer 2021 (perte de la composition) ; évolution 2021 à 2023 (rupture de série). La corrélation entre les deux niveaux (ρ = 0,93) est classée « Revenus » dans l'Explorer, donc filtrée du classement inter-thématiques.</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] BPE : panier de la vie courante, 10 familles</h3>
+  <div class="rule"><strong>Decision :</strong> score de 0 à 10 = nombre de familles présentes dans la commune parmi : médecin généraliste, pharmacie, boulangerie-pâtisserie, alimentation générale, école, poste, banque, coiffure, restaurant, chirurgien-dentiste. Choix de l'équipe de données, listé sur la page Services.</div>
+  <div class="why"><strong>Rationale :</strong> un indice simple et lisible plutôt qu'un total d'équipements (qui reproduit la taille). Limite : présence dans la commune n'est pas accès ; aucun temps de trajet.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> total d'équipements (tautologie de taille) ; panier pondéré (poids arbitraires).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] CAF : taux seulement à partir de 1 000 habitants</h3>
+  <div class="rule"><strong>Decision :</strong> RSA et aides au logement affichés en % de la population uniquement si la population atteint 1 000 habitants ; MSA exclue ; avertissement Guyane (population sous-estimée au recensement, Camopi à 68 % de RSA).</div>
+  <div class="why"><strong>Rationale :</strong> la CNAF arrondit les comptes à 5 et applique le secret : sous 1 000 habitants, un taux n'est pas lisible (9 949 communes conservées).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] DPE : part F/G seulement à partir de 30 diagnostics</h3>
+  <div class="rule"><strong>Decision :</strong> la part de DPE classés F ou G est publiée si la commune compte au moins 30 diagnostics (22 432 communes). Libellé « part des DPE depuis 07/2021 », avec une mention explicite de non-représentativité.</div>
+  <div class="why"><strong>Rationale :</strong> un DPE est établi à la vente ou à la location : l'échantillon n'est pas le parc ; la méthode a changé le 1<sup>er</sup> juillet 2024 ; les doublons de logement ne sont pas dédoublonnables en agrégé.</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] DVF 2025 : « provisoire »</h3>
+  <div class="rule"><strong>Decision :</strong> DVF couvre 2021 à 2025 ; l'année 2025 est étiquetée « provisoire ».</div>
+  <div class="why"><strong>Rationale :</strong> 740 000 ventes en 2025 contre 655 000 en 2024 : la complétude du millésime n'est pas confirmée (délais d'enregistrement), donc aucune tendance 2024 à 2025 n'est à lire comme définitive.</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] MOBPRO passe au RP 2022</h3>
+  <div class="rule"><strong>Decision :</strong> mêmes schémas, millésime RP 2022. Changements à connaître : <code>mob_pct_emploi_local</code> de Paris, Lyon et Marseille vaut maintenant 70 / 63 / 84 % (0 auparavant) ; <code>mob_pct_velo</code> inclut les vélos à assistance électrique et n'est pas comparable avec 2019 ; la destination principale n'est plus le code 99999.</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] Participation électorale 2002-2026</h3>
+  <div class="rule"><strong>Decision :</strong> séries d'abstention par commune depuis les élections agrégées par bureau de vote ; Français de l'étranger exclus ; blancs et nuls non distingués avant 2016. Vues : présidentielle 2022 (T1), européennes 2024, municipales 2026 (T1) et évolution 2002 à 2022.</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-14] Communes ou électeurs : chiffre corrigé</h3>
+  <div class="rule"><strong>Decision :</strong> la vue « Électeurs » de la page Législatives dessine un cercle par commune (surface ∝ inscrits). La synthèse « communes contre inscrits » est calculée à chaque rendu. <strong>Sur les données actuelles, le RN gagne 49,7 % des communes mais 28,9 % des inscrits</strong> (audit initial : 50,2 % et 31,0 %, avant les corrections de données).</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-14] 28 indicateurs ajoutés à l'Explorer, sans tautologie de taille</h3>
+  <div class="rule"><strong>Decision :</strong> seuls des taux, parts et densités entrent dans <code>commune_merged</code> (aucun total brut, donc pas de corrélation « population × effectif »). Chaque variable porte un groupe thématique (<code>explorer/indicator_meta.parquet</code>) ; deux variables d'un même groupe sont écartées du classement inter-thématiques. Évolution ORE, taux CAF et part DPE sont mis à NA hors de leurs règles de publication.</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-15] DGFiP : DROM et départements 90 à 95 perdus à la jointure</h3>
+  <div class="rule"><strong>Decision :</strong> la DGFiP code les départements d'outre-mer 101 à 106 (101 Guadeloupe, 102 Guyane, 103 Martinique, 104 Réunion, 106 Mayotte) ; ils sont recodés en 971 à 976 avant la construction du code commune (icom DGFiP = 3 derniers chiffres du code INSEE). 129 communes d'outre-mer ont désormais des comptes. Même correction pour 601 communes du Territoire de Belfort et d'Île-de-France (90 à 95), dont le code DGFiP « 09x » n'était pas ramené à deux chiffres.</div>
+  <div class="why"><strong>Rationale :</strong> sans recodage, les cartons DROM de la page Finances étaient entièrement hachurés alors que la donnée est publiée.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> mention « non publié » sur les cartons (faux : la DGFiP publie).</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-14] Sécurité : taux lissés (Bayes empirique, Poisson-gamma)</h3>
+  <div class="rule"><strong>Decision :</strong> les taux de délinquance peuvent être affichés lissés : modèle Poisson-gamma, prior estimé par la méthode des moments <strong>dans chaque classe de densité INSEE</strong> (code : <code>eb_poisson_gamma</code> dans <code>R/socio_helpers.R</code>). Vue par défaut = taux brut ; bascule « lissé » proposée.</div>
+  <div class="why"><strong>Rationale :</strong> un taux sur un petit dénominateur est instable ; le lissage tire les petites communes vers leur classe sans masquer la valeur brute, qui reste la vue d'ouverture.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> lissage par défaut (cache la donnée observée) ; prior national unique (mélange rural et urbain).</div></div>
+
+<div class="decision cat-data"><h3>[2026-10-14] Immobilier : DVF 2025 provisoire, vue d'évolution 2021 à 2024</h3>
+  <div class="rule"><strong>Decision :</strong> 2025 est provisoire ; la vue « évolution » s'ouvre sur 2021 à 2024 ; la page Immobilier s'ouvre sur Maison 2024 (3 387 communes seulement ont un prix appartement fiable contre 14 191 pour les maisons).</div>
+  <div class="why"><strong>Rationale :</strong> la complétude de 2025 n'est pas confirmée (voir DVF 2025 ci-dessus), et un défaut sur un type presque vide donnerait une carte grise.</div></div>
+
+<div class="decision cat-viz"><h3>[2026-10-14] Départements : délinquance totale grisée sous 25 % de population couverte</h3>
+  <div class="rule"><strong>Decision :</strong> la tuile « délinquance totale » d'un département est grisée si moins de 25 % de sa population vit dans une commune où le total est publié (<code>delinq_pop_couverte</code>).</div>
+  <div class="why"><strong>Rationale :</strong> le total n'existe que pour 685 communes ; une moyenne sur une fraction faible de la population ne représente pas le département.</div></div>
+
+<div class="decision cat-viz"><h3>[2026-10-14] Profil : l'axe « Délinquance (total) » remplacé par Cambriolages</h3>
+  <div class="rule"><strong>Decision :</strong> l'axe du radar est le taux de cambriolages et non le total de délinquance.</div>
+  <div class="why"><strong>Rationale :</strong> le total ne couvre que 685 communes (NA dès qu'une composante est secrète) ; les cambriolages sont publiés pour bien plus de communes.</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-15] Communes semblables : k plus proches voisins sur critères au choix</h3>
+  <div class="rule"><strong>Decision :</strong> les semblables d'une commune sont ses <em>k</em> plus proches voisins (défaut k = 15, de 5 à 30). Critères par défaut : population (log) et classe de densité INSEE ; ajoutables : revenu médian, prix m² maison et appartement (DVF 2024), part de propriétaires, APL médecins, part de la voiture, logements vacants, fibre, panier de services. Chaque critère est transformé (log1p pour les prix), centré-réduit sur toutes les communes qui l'ont, puis distance = racine de la moyenne des carrés des écarts réduits (comparable quel que soit le nombre de critères). Filtres durs facultatifs : même département, même classe de densité (si trop peu de communes dans la classe, complété hors classe et annoncé). Un critère non publié pour la commune de référence est ignoré ; une commune sans valeur sur un critère actif n'est pas candidate. Tri déterministe (distance, puis ordre de l'index). Paris, Lyon et Marseille : peu de communes de taille comparable, le groupe s'élargit et la page le dit. Code : <code>assets/peers-core.js</code>, test : <code>tests/check_peers.js</code>.</div>
+  <div class="why"><strong>Rationale :</strong> une règle unique, lisible (« les 15 communes les plus proches sur ces critères »), qui garantit une taille de groupe stable, contrairement à une fenêtre de tolérance (±X % de population) qui donne 0 ou 400 communes selon la taille.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> même classe de densité + population à ±X % (taille du groupe imprévisible, vide pour les très grandes villes) ; distance de Mahalanobis (opaque et dominée par les critères corrélés) ; « même région » (le registre n'a pas de région) ; part des seniors (pas dans <code>commune_merged</code>). La proximité est descriptive : elle dépend des critères choisis.</div></div>
+
+<div class="decision cat-viz"><h3>[2026-10-15] Constellation : un moteur de points, sans d3</h3>
+  <div class="rule"><strong>Decision :</strong> la page Constellation dessine 34 875 communes et 101 départements sur un seul <code>&lt;canvas&gt;</code> (<code>assets/constellation.js</code>), avec quatre dispositions (carte, population, nuage, classement) liées par des transitions de 450 ms (instantanées si <code>prefers-reduced-motion</code>). Échelles, interpolation et brosse sont écrites à la main (~100 lignes) ; fonctions pures testées sous Node (<code>assets/constellation-core.js</code>, <code>tests/check_constellation.js</code>).</div>
+  <div class="why"><strong>Rationale :</strong> d3 n'est pas déjà embarqué dans le site (ni dans le runtime Quarto des tableaux de bord) ; l'ajouter coûte ~90 ko gzip pour trois usages triviaux. Le reste du site est en JS sans dépendance.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> SVG (35 000 nœuds : trop lent) ; OJS / Plot (runtime lourd, hors du format tableau de bord).</div></div>
+
+<div class="decision cat-viz"><h3>[2026-10-15] Vue population : cercles de Dorling, placement glouton</h3>
+  <div class="rule"><strong>Decision :</strong> en vue « Population », la surface d'un cercle est proportionnelle aux habitants (INSEE, recensement 2021) <em>au-dessus de ≈ 477 habitants</em>, avec un rayon plancher de 0,7 unité (≈ 0,6 px) pour les très petites communes. Positions précalculées en R (<code>R/dorling.R</code>) : du plus grand au plus petit, chaque cercle est posé à sa position géographique ; s'il gêne, il prend la première position libre sur des anneaux de rayon croissant. L'échelle (surface totale des cercles de la métropole = 22 % de son cadre) est identique partout, outre-mer compris.</div>
+  <div class="why"><strong>Rationale :</strong> aucun chevauchement par construction (contrôlé sur les cercles placés par <code>tests/check_constellation.js</code>), toutes les communes placées, sans graine ni itérations de relaxation à régler. Contrepartie : les plus grandes villes sont à leur place exacte et leurs banlieues sont repoussées en couronne (Paris), ce qui est précisément l'effet de lecture voulu.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> relaxation par forces (résidus de chevauchement, réglage de convergence) ; d3-force au runtime (35 k corps, trop lent) ; cartogramme continu (déformation des formes).</div></div>
+
+<div class="decision cat-viz"><h3>[2026-10-15] Outre-mer : cinq encarts égaux, à échelle propre</h3>
+  <div class="rule"><strong>Decision :</strong> Guadeloupe, Martinique, Guyane, La Réunion et Mayotte sont dans cinq encarts égaux sous la métropole, dans le même ordre dans les vues Carte et Population (Saint-Pierre-et-Miquelon et les collectivités 98x n'ont pas de géométrie dans la source : non placés). En vue Carte, chaque encart est ajusté à SA propre échelle (mention « échelle propre » sur la page) ; en vue Population, les cercles gardent la même échelle que la métropole. Projection de la métropole : Web Mercator, comme les cartes Leaflet du site. Mayotte n'a pas de population dans la base : ses communes sont au rayon plancher.</div>
+  <div class="why"><strong>Rationale :</strong> la même place visible aux cinq territoires dans les deux vues, une convention unique et lisible. Un encart à échelle propre exagère la surface des DROM : c'est dit sur la page, et c'est la vue Population qui rétablit les proportions.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> échelle commune (Guyane et Mayotte illisibles) ; encarts en bas à gauche de la mer (trop petits).</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-15] Constellation : départements par défaut, médiane pondérée</h3>
+  <div class="rule"><strong>Decision :</strong> la vue nationale montre 101 points départementaux ; chaque valeur est la <strong>médiane des communes du département pondérée par la population</strong> (plus petite valeur dont le poids cumulé atteint la moitié ; poids tous nuls : médiane simple). Choisir un département ou une densité, ou cliquer un point départemental, révèle les communes. La couleur d'un point départemental utilise les seuils des communes.</div>
+  <div class="why"><strong>Rationale :</strong> 35 k points d'emblée sont illisibles ; la médiane pondérée est robuste aux valeurs extrêmes et représente l'habitant médian plutôt que la commune médiane. Contrôle : <code>tests/check_constellation.js</code>.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> moyenne (sensible aux queues lourdes) ; médiane simple des communes (dominée par les petites communes).</div></div>
+
+<div class="decision cat-ana"><h3>[2026-10-15] Nuage de points : association, jamais causalité</h3>
+  <div class="rule"><strong>Decision :</strong> le nuage de deux indicateurs affiche le ρ de Spearman et le nombre de communes ayant les deux valeurs, calculés sur les communes du filtre (pas sur les médianes départementales, ce qui est précisé), avec la source et le millésime de chaque axe et la mention « association, pas causalité » (biais écologique, causes communes, dates différentes). Axes fixes du 1<sup>er</sup> au 99<sup>e</sup> centile, logarithmiques si toutes les valeurs sont positives et la queue haute étirée ; les points au-delà sont posés sur le bord. Les millésimes viennent de <code>R/indicator_sources.R</code> (le registre <code>indicator_meta</code> n'en porte pas).</div>
+  <div class="why"><strong>Rationale :</strong> des axes stables permettent de comparer les filtres entre eux ; Spearman reste cohérent avec le reste du site (voir la décision Spearman par défaut).</div></div>
+
+<div class="decision cat-viz"><h3>[2026-10-15] Brosse sur histogramme : Constellation et cartes thématiques</h3>
+  <div class="rule"><strong>Decision :</strong> l'histogramme sous la Constellation est brossable ; les points hors plage s'estompent (opacité 0,1) et un second indicateur montre sa distribution dans la plage contre l'ensemble. Même mécanisme, générique, dans <code>assets/cmap.js</code> : l'histogramme de la légende de toutes les cartes thématiques se brosse (glisser pour isoler, cliquer pour effacer ; opacité des polygones hors plage réduite ; nombre de communes et part de la population de la plage), sans modification par page. La brosse est réinitialisée à chaque changement d'indicateur.</div>
+  <div class="why"><strong>Rationale :</strong> une seule implémentation lisant seulement <code>CMap.cur.get(code)</code>. L'état est appliqué au relâchement de la souris (35 k polygones Leaflet à restyler).</div></div>
+<div class="decision cat-data"><h3>[2026-10-15] Audit Referee 2 : corrections C1 à C5, M1 à M5</h3>
+  <div class="rule"><strong>Decision (C1) :</strong> les libellés des 6 classes de densité viennent d'une seule source, <code>grille_densite.parquet</code> (rang 1 Rural non périurbain, 2 Rural périurbain, 3 Ceintures urbaines, 4 Petites villes, 5 Centres urbains intermédiaires, 6 Grands centres urbains), émise dans <code>assets/data/communes.json</code> (<code>dl</code>) et lue par <code>CMap.densLabels</code>. Le repli de <code>cmap.js</code> est vérifié contre les données (test Node et validateur).</div>
+  <div class="why"><strong>Rationale :</strong> l'ordre des libellés courts était recopié à la main et faux pour les rangs 3 à 5 (Montluçon affichée « Ceintures urbaines »). Les libellés courts sont désormais indexés par le libellé INSEE, jamais par la position.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> corriger seulement l'ordre du tableau JS (la même erreur pourrait revenir sans contrôle).</div>
+  <div class="rule"><strong>Decision (C2, M1) :</strong> les populations légales RP 2017-2021 sont <strong>sommées</strong> vers le COG 2026 (<code>cog_map("2016-01-01")</code>, effectifs sommés, jamais moyennés), comme les effectifs des autres sources. La table des communes (<code>commune_merged</code>) est le COG 2026 (34 875 communes, Paris/Lyon/Marseille sous le code ville) ; les résultats électoraux sont harmonisés au COG 2026 dans <code>02_elections.R</code> (voix recombinées, pourcentages pondérés par les exprimés, abstention par les inscrits ; famille gagnante d'une commune fusionnée = famille aux voix cumulées les plus élevées). Mayotte : population légale du recensement 2017 (256 518 hab., champ <code>insee_pop</code> de la base SSMSI), millésime tracé dans <code>pop_millesime</code>. Les 7 communes rétablies ou sans habitant restent sans population (NA), jamais inventée ; la commune parente d'une commune rétablie en 2026 garde la population d'avant scission (non scindable sans source).</div>
+  <div class="why"><strong>Rationale :</strong> numérateur (N communes) et dénominateur (une seule) divergeaient : Saint-Denis 93066 affichait 143 ‰ au lieu de 111 ‰, Montbenoît 199 ‰ au lieu de 42 ‰. Total contrôlé : 67 408 052 hab. = populations légales 2021 INSEE hors Mayotte.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> passer aux populations légales 2023 au COG 2026 (millésime différent des autres dénominateurs et de la consigne de sommation) ; moyenner les taux.</div>
+  <div class="rule"><strong>Decision (C3) :</strong> si une source publie la ligne ville PLM (FiLoSoFi : 75056, 69123, 13055), elle est conservée telle quelle ; la ville n'est reconstruite à partir des arrondissements que lorsqu'elle manque (DVF, APL, DEFM), les effectifs étant sommés (y compris <code>dvf_n_app</code>/<code>dvf_n_mai</code>).</div>
+  <div class="why"><strong>Rationale :</strong> la moyenne des Ginis d'arrondissements ignore l'inégalité entre arrondissements (Paris 0,410 contre 0,454 officiel) ; médiane Paris 29 730 contre 30 749.</div>
+  <div class="rule"><strong>Decision (C4) :</strong> voir SSMSI ci-dessus : cambriolages en ‰ logements, total reconstruit depuis les effectifs sur la population, lissage empirique-Bayes des cambriolages avec les logements comme exposition, effectif publié affiché tel quel (Paris 7 072).</div>
+  <div class="rule"><strong>Decision (C5) :</strong> <code>assets/data/elections_lookup.json</code> est produit au pré-rendu (<code>R/build_web_assets.R</code>) ; aucune page n'écrit plus dans <code>assets/</code> (Quarto fige la liste des ressources avant le rendu des pages).</div>
+  <div class="rule"><strong>Decision (M2) :</strong> sur les cartes à l'arrondissement, la ville PLM prend la moyenne simple de ses arrondissements dans les parts de légende et le gradient (<code>CMapStats.withPlmFallback</code>), au lieu de « Non publié ».</div>
+  <div class="rule"><strong>Decision (M3) :</strong> le rayon plancher de la vue Population (0,7 unité) est annoncé sur la page ; seule la surface des communes au-dessus du seuil est proportionnelle aux habitants.</div>
+  <div class="rule"><strong>Decision (M4) :</strong> <code>refresh-data.yml</code> exécute les scripts dans l'ordre des dépendances sans <code>|| true</code>, puis <code>99_validate_data.R</code> avant tout commit ; <code>deploy.yml</code> se relance à la fin du refresh (<code>workflow_run</code>). Les millésimes affichés (DEFM, Atmo, SSMSI, DGFiP, CAF, ARCEP) sont lus dans les données (<code>R/indicator_sources.R</code>).</div>
+  <div class="rule"><strong>Decision (M5) :</strong> nouveaux contrôles : table des communes = COG 2026 (34 875), population totale 2021 = 67 408 052 (INSEE), PLM = ligne officielle FiLoSoFi, unités SSMSI (cambriolages ÷ logements, total ÷ population), libellés de densité du JS. La constante « 24,7 % d'abstention attendue » (non sourcée, calée sur la sortie) est supprimée, remplacée par une conservation des inscrits avant/après remappage. Les planchers de couverture sont étiquetés garde-fous de régression.</div>
+  <div class="alt"><strong>Mineurs :</strong> m1 (DEFM renommé « Demandeurs d'emploi ») et m7 (effectifs PLM sommés) corrigés. Non traités : m2 (chômage départemental = médiane pondérée), m3-m6, m8-m25 (hors périmètre de cette passe).</div>
+</div>
+
+<div class="decision cat-data"><h3>[2026-10-15] Audit Referee 2, tour 2 : corrections N1 à N10</h3>
+  <div class="rule"><strong>[2026-10-15] Decision (N1) :</strong> chaque script du refresh télécharge lui-même son fichier brut dans <code>data/raw/</code> (cache idempotent), pour que <code>refresh-data.yml</code> fonctionne depuis un <code>data/raw/</code> vide : <code>07_</code> (SSMSI parquet et DGFiP CSV, URLs « latest » data.gouv.fr de la ressource), <code>11_</code> (BAAC <code>Caract_2024.csv</code>), <code>06_</code> (populations légales 2023 INSEE <code>ensemble.zip</code> et INSEE Focus 105 pour Mayotte). La population de Mayotte ne dépend plus d'un autre script. <code>08_drees_apl.R</code> est <strong>sorti de la boucle automatique</strong> : ses 5 XLSX (feuille « APL 2023 ») ne sont téléchargeables par aucune URL stable (anciennes ressources data.gouv supprimées, nouvelle édition à autre mise en page) ; le script s'arrête désormais avant d'écrire s'il n'a aucun fichier, et le parquet commité est conservé. <code>15_agriculture_bio.R</code> est sorti de la boucle pour une autre raison, trouvée par la simulation d'un runner neuf : ses deux URL datées renvoient 404 depuis la republication Agence Bio de septembre 2026 (fichiers renommés, opérateurs en CSV à virgule, millésime 2025) ; le migrer changerait le millésime affiché (2024). Preuve : exécution complète de la boucle sur une copie sans <code>data/raw/</code> (résultat dans le rapport de session).</div>
+  <div class="why"><strong>Rationale :</strong> la réécriture M4 avait transformé « pousse des données douteuses » en « échoue toujours ». Un script non téléchargeable est mieux hors boucle (avec commentaire) que de faire échouer tout le job.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> <code>actions/cache</code> sur <code>data/raw/</code> (le premier run échouerait de la même façon et le cache masquerait un lien mort) ; lire Mayotte dans le fichier SSMSI brut (dépendance cachée entre scripts).</div>
+  <div class="rule"><strong>[2026-10-15] Decision (N2) :</strong> <strong>une seule définition du vainqueur pour toutes les communes</strong> (<code>aggregate_commune</code>, <code>harmonise_cog2026</code>) : la famille aux voix cumulées les plus élevées sur tous les candidats de la commune (communes coupées entre circonscriptions comprises), ses parts calculées sur les exprimés cumulés de la commune, la marge étant l'écart avec la 2<sup>e</sup> famille ; <code>nuance_vainqueur</code> = nuance du meilleur candidat de la famille gagnante. Une commune sans suffrage exprimé n'a pas de vainqueur (le T1 prend le relais : Geay 79131, 0 exprimé au T2 dans le fichier source). Avant : meilleur candidat d'une seule circonscription (Marseille « Divers 12,5 % » avec RN 48,0 % et NFP 39,5 %). Après : Marseille RN 48,0 %, Caen NFP 52,7 %, Angers ENS 44,8 %, Troyes RN 38,8 %, Grasse RN ; 181 communes changent de famille gagnante (150 au T2, 31 au T1) : 180 où le vainqueur affiché contredisait les parts, plus Geay (0 exprimé au T2, qui passe au T1). Contrôle de validation : famille gagnante = famille de part maximale pour toute commune sans égalité. <strong>Limite assumée</strong> : la famille « Divers » additionne des candidats sans lien (DVG, DVD, REG, ECO…) et peut devancer la première famille identifiée ; elle n'est pas exclue, pour garder une règle unique.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> un vainqueur par (commune × circonscription) sans vainqueur de ville (casse la carte communale) ; exclure « Divers » de l'argmax (deuxième règle, difficile à justifier).</div>
+  <div class="rule"><strong>[2026-10-15] Decision (A, audit round 3) :</strong> <strong>divulguer la couverture partielle des résultats législatifs maintenant</strong>, reconstruire plus tard. Le fichier du 2nd tour ne contient que les circonscriptions allées au 2nd tour ; pour une commune coupée entre circonscriptions, le « tour décisif » ne portait que sur une partie de l'électorat (Paris : 9 députés NFP élus au 1<sup>er</sup> tour absents). <code>02_elections.R</code> calcule <code>couverture_inscrits</code> = inscrits du résultat affiché ÷ inscrits de la commune au 1<sup>er</sup> tour (le fichier T1 couvre toutes les circonscriptions), plafonnée à 1 (les listes électorales bougent de quelques inscrits entre les deux dimanches ; arrêt si &gt; 25 %, ou &gt; 2 % au-dessus de 500 inscrits). Elle est transmise à <code>commune_merged</code> (<code>elec_couverture_inscrits</code>), à la fiche communale et à la carte. Valeurs : Paris 0,5035 (687 417 / 1 365 376), Marseille 0,746, Toulon 0,679, Courbevoie 0,154 ; 2 295 communes &lt; 1, dont 194 &lt; 0,99 et 6 &lt; 0,5. Page Législatives : hachures sombres pour tout résultat partiel, sous 99 % (194 communes ; légende « résultat partiel (circonscriptions élues au 1<sup>er</sup> tour exclues) »), phrase « résultat sur X % des inscrits de la commune (circonscriptions élues au 1<sup>er</sup> tour exclues) » sous 99 %, et « tour décisif » remplacé par « 2nd tour, ou 1<sup>er</sup> tour là où aucun 2nd tour n'a eu lieu dans la commune ». Les arrondissements PLM héritent de la couverture de leur ville (le fichier est au niveau de la ville). Contrôle de validation : couverture dans (0, 1] et Paris recalculé depuis les fichiers bruts. Un premier seuil de hachure à 0,5 laissait Paris (0,5035) non hachuré : abandonné au profit de 0,99.</div>
+  <div class="alt"><strong>Alternatives rejetées pour l'instant :</strong> reconstruire depuis le fichier par bureau de vote avec, pour chaque circonscription, le tour qui a élu le député (couverture totale, résultat exact) : prévu dans une PR de suivi ; exclure les 194 communes (perd l'information).</div>
+  <div class="rule"><strong>[2026-10-15] Decision (N3) :</strong> <code>11_baac.R</code> remappe les codes BAAC vers le COG 2026 (<code>cog_map("2024-01-01")</code>) avant d'agréger, effectifs sommés : 62 accidents d'anciennes communes récupérés (Saint-Denis 259 → 286 accidents, Orée d'Anjou 0 → 4). Contrôle de validation : Σ accidents des communes du cadre = accidents bruts remappés.</div>
+  <div class="rule"><strong>[2026-10-15] Decision (N4) :</strong> les 10 communes concernées par un rétablissement 2024-2025 (MOD 21 : Essarts-en-Bocage/L'Oie/Sainte-Florence, Beaumont-les-Nonains/Les Hauts-Talican, Neussargues-Moissac + Celles, Chalinargues, Chavagnac, Sainte-Anastasie) prennent leur <code>pop_latest</code> dans les <strong>populations légales 2023</strong> de l'INSEE (géographie au 1<sup>er</sup> janvier 2025, <a href="https://www.insee.fr/fr/statistiques/8680726">insee.fr/fr/statistiques/8680726</a>), avec <code>pop_millesime = 2023</code>. <code>pop_2021</code> (RP 2021 harmonisé, total contrôlé 67 408 052) n'est pas modifié. Beaumont-les-Nonains : 878 → 339 hab. ; Essarts-en-Bocage 9 399 → 6 851. <strong>Correction (audit round 3) :</strong> les numérateurs ne sont <em>pas</em> scindés (DEFM : 60054 libellé « Les Hauts-Talican » à toutes les dates, aucune ligne pour 60694, 85165, 85212, 15141 ; Celles apparaissait 1<sup>re</sup> de France à 368,7 ‰). Les taux par habitant de ces 10 communes (<code>defm_taux_pop</code>, <code>acc_taux_pop</code>, CAF, BPE santé, ENAF, ORE MWh/hab.) sont donc <strong>masqués</strong> dans <code>commune_merged</code> ; les effectifs restent publiés. Le contrôle « &le; 10 communes sans population » est remplacé par « aucune » (0 observée) et par le millésime 2023 des 10 communes. <strong>Limite</strong> : une source encore à la géographie d'avant 2024 donne à la commune parente le total de ses ex-communes déléguées face à ce dénominateur réduit.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> masquer les taux des 3 parents (perd l'information) ; populations 2022 (ne contiennent pas les 4 villages du Cantal rétablis en 2025). Remplace la mention « non scindable sans source » (fausse).</div>
+  <div class="rule"><strong>[2026-10-15] Decision (N6) :</strong> (a) <code>05_merge_and_explore.R</code> passe <strong>toutes</strong> les sources par <code>cog_rename()</code>, qui applique à un seul endroit les changements de code sans changement de territoire (MOD 41 et 50, <code>cog_map</code> filtré) avant les jointures (Orée d'Anjou 49069 → 49126, Conques-en-Rouergue, Aurseulles, Porte des Pierres Dorées) ; les fusions ne sont pas traitées ici (un niveau ne se somme pas). Orée d'Anjou : 45 → 73 indicateurs renseignés sur 80 (12218 : 41 → 64). (b) Les contours communaux viennent maintenant d'Etalab « contours-administratifs » édition 2026 (COG 2026, 1 000 m) au lieu du dépôt gregoiredavid : 34 917 polygones (communes + 45 arrondissements PLM, villes PLM écartées pour ne pas recouvrir les arrondissements). Avant : 5 communes COG sans polygone, 1 015 polygones à d'anciens codes, 70 communes grises avec données ; après : 0 et 0. Contrôle de validation : toute commune COG 2026 a un polygone et aucun polygone n'est hors COG.</div>
+  <div class="alt"><strong>Alternatives rejetées :</strong> dissoudre les anciens polygones vers les communes fusionnées (ne crée pas les polygones des communes rétablies, qui n'existent dans aucune géométrie antérieure) ; additionner les niveaux d'une fusion.</div>
+  <div class="rule"><strong>[2026-10-15] Decision (N5, N7-N10, m10, m24) :</strong> N5 : <code>02_elections.R</code> remappe depuis 2015 (4 sections réelles récupérées : Le Fresne-sur-Loire 44060, Pont-Farcy, Freigné, et la section « Cormicy » codée 02899 dans le fichier T1, rattachée à Cormicy 51171 par libellé, seul rattachement manuel) et échoue sur tout autre code non communal inconnu. N7 : strate NA, pas « Ville moyenne », sans population ni inscrits. N8 : le contrôle Paris 7 072 compare à la ligne brute SSMSI de la même édition (ignoré avec message si <code>data/raw/</code> est absent) ; le contrôle de conservation de <code>19_</code> compare à un calcul indépendant (inscrits des codes vivants ou remappables), donc peut échouer ; Saint-Denis ignoré avec message en CI. N9 : <code>pop_millesime</code> des villes PLM = 2021 (le script sommait aussi la colonne <code>pop_millesime</code>). N10 : la population de Mayotte (RP 2017, plus ancienne que les numérateurs 2024-2025 ; ≈ +25 % de population depuis) est signalée sur les pages Sécurité (accidents), Démographie (DEFM), Revenus (CAF) et dans les sources de la Constellation. m10 : la légende dit « communes de France métropolitaine (hors DROM) », ce qu'elle compte. m24 : la page Profil relit l'adresse à chaque changement de <code>#</code>.</div>
+  <div class="alt"><strong>Non traités :</strong> m2, m3, m4, m5, m8, m11-m23, m25 ; N11 partiellement (README et décision pop mis à jour).</div>
+</div>
 ```

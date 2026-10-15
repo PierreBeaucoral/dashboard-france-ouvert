@@ -9,6 +9,7 @@ format:
     theme:
       - cosmo
       - styles/custom.scss
+      - styles/tokens.scss
 execute:
   echo: false
   warning: false

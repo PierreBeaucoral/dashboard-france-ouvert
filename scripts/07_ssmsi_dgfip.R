@@ -23,6 +23,7 @@ suppressPackageStartupMessages({
   library(here)
   library(glue)
   library(stringr)
+  library(curl)
 })
 
 # ---- Chemins ----
@@ -30,6 +31,24 @@ suppressPackageStartupMessages({
 ssmsi_raw <- here::here("data", "raw", "ssmsi", "base_communale.parquet")
 dgfip_raw <- here::here("data", "raw", "dgfip", "comptes_communes_2023_2024.csv")
 out_dir   <- here::here("data", "processed")
+
+# Téléchargement (audit N1) : le refresh mensuel part d'un data/raw/ vide. URLs
+# « latest » data.gouv.fr (stables, redirigent vers la dernière édition publiée) ;
+# fichiers mis en cache sous data/raw/ (idempotent : supprimer le fichier pour forcer).
+#   SSMSI : ressource « COM - Base statistique communale ... » (parquet, 16 Mo)
+#   DGFiP : export CSV du fichier global 2023-2024 (data.economie.gouv.fr, ~100 Mo)
+URL_SSMSI <- "https://www.data.gouv.fr/api/1/datasets/r/604d71b8-337d-4869-9226-49e01bae87df"
+URL_DGFIP <- "https://www.data.gouv.fr/api/1/datasets/r/6adb3821-1324-4ba8-a5e9-e805c08b9c7c"
+dl_if_missing <- function(url, dest, min_bytes) {
+  dir.create(dirname(dest), recursive = TRUE, showWarnings = FALSE)
+  if (file.exists(dest) && file.size(dest) >= min_bytes) { message("  Cache : ", basename(dest)); return(invisible(NULL)) }
+  message("  Télécharge : ", url)
+  curl::curl_download(url, paste0(dest, ".part"), quiet = TRUE,
+                      handle = curl::new_handle(useragent = "Mozilla/5.0", timeout = 1800))
+  file.rename(paste0(dest, ".part"), dest)
+}
+dl_if_missing(URL_SSMSI, ssmsi_raw, 1e7)
+dl_if_missing(URL_DGFIP, dgfip_raw, 5e7)
 dir.create(file.path(out_dir, "ssmsi"), recursive = TRUE, showWarnings = FALSE)
 dir.create(file.path(out_dir, "dgfip"), recursive = TRUE, showWarnings = FALSE)
 
@@ -54,7 +73,8 @@ indicators_short <- c(
   "Vols avec armes"                         = "del_vols_armes",
   "Vols violents sans arme"                 = "del_vols_violents",
   "Cambriolages de logement"                = "del_cambriolages",
-  "Vols de véhicules"                       = "del_vols_vehicules",
+  "Vols de véhicule"                        = "del_vols_vehicules",   # libellé éd. 2025
+  "Vols de véhicules"                       = "del_vols_vehicules",   # ancien libellé
   "Vols dans les véhicules"                 = "del_vols_dans_vehicules",
   "Vols d'accessoires sur véhicules"        = "del_vols_accessoires",
   "Destructions et dégradations volontaires" = "del_degradations",
@@ -62,14 +82,19 @@ indicators_short <- c(
   "Usage de stupéfiants"                    = "del_usage_stup"
 )
 
+# Le millésime du code géo change à chaque édition (CODGEO_2025, _2026...)
+codgeo_col <- grep("^CODGEO", names(ssmsi), value = TRUE)[1]
+
 ssmsi_filt <- ssmsi |>
   dplyr::filter(annee == latest_year, est_diffuse == "diff") |>
   dplyr::filter(indicateur %in% names(indicators_short)) |>
   dplyr::mutate(
-    var = unname(indicators_short[indicateur]),
-    code_commune = stringr::str_pad(CODGEO_2025, 5, "left", "0")
+    # as.character : `indicateur` est un facteur ; indexer par le facteur utiliserait
+    # ses codes entiers (mauvais libellés -> colonnes permutées)
+    var = unname(indicators_short[as.character(indicateur)]),
+    code_commune = stringr::str_pad(.data[[codgeo_col]], 5, "left", "0")
   ) |>
-  dplyr::select(code_commune, var, taux_pour_mille, nombre, insee_pop)
+  dplyr::select(code_commune, var, taux_pour_mille, nombre, insee_pop, insee_log)
 
 ssmsi_wide <- ssmsi_filt |>
   dplyr::select(code_commune, var, taux_pour_mille) |>
@@ -78,6 +103,12 @@ ssmsi_wide <- ssmsi_filt |>
     values_from  = taux_pour_mille,
     values_fn    = mean
   )
+
+# Effectifs bruts (nombre) : base du total et des comptes affichés.
+counts_wide <- ssmsi_filt |>
+  dplyr::select(code_commune, var, nombre) |>
+  tidyr::pivot_wider(names_from = var, values_from = nombre,
+                     names_prefix = "n_", values_fn = mean)
 
 # Garde : si une nuance n'a pas de libellé court dans `indicators_short`,
 # pivot_wider crée une colonne au nom NA (artefact). On la supprime — elle
@@ -88,22 +119,43 @@ if (any(na_named)) {
   ssmsi_wide <- ssmsi_wide[, !na_named, drop = FALSE]
 }
 
-# Taux global agrégé : somme des taux (vols + violences + dégradations + drogue)
+# Règle du secret statistique (SSMSI) : un décompte n'est diffusé que s'il vaut
+# 0 ou >= 5 ; les valeurs 1-4 sont "ndiff" (NA ici, jamais 0). Un 0 "diff" est
+# donc un vrai zéro. Conséquence : dans les petites communes, seules celles à
+# 0 apparaissent -> biais de sélection (voir docs/decisions.qmd).
+# Total = somme des 13 composantes SEULEMENT si toutes sont diffusées, sinon NA
+# (l'ancien rowSums(na.rm = TRUE) sommait des sous-ensembles différents).
+# UNITÉ (audit C4) : `taux_pour_mille` est rapporté aux HABITANTS (insee_pop) pour
+# tous les postes SAUF « Cambriolages de logement », rapporté aux LOGEMENTS
+# (insee_log). Les additionner mélangeait deux dénominateurs. Le total est donc
+# reconstruit à partir des EFFECTIFS sur un dénominateur unique (population),
+# et le taux de cambriolages reste « pour 1 000 logements » (colonne
+# del_cambriolages, jamais additionnée). Les postes ont aussi des unités de
+# compte différentes (victimes, infractions, mis en cause) : le total est un
+# indice agrégé de volumes enregistrés, pas un nombre de faits.
+comp_cols <- unique(unname(indicators_short))
+comp_cols <- intersect(comp_cols, names(ssmsi_wide))
+n_cols <- paste0("n_", comp_cols)
 ssmsi_wide <- ssmsi_wide |>
-  dplyr::mutate(
-    del_total_pour_mille = rowSums(
-      dplyr::across(dplyr::starts_with("del_")),
-      na.rm = TRUE
-    )
-  )
+  dplyr::left_join(counts_wide, by = "code_commune")
 
-# Pop référence
+# Pop et logements référence
 pops <- ssmsi_filt |>
-  dplyr::distinct(code_commune, insee_pop)
+  dplyr::distinct(code_commune, insee_pop, insee_log)
 ssmsi_out <- ssmsi_wide |>
   dplyr::left_join(pops, by = "code_commune") |>
-  dplyr::rename(ssmsi_pop_ref = insee_pop) |>
-  dplyr::mutate(annee_ssmsi = latest_year)
+  dplyr::rename(ssmsi_pop_ref = insee_pop, ssmsi_log_ref = insee_log) |>
+  dplyr::mutate(
+    del_n_publies = rowSums(!is.na(dplyr::across(dplyr::all_of(comp_cols)))),
+    del_n_total = ifelse(del_n_publies == length(comp_cols),
+                         rowSums(dplyr::across(dplyr::all_of(n_cols))), NA_real_),
+    del_total_pour_mille = ifelse(!is.na(del_n_total) & ssmsi_pop_ref > 0,
+                                  del_n_total / ssmsi_pop_ref * 1000, NA_real_),
+    annee_ssmsi = latest_year
+  ) |>
+  dplyr::rename(del_cambriolages_n = n_del_cambriolages) |>
+  dplyr::select(-dplyr::starts_with("n_del_"))
+stopifnot(all(c("del_cambriolages_n", "ssmsi_log_ref", "del_n_total") %in% names(ssmsi_out)))
 
 arrow::write_parquet(ssmsi_out, file.path(out_dir, "ssmsi", "delinquance_commune.parquet"))
 message(glue::glue("  ✔ SSMSI : {nrow(ssmsi_out)} communes → ssmsi/delinquance_commune.parquet"))
@@ -132,12 +184,20 @@ clean_num <- function(x) {
 dgfip_clean <- dgfip |>
   dplyr::filter(an == max(an, na.rm = TRUE)) |>
   dplyr::mutate(
-    # Construire code commune INSEE 5 chars : drop leading zero du dept si <96,
-    # garder 3 chars pour DROM
-    dep_norm = ifelse(substr(dep, 1, 1) == "0" & nchar(dep) == 3 & !substr(dep, 2, 2) == "9",
+    # Construire code commune INSEE 5 chars : drop le zéro initial du département (001 -> 01, 02A -> 2A, 091 -> 91) ;
+    # les DROM (101-106) sont recodés plus bas
+    dep_norm = ifelse(substr(dep, 1, 1) == "0" & nchar(dep) == 3,
                       substr(dep, 2, 3), dep),
+    # DROM : la DGFiP code les départements d'outre-mer 101 à 106 (et non 971 à 976) ;
+    # icom DGFiP = 3 derniers chiffres du code INSEE (code = 97 + icom) (vérifié sur les noms : Matoury =
+    # 102/307 -> 97307, Pamandzi = 106/615 -> 97615). 101 Guadeloupe, 102 Guyane,
+    # 103 Martinique, 104 La Réunion, 106 Mayotte.
+    dep_norm = dplyr::recode(dep_norm, "101" = "971", "103" = "972", "102" = "973",
+                             "104" = "974", "106" = "976"),
     icom_norm = stringr::str_pad(icom, 3, "left", "0"),
-    code_commune = paste0(dep_norm, icom_norm),
+    # DROM : code INSEE = "97" + icom (icom DGFiP = chiffre du département + rang à 2 chiffres)
+    code_commune = ifelse(substr(dep_norm, 1, 2) == "97", paste0("97", icom_norm),
+                          paste0(dep_norm, icom_norm)),
     # Pad to 5 chars
     code_commune = stringr::str_pad(code_commune, 5, "left", "0")
   ) |>
@@ -145,12 +205,18 @@ dgfip_clean <- dgfip |>
     code_commune,
     annee_dgfip = as.integer(an),
     fin_pop_ref       = clean_num(pop1),
-    fin_recettes      = clean_num(prod),     # € par hab.
-    fin_charges       = clean_num(charge),
-    fin_dette         = clean_num(dette),
-    fin_caf           = clean_num(caf),       # capacité autofinancement
-    fin_invest        = clean_num(depinv),    # dépenses investissement
-    fin_emprunt       = clean_num(emp),
+    # Colonnes DGFiP préfixées "f" = EUROS PAR HABITANT (vérifié : prod*1000/pop1
+    # = fprod pour toutes les communes). Les montants bruts (prod, charge...) sont
+    # des TOTAUX EN MILLIERS D'EUROS -> conservés sous *_total_keur.
+    fin_recettes      = clean_num(fprod),    # €/hab (produits de fonctionnement)
+    fin_charges       = clean_num(fcharge),  # €/hab
+    fin_dette         = clean_num(fdette),   # €/hab (encours de dette)
+    fin_caf           = clean_num(fcaf),     # €/hab (capacité d'autofinancement)
+    fin_invest        = clean_num(fdepinv),  # €/hab (dépenses d'investissement)
+    fin_emprunt       = clean_num(femp),     # €/hab (emprunts)
+    fin_recettes_total_keur = clean_num(prod),
+    fin_charges_total_keur  = clean_num(charge),
+    fin_dette_total_keur    = clean_num(dette),
     # Taux des taxes locales (en %)
     fin_taux_taxe_hab = clean_num(tth),
     fin_taux_fonc_bati  = clean_num(tfb),
@@ -177,3 +243,4 @@ cat(glue::glue("
     {nrow(dgfip_clean)} communes
 "))
 print(dgfip_clean |> dplyr::select(fin_recettes, fin_charges, fin_dette, fin_taux_taxe_hab) |> summary())
+stopifnot(median(dgfip_clean$fin_recettes, na.rm = TRUE) < 5000)  # €/hab, pas k€ totaux

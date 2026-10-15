@@ -1,7 +1,10 @@
 ---
-title: "Qualité de l'air · ATMO 30j"
+title: "Qualité de l'air"
+subtitle: "Indice ATMO moyen sur 30 jours (Atmo France)"
 format:
   dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
     orientation: rows
@@ -14,13 +17,6 @@ execute:
 ```{r setup}
 #| include: false
 source(here::here("R", "setup_dashboard.R"))
-```
-
-```{r}
-#| label: inject-commune-names
-#| results: asis
-#| echo: false
-emit_commune_names_js()
 ```
 
 ```{r}
@@ -38,34 +34,21 @@ if (atmo_ready) {
       label = qual_label, source = source_aasqa,
       imputed = as.logical(imputed)
     )
-  atmo_json <- jsonlite::toJSON(atmo_for_js, auto_unbox = TRUE, na = "null")
-
-  atmo_colors_js <- jsonlite::toJSON(as.list(.atmo_colors), auto_unbox = TRUE)
+  emit_table("atmoData", atmo_for_js)
+  atmo_colors_js <- jsonlite::toJSON(as.list(ATMO_COLORS), auto_unbox = TRUE)
   atmo_labels_js <- jsonlite::toJSON(as.list(.atmo_labels), auto_unbox = TRUE)
 
   cat('<script>\n',
-      'window.atmoRaw = ', as.character(atmo_json), ';\n',
       'window.atmoColors = ', as.character(atmo_colors_js), ';\n',
       'window.atmoLabels = ', as.character(atmo_labels_js), ';\n',
-      'window.atmoNAColor = "#E8E4DC";\n',
-      'window.atmoData = {};\n',
-      'window.atmoRaw.forEach(function(r) { window.atmoData[r.code] = r; });\n',
-      'window.atmoColorFor = function(v) {\n',
-      '  if (v == null || v === undefined || v === "NA") return window.atmoNAColor;\n',
-      '  return window.atmoColors[String(v)] || window.atmoNAColor;\n',
-      '};\n',
+      'window.atmoPalette = ["1","2","3","4","5","6"].map(function (k) { return window.atmoColors[k]; });\n',
+      'window.atmoLevels = ', as.character(jsonlite::toJSON(.ATMO_LABELS)), ';\n',
       'window.atmoFieldMap = { "qual_indice":"qual", "no2_indice":"no2", "o3_indice":"o3", "pm10_indice":"pm10", "pm25_indice":"pm25" };\n',
       'window.atmoRecolor = function(pollutantCol) {\n',
-      '  var map = window.atmoMap;\n',
-      '  if (!map) return;\n',
       '  var key = window.atmoFieldMap[pollutantCol] || "qual";\n',
-      '  map.eachLayer(function(layer) {\n',
-      '    if (!layer.options || !layer.options.layerId) return;\n',
-      '    var code = layer.options.layerId;\n',
-      '    var ent = window.atmoData[code];\n',
-      '    var v = ent ? ent[key] : null;\n',
-      '    layer.setStyle({ fillColor: window.atmoColorFor(v), fillOpacity: (v == null ? 0.25 : 0.85) });\n',
-      '  });\n',
+      '  CMap.recolor({ get: function (c) { var r = window.atmoData[c]; var v = r ? r[key] : null; return (v >= 1 && v <= 6) ? v : null; },\n',
+      '    levels: window.atmoLevels, palette: window.atmoPalette,\n',
+      '    legend: { title: "Indice ATMO (" + pollutantCol.replace("_indice", "").toUpperCase().replace("QUAL", "global") + "), moyenne sur 30 jours", naLabel: "Pas d\\u2019indice publié" } });\n',
       '};\n',
       'window.updateAirPanel = function(code) {\n',
       '  var el = document.getElementById("air-content");\n',
@@ -98,7 +81,7 @@ if (atmo_ready) {
       '    \'</div>\' +\n',
       '    \'<div class="cp-section"><h4>Sous-indices polluants (moyenne 30j)</h4>\' +\n',
       '    pill("NO₂", ent.no2) + pill("O₃", ent.o3) + pill("PM₁₀", ent.pm10) + pill("PM₂.₅", ent.pm25) + \'</div>\' +\n',
-      '    \'<div class="cp-section" style="font-size:0.78rem;color:#7A7A7A;">Source : \' + (ent.source || (ent.imputed ? "Imputée (moy. dépt)" : "—")) + \'</div>\';\n',
+      '    \'<div class="cp-section" class="cp-meta">Source : \' + (ent.source || (ent.imputed ? "Imputée (moy. dépt)" : "—")) + \'</div>\';\n',
       '};\n',
       '</script>\n',
       sep = ""
@@ -107,9 +90,9 @@ if (atmo_ready) {
 ```
 
 
-## Row {height="82%"}
+## Row {height="77%"}
 
-::: {.card title="Indice ATMO moyen sur 30 jours · par commune" width="72%"}
+::: {.card title="Indice ATMO par commune" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
@@ -128,50 +111,10 @@ if (atmo_ready) {
 ```{r}
 #| label: map-air
 if (atmo_ready) {
-  m <- choropleth_atmo(com_metro_only, dep_metro, atmo, display_date = atmo_date)
-  m |>
-    htmlwidgets::onRender(
-      sprintf(
-        "function(el, x) {
-           window.atmoMap = this;
-           var self = this;
-           function attach() {
-             self.eachLayer(function(layer) {
-               if (layer.options && layer.options.layerId && !layer._atmoClickOn) {
-                 layer._atmoClickOn = true;
-                 layer.on('click', function(e) {
-                   var code = e.target.options.layerId;
-                   if (window.updateAirPanel) window.updateAirPanel(code);
-                 });
-               }
-             });
-           }
-           self._cpReattach = attach;
-           setTimeout(attach, 60);
-           setTimeout(attach, 500);
-           setTimeout(attach, 2000);
-           self.on('layeradd', function() { setTimeout(attach, 0); });
-           function readSel() {
-             var p = document.querySelector('input[name=atmo-pol]:checked');
-             return p ? p.value : 'qual_indice';
-           }
-           function onChange() {
-             var pol = readSel();
-             if (window.atmoRecolor) window.atmoRecolor(pol);
-           }
-           setTimeout(function() {
-             document.querySelectorAll('input[name=atmo-pol]')
-               .forEach(function(r) { r.addEventListener('change', onChange); });
-           }, 300);
-         }"
-      )
-    )
+  m <- cmap_atmo(com_metro_only, dep_metro, atmo, display_date = atmo_date)
+  cmap_on_render(m, cmap_page_hooks("atmo", "updateAirPanel", "air-content", "atmo-pol", "atmoRecolor", "qual_indice"))
 } else {
-  htmltools::HTML(
-    "<p style='padding:2rem;color:#7A7A7A;'>",
-    "Air non chargé. Lancer<br><code>Rscript scripts/04_air_atmo.R</code>",
-    "</p>"
-  )
+  htmltools::HTML("<p class='js-loading'>Air non chargé. Lancer Rscript scripts/04_air_atmo.R.</p>")
 }
 ```
 :::
@@ -193,47 +136,34 @@ if (atmo_ready) {
 ```
 :::
 
-## Row {height="18%" .fill}
-
-```{r}
-#| label: drom-air-prep
-#| include: false
-if (atmo_ready) {
-  air_drom_vals <- atmo |>
-    dplyr::transmute(code_commune, value = qual_mean)
-  # Palette ATMO officielle (1=Bon → 6=Extrême mauvais)
-  .air_drom_palette <- c("#50CCAA", "#50F0E6", "#F0E641", "#FF5050", "#960032")
-  .air_drom_breaks  <- c(1, 2, 3, 4, 5, 6)
-}
-```
+## Row {height="23%" .drom-row}
 
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
-if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "971", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "971")
+if (atmo_ready) cmap_atmo_inset(com_drom_only, "971", atmo) else if (data_ready) drom_inset(dep_drom, "971")
 ```
 :::
 
 ::: {.card title="Martinique (972)"}
 ```{r}
-if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "972", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "972")
+if (atmo_ready) cmap_atmo_inset(com_drom_only, "972", atmo) else if (data_ready) drom_inset(dep_drom, "972")
 ```
 :::
 
 ::: {.card title="Guyane (973)"}
 ```{r}
-if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "973", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "973")
+if (atmo_ready) cmap_atmo_inset(com_drom_only, "973", atmo) else if (data_ready) drom_inset(dep_drom, "973")
 ```
 :::
 
 ::: {.card title="La Réunion (974)"}
 ```{r}
-if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "974", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "974")
+if (atmo_ready) cmap_atmo_inset(com_drom_only, "974", atmo) else if (data_ready) drom_inset(dep_drom, "974")
 ```
 :::
 
 ::: {.card title="Mayotte (976)"}
 ```{r}
-if (atmo_ready) choropleth_drom_socio_inset(com_drom_only, "976", air_drom_vals, palette = .air_drom_palette, breaks = .air_drom_breaks) else if (data_ready) drom_inset(dep_drom, "976")
+if (atmo_ready) cmap_atmo_inset(com_drom_only, "976", atmo) else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::
-

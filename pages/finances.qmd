@@ -1,7 +1,10 @@
 ---
-title: "Finances communales · DGFiP"
+title: "Finances communales"
+subtitle: "Comptes DGFiP 2024, en euros par habitant"
 format:
   dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
     orientation: rows
@@ -14,13 +17,6 @@ execute:
 ```{r setup}
 #| include: false
 source(here::here("R", "setup_dashboard.R"))
-```
-
-```{r}
-#| label: inject-commune-names
-#| results: asis
-#| echo: false
-emit_commune_names_js()
 ```
 
 ```{r}
@@ -41,37 +37,16 @@ if (dgfip_ready) {
       tfb  = round(fin_taux_fonc_bati,  1),
       tnb  = round(fin_taux_fonc_nbati, 1)
     )
-  fin_json <- jsonlite::toJSON(fin_for_js, auto_unbox = TRUE, na = "null")
-  blue_palette_js <- jsonlite::toJSON(.palette_blue)
+  emit_table("finData", fin_for_js)
 
   cat('<script>\n',
-      'window.finRaw = ', as.character(fin_json), ';\n',
-      'window.finPalette = ', as.character(blue_palette_js), ';\n',
-      'window.finData = {};\n',
-      'window.finRaw.forEach(function(r) { window.finData[r.code] = r; });\n',
-      'window.finFieldMap = { fin_recettes:"rec", fin_charges:"cha", fin_dette:"det", fin_caf:"caf", fin_taux_taxe_hab:"tth", fin_taux_fonc_bati:"tfb" };\n',
-      'window.finBreaks = {};\n',
-      'Object.keys(window.finFieldMap).forEach(function(field) {\n',
-      '  var key = window.finFieldMap[field];\n',
-      '  var vals = window.finRaw.map(function(r) { return r[key]; }).filter(function(v) { return v != null && isFinite(v); }).sort(function(a,b){return a-b;});\n',
-      '  var n = vals.length;\n',
-      '  window.finBreaks[field] = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return vals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
-      '});\n',
-      'window.finColorFor = function(v, field) {\n',
-      '  if (v == null || !isFinite(v)) return "#E8E4DC";\n',
-      '  var br = window.finBreaks[field];\n',
-      '  for (var i = 1; i < 5; i++) { if (v < br[i]) return window.finPalette[i-1]; }\n',
-      '  return window.finPalette[4];\n',
-      '};\n',
+      'window.finPalette = ', as.character(jsonlite::toJSON(PAL$blue)), ';\n',
+      'window.finFields = ', '{"fin_recettes": {"key": "rec", "title": "Recettes, €/hab", "unit": "€", "digits": 0, "scale": "quantile"}, "fin_charges": {"key": "cha", "title": "Charges, €/hab", "unit": "€", "digits": 0, "scale": "quantile"}, "fin_dette": {"key": "det", "title": "Dette, €/hab", "unit": "€", "digits": 0, "scale": "quantile"}, "fin_caf": {"key": "caf", "title": "CAF, €/hab", "unit": "€", "digits": 0, "scale": "quantile"}, "fin_taux_taxe_hab": {"key": "tth", "title": "Taux de taxe d\'habitation, %", "unit": "%", "digits": 1, "scale": "quantile"}, "fin_taux_fonc_bati": {"key": "tfb", "title": "Taux de foncier bâti, %", "unit": "%", "digits": 1, "scale": "quantile"}}', ';\n',
       'window.finRecolor = function(field) {\n',
-      '  if (!window.finMap) return;\n',
-      '  var key = window.finFieldMap[field];\n',
-      '  window.finMap.eachLayer(function(layer) {\n',
-      '    if (!layer.options || !layer.options.layerId) return;\n',
-      '    var ent = window.finData[layer.options.layerId];\n',
-      '    var v = ent ? ent[key] : null;\n',
-      '    layer.setStyle({ fillColor: window.finColorFor(v, field), fillOpacity: (v != null ? 0.85 : 0.25) });\n',
-      '  });\n',
+      '  var f = window.finFields[field];\n',
+      '  CMap.recolor({ get: function (c) { var r = window.finData[c]; return r ? r[f.key] : null; },\n',
+      '    scale: f.scale, palette: window.finPalette,\n',
+      '    legend: { title: f.title, unit: f.unit, digits: f.digits, naLabel: f.na } });\n',
       '};\n',
       'window.updateFinPanel = function(code) {\n',
       '  var el = document.getElementById("fin-content");\n',
@@ -114,9 +89,9 @@ if (dgfip_ready) {
 ```
 
 
-## Row {height="82%"}
+## Row {height="77%"}
 
-::: {.card title="Finances communales · DGFiP 2024 · €/hab" width="72%"}
+::: {.card title="Finances communales, euros par habitant" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
@@ -136,46 +111,18 @@ if (dgfip_ready) {
 ```{r}
 #| label: map-fin
 if (dgfip_ready) {
-  vals0 <- dgfip_data |>
-    dplyr::transmute(code_commune, value = fin_recettes)
-  m <- choropleth_socio(com_metro_only, dep_metro, vals0,
-                        palette = .palette_blue,
-                        legend_title = "Recettes €/hab",
-                        value_unit   = "€",
-                        value_fmt    = function(x) format(round(x), big.mark = " "))
-  m |>
-    htmlwidgets::onRender(
-      "function(el, x) {
-         window.finMap = this;
-         var self = this;
-         function attach() {
-           self.eachLayer(function(layer) {
-             if (layer.options && layer.options.layerId && !layer._finClickOn) {
-               layer._finClickOn = true;
-               layer.on('click', function(e) {
-                 if (window.updateFinPanel) window.updateFinPanel(e.target.options.layerId);
-               });
-             }
-           });
-         }
-         self._cpReattach = attach;
-         setTimeout(attach, 60);
-         setTimeout(attach, 500);
-         setTimeout(attach, 2000);
-         self.on('layeradd', function() { setTimeout(attach, 0); });
-         function onChange() {
-           var sel = document.querySelector('input[name=fin-ind]:checked');
-           if (sel && window.finRecolor) window.finRecolor(sel.value);
-         }
-         setTimeout(function() {
-           document.querySelectorAll('input[name=fin-ind]').forEach(function(r) {
-             r.addEventListener('change', onChange);
-           });
-         }, 300);
-       }"
-    )
+  vals0 <- dgfip_data |> dplyr::transmute(code_commune, value = fin_recettes)
+  st_fin <- cmap_breaks(vals0$value[vals0$code_commune %in% com_metro_only$code], "quantile")
+  m <- cmap_choropleth(com_metro_only, dep_metro, vals0, palette = PAL$blue,
+                       legend_title = "Recettes, €/hab", unit = "€", digits = 0L,
+                       scale = "quantile", breaks = st_fin)
+  cmap_on_render(m, cmap_page_hooks(
+    "fin", "updateFinPanel", "fin-content", "fin-ind", "finRecolor", "fin_recettes",
+    ctx = list(ctx_spec("fin_recettes", "Recettes", "€/hab"), ctx_spec("fin_charges", "Charges", "€/hab"),
+               ctx_spec("fin_dette", "Dette", "€/hab"), ctx_spec("fin_caf", "CAF", "€/hab"),
+               ctx_spec("fin_taux_fonc_bati", "Taux de foncier bâti", "%", 1L))))
 } else {
-  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>DGFiP non chargé.</p>")
+  htmltools::HTML("<p class='js-loading'>DGFiP non chargé.</p>")
 }
 ```
 :::
@@ -191,50 +138,48 @@ if (dgfip_ready) {
   </div>
   <div class="cp-source">
     <strong>Source</strong> · DGFiP · comptes communaux 2024.<br>
-    €/habitant. CAF = capacité d'auto-financement. TH/TFB/TFNB = taxes habitation / foncière bâti / non-bâti.
+    €/habitant (population de référence DGFiP). CAF = capacité d'auto-financement. TH/TFB/TFNB = taxes habitation / foncière bâti / non-bâti. Les parts de la légende portent sur les communes de métropole.
   </div>
 </div>
 ```
 :::
 
-## Row {height="18%" .fill}
+## Row {height="23%" .drom-row}
 
 ```{r}
-#| label: drom-fin-prep
+#| label: drom-prep
 #| include: false
 if (dgfip_ready) {
-  fin_drom_vals <- dgfip_data |>
-    dplyr::transmute(code_commune, value = fin_recettes)
+  drom_vals <- dgfip_data |> dplyr::transmute(code_commune, value = fin_recettes)
 }
 ```
 
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
-if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "971", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "971")
+if (dgfip_ready) cmap_inset(com_drom_only, "971", drom_vals, PAL$blue, st_fin) else if (data_ready) drom_inset(dep_drom, "971")
 ```
 :::
 
 ::: {.card title="Martinique (972)"}
 ```{r}
-if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "972", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "972")
+if (dgfip_ready) cmap_inset(com_drom_only, "972", drom_vals, PAL$blue, st_fin) else if (data_ready) drom_inset(dep_drom, "972")
 ```
 :::
 
 ::: {.card title="Guyane (973)"}
 ```{r}
-if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "973", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "973")
+if (dgfip_ready) cmap_inset(com_drom_only, "973", drom_vals, PAL$blue, st_fin) else if (data_ready) drom_inset(dep_drom, "973")
 ```
 :::
 
 ::: {.card title="La Réunion (974)"}
 ```{r}
-if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "974", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "974")
+if (dgfip_ready) cmap_inset(com_drom_only, "974", drom_vals, PAL$blue, st_fin) else if (data_ready) drom_inset(dep_drom, "974")
 ```
 :::
 
 ::: {.card title="Mayotte (976)"}
 ```{r}
-if (dgfip_ready) choropleth_drom_socio_inset(com_drom_only, "976", fin_drom_vals, palette = .palette_blue, scale = "log_quantile") else if (data_ready) drom_inset(dep_drom, "976")
+if (dgfip_ready) cmap_inset(com_drom_only, "976", drom_vals, PAL$blue, st_fin) else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::
-

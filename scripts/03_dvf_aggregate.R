@@ -36,10 +36,10 @@ suppressPackageStartupMessages({
   library(dplyr)
 })
 
-# Etalab "latest" ne conserve que les 4 dernières années. Pour les années
+# Etalab "latest" ne conserve que les 5 dernières années (2021-2025 au 2026-10). Pour les années
 # plus anciennes (avant 2021), il faudrait taper dans les snapshots datés
 # (https://files.data.gouv.fr/geo-dvf/{YYYY-MM}/), à faire plus tard si besoin.
-YEARS    <- 2021:2024
+YEARS    <- 2021:2025
 raw_dir  <- here::here("data", "raw", "dvf")
 out_dir  <- here::here("data", "processed", "dvf")
 out_path <- file.path(out_dir, "dvf_aggregated.parquet")
@@ -54,7 +54,7 @@ if (length(missing) > 0) {
   stop("Fichiers DVF manquants :\n  ",
        paste(missing, collapse = "\n  "),
        "\n\nLancer le téléchargement :\n",
-       "  cd data/raw/dvf && for y in 2019..2024; do ",
+       "  cd data/raw/dvf && for y in 2021 2022 2023 2024 2025; do ",
        "    curl -sSL -o dvf_$y.csv.gz ",
        "https://files.data.gouv.fr/geo-dvf/latest/csv/$y/full.csv.gz; ",
        "  done")
@@ -172,3 +172,16 @@ print(out |>
         dplyr::filter(type_local == "Maison", n_transactions >= 5) |>
         dplyr::group_by(annee) |>
         dplyr::summarise(prix_median_global = median(prix_m2_median, na.rm = TRUE)))
+
+# ---- Contrôles ----
+stopifnot(
+  setequal(unique(out$annee), YEARS),
+  !anyDuplicated(out[c("code_commune", "annee", "type_local")]),
+  all(nchar(out$code_commune) == 5),
+  all(out$prix_m2_median >= 200 & out$prix_m2_median <= 30000),
+  all(out$n_transactions >= 1),
+  setequal(names(out), c("code_commune", "annee", "type_local", "n_transactions",
+                         "prix_m2_median", "prix_m2_q25", "prix_m2_q75",
+                         "estimation_insuffisante"))
+)
+cat("\n✔ stopifnot() OK\n")

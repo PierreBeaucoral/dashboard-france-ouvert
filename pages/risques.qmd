@@ -1,0 +1,169 @@
+---
+title: "Risques et sols"
+subtitle: "Catastrophes naturelles reconnues (GASPAR), plans de prévention et artificialisation (Cerema)"
+format:
+  dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
+    include-after-body:
+      - _includes/after-body.html
+    orientation: rows
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+source(here::here("R", "page_helpers.R"))
+
+cat_ <- arrow::read_parquet(here::here("data", "processed", "risques", "catnat_commune.parquet"))
+enaf <- arrow::read_parquet(here::here("data", "processed", "risques", "enaf_commune.parquet"))
+rk <- dplyr::full_join(cat_, enaf, by = "code_commune") |> th_plm()
+rk_ready <- exists("com_metro_only") && nrow(rk) > 0
+
+pals <- list(seq = PAL$red, bin = c(PAL$red[1], PAL$red[4]), rev = rev(PAL$div))
+fields <- list(
+  cat15 = list(col = "n_catnat_since_2015", key = "cat15", label = "CatNat depuis 2015",
+               title = "Arrêtés de catastrophe naturelle depuis 2015", unit = "", digits = 0, pal = "seq",
+               scale = "quantile", na = "Non renseigné", sub = "Tous périls, 2015 à 2025",
+               note = "2025 est sous-compté : les arrêtés récents arrivent avec des mois de retard."),
+  sech = list(col = "n_catnat_secheresse", key = "sech", label = "Sécheresse (argiles)",
+               title = "Arrêtés CatNat sécheresse (retrait-gonflement des argiles)", unit = "", digits = 0, pal = "seq",
+               scale = "quantile", na = "Non renseigné", sub = "Depuis 1982"),
+  pprn = list(col = "pprn_inondation_opposable", key = "pprn", label = "PPR inondation",
+               title = "Plan de prévention du risque inondation opposable", pal = "bin",
+               levels = c("Non", "Oui"), na = "Non renseigné"),
+  enaf = list(col = "enaf_ha_par_1000hab_2011_2025", key = "enaf", label = "Artificialisation par habitant",
+               title = "Espaces naturels, agricoles et forestiers consommés, ha pour 1 000 hab.", unit = "ha", digits = 1,
+               pal = "seq", scale = "log_quantile", na = "Non publié (moins de 50 habitants)",
+               sub = "Flux cumulé 2011 à 2025",
+               note = "Un flux, pas un stock : ce n'est pas la part de sols artificialisés."),
+  evar = list(col = "enaf_variation_vs_ref_pct", key = "evar", label = "Rythme vs 2011-2021",
+               title = "Rythme d'artificialisation 2021-2025 vs 2011-2021", unit = "%", digits = 0, pal = "rev",
+               breaks = c(-100, -60, -30, 0, 30, 100000),
+               cats = c("Baisse de plus de 60 %", "Baisse de 30 à 60 %", "Baisse de 0 à 30 %", "Hausse de 0 à 30 %", "Hausse de plus de 30 %"),
+               na = "Non calculé (moins de 5 ha en 2011-2021)", sub = "ha par an, 2021-25 vs 2011-21")
+)
+panel <- list(
+  empty = "Pas de donnée de risque pour cette commune.",
+  sections = list(
+    list(h = "Catastrophes naturelles (arrêtés CatNat)",
+         def = "Un arrêté est pris <strong>sur demande de la commune</strong> : c'est une exposition reconnue administrativement, pas une mesure d'intensité de l'aléa. Les petites communes sont sous-représentées ; la sécheresse se concentre sur les sols argileux.",
+         rows = list(list(l = "Depuis 2015, tous périls", k = "cat15", d = 0),
+                     list(l = "dont inondation (depuis 1982)", k = "cinon", d = 0),
+                     list(l = "dont sécheresse (depuis 1982)", k = "sech", d = 0),
+                     list(l = "Tous périls depuis 1982", k = "ctot", d = 0),
+                     list(l = "Dernier arrêté", k = "cann", d = -1))),
+    list(h = "Plans de prévention des risques naturels (PPRN)",
+         rows = list(list(l = "PPRN opposable (tous risques)", k = "ppr", d = -2),
+                     list(l = "PPR inondation opposable", k = "pprn", d = -2),
+                     list(l = "PPR retrait-gonflement argiles", k = "pprg", d = -2))),
+    list(h = "Artificialisation des sols (ENAF 2011-2025)", show = "enaf",
+         def = "Surface d'espaces naturels, agricoles et forestiers devenue artificialisée (Fichiers fonciers). C'est un <strong>flux</strong>. Le rythme 2021-25 est comparé à 2011-21 uniquement si la référence atteint 5 ha.",
+         rows = list(list(l = "Pour 1 000 habitants", k = "enaf", d = 1, u = "ha"),
+                     list(l = "Total 2011-2025", k = "ehat", d = 1, u = "ha"),
+                     list(l = "dont 2021-2025", k = "e2125", d = 1, u = "ha"),
+                     list(l = "Rythme vs 2011-2021", k = "evar", d = 0, u = "%", na = "non calculé"),
+                     list(l = "Part destinée à l'habitat", k = "ehab", d = 0, u = "%")))
+  )
+)
+```
+
+```{=html}
+<script src="/assets/thematic.js"></script>
+```
+
+```{r}
+#| label: inject-risques
+#| results: asis
+if (rk_ready) {
+  th_emit("risk", "updateRiskPanel", rk,
+          keys = c(cat15 = "n_catnat_since_2015", cinon = "n_catnat_inondation", sech = "n_catnat_secheresse",
+                   ctot = "n_catnat_total", cann = "annee_dernier_catnat", ppr = "pprn_opposable",
+                   pprn = "pprn_inondation_opposable", pprg = "pprn_rga_opposable",
+                   enaf = "enaf_ha_par_1000hab_2011_2025", ehat = "enaf_ha_2011_2025",
+                   e2125 = "enaf_ha_2021_2025", evar = "enaf_variation_vs_ref_pct", ehab = "enaf_part_habitat_pct"),
+          dec = list(enaf = 2, ehat = 1, e2125 = 1, evar = 0, ehab = 0, cat15 = 0, cinon = 0, sech = 0, ctot = 0,
+                     cann = 0, ppr = 0, pprn = 0, pprg = 0),
+          fields = fields, panel = panel, pals = pals, first = "cat15")
+}
+```
+
+## Row {height="77%"}
+
+::: {.card title="Risques et sols par commune" width="72%"}
+```{r}
+#| label: radios-risk
+if (rk_ready) th_radios("risk", fields)
+```
+
+```{r}
+#| label: map-risk
+if (rk_ready) {
+  vals0 <- th_values(rk, fields$cat15)
+  st_risk <- th_breaks(vals0, fields$cat15)
+  th_map("risk", fields$cat15, vals0, st_risk, pals)
+} else {
+  htmltools::HTML("<p class='js-loading'>Risques non chargés. Lancer Rscript scripts/21_catnat_gaspar.R et scripts/25_conso_enaf.R.</p>")
+}
+```
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
+<div id="risk-panel" class="commune-panel">
+  <div id="risk-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir ses arrêtés de catastrophe naturelle et son artificialisation.</p>
+      <p class="cp-hint">CatNat depuis 2015, sécheresse, PPR inondation, ENAF pour 1 000 habitants.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Sources</strong> · MTE / Géorisques, base GASPAR (arrêtés CatNat et PPRN, extraction 2026-10-05, événements jusqu'en 2025) ; Cerema, consommation d'espaces NAF 2011-2025 (Fichiers fonciers).<br>
+    Un arrêté CatNat est accordé sur demande : exposition reconnue, pas intensité de l'aléa. 2025 est sous-compté.
+    L'ENAF est un flux cumulé (Métropole et 971-974, pas Mayotte), pas une part de sols artificialisés.
+  </div>
+</div>
+```
+:::
+
+## Row {height="23%" .drom-row}
+
+```{r}
+#| label: drom-prep-risk
+#| include: false
+if (rk_ready) drom_vals <- th_values(rk, fields$cat15)
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (rk_ready) th_inset("971", fields$cat15, drom_vals, st_risk, pals)
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (rk_ready) th_inset("972", fields$cat15, drom_vals, st_risk, pals)
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (rk_ready) th_inset("973", fields$cat15, drom_vals, st_risk, pals)
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (rk_ready) th_inset("974", fields$cat15, drom_vals, st_risk, pals)
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (rk_ready) th_inset("976", fields$cat15, drom_vals, st_risk, pals)
+```
+:::

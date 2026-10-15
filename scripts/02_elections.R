@@ -20,6 +20,9 @@
 #   - On combine : si une commune existe au T2, on garde le résultat T2.
 #     Sinon (commune dans une circo décidée au T1), on prend le résultat T1.
 #   - La colonne `tour` trace si le résultat affiché vient de T1 ou T2.
+#   - `couverture_inscrits` = part des inscrits de la commune (T1, toutes circonscriptions)
+#     portée par le résultat affiché : < 1 pour les communes coupées entre circonscriptions dont
+#     une partie a été élue au 1er tour (le fichier T2 ne contient que les 2nd tours).
 #
 # Produit : data/processed/elections/legislatives_2024_t2.parquet
 #   1 ligne / commune, ~36 000 lignes (couverture quasi-totale).
@@ -160,46 +163,58 @@ parse_tour <- function(csv_path, tour_label) {
 }
 
 # ---- Agrégation commune-level ----
-
+# RÈGLE UNIQUE (audit N2) : la famille gagnante d'une commune est la famille aux voix
+# CUMULÉES les plus élevées sur l'ensemble de ses candidats (une commune coupée entre
+# plusieurs circonscriptions cumule tous leurs candidats) ; sa part est calculée sur les
+# exprimés cumulés de la commune ; la marge est l'écart avec la 2e famille. Même règle que
+# `harmonise_cog2026` pour les communes fusionnées. (Avant : le « vainqueur » était le
+# meilleur candidat d'une seule circonscription, contradictoire avec les parts par famille
+# affichées à côté : Marseille « Divers 12,5 % » alors que RN 48 % / NFP 39,5 %.)
+# Limite assumée : « Divers » additionne des candidats sans lien (DVG, DVD, REG, ECO...),
+# et peut donc l'emporter sur la première famille identifiée (cf. docs/decisions.qmd).
 aggregate_commune <- function(df_long) {
-  ranked <- df_long |>
-    dplyr::group_by(code_insee) |>
-    dplyr::arrange(dplyr::desc(voix), .by_group = TRUE) |>
-    dplyr::mutate(rang = dplyr::row_number()) |>
-    dplyr::ungroup()
-
-  vainqueur <- ranked |>
-    dplyr::filter(rang == 1L) |>
-    dplyr::transmute(
-      code_insee,
-      tour,
-      nuance_vainqueur  = nuance,
-      famille_vainqueur = famille,
-      voix_vainqueur    = voix,
-      pct_vainqueur     = pct_voix_exprimes
-    )
-
-  second <- ranked |>
-    dplyr::filter(rang == 2L) |>
-    dplyr::transmute(
-      code_insee,
-      voix_second = voix,
-      pct_second  = pct_voix_exprimes
-    )
-
-  pct_par_famille <- df_long |>
-    dplyr::group_by(code_insee, famille) |>
-    dplyr::summarise(pct = sum(pct_voix_exprimes, na.rm = TRUE),
-                     .groups = "drop") |>
-    tidyr::pivot_wider(
-      names_from   = famille,
-      values_from  = pct,
-      names_prefix = "pct_"
-    )
-
   fixes <- df_long |>
     dplyr::distinct(code_insee, nom_commune, code_dept, libelle_dept,
                     inscrits, votants, exprimes, abstentions, pct_abstention)
+  stopifnot(!anyDuplicated(fixes$code_insee))
+
+  # voix par (commune x famille), puis rang des familles (égalité : ordre FAMS, déterministe)
+  fam_voix <- df_long |>
+    dplyr::group_by(code_insee, famille) |>
+    dplyr::summarise(voix = sum(voix, na.rm = TRUE), .groups = "drop") |>
+    dplyr::left_join(dplyr::select(fixes, code_insee, exprimes), by = "code_insee") |>
+    dplyr::mutate(pct = ifelse(exprimes > 0, round(100 * voix / exprimes, 2), NA_real_)) |>
+    dplyr::group_by(code_insee) |>
+    dplyr::arrange(dplyr::desc(voix), match(famille, c("NFP", "ENS", "LR", "RN", "Divers")), .by_group = TRUE) |>
+    dplyr::mutate(rang = dplyr::row_number()) |>
+    dplyr::ungroup()
+
+  # nuance du meilleur candidat DANS la famille gagnante (libellé d'affichage)
+  top_nuance <- df_long |>
+    dplyr::group_by(code_insee, famille) |>
+    dplyr::slice_max(voix, n = 1L, with_ties = FALSE) |>
+    dplyr::ungroup() |>
+    dplyr::select(code_insee, famille, nuance)
+
+  vainqueur <- fam_voix |>
+    dplyr::filter(rang == 1L) |>
+    dplyr::left_join(top_nuance, by = c("code_insee", "famille")) |>
+    dplyr::transmute(
+      code_insee,
+      tour              = df_long$tour[1],
+      nuance_vainqueur  = nuance,
+      famille_vainqueur = famille,
+      voix_vainqueur    = voix,
+      pct_vainqueur     = pct
+    )
+
+  second <- fam_voix |>
+    dplyr::filter(rang == 2L) |>
+    dplyr::transmute(code_insee, voix_second = voix, pct_second = pct)
+
+  pct_par_famille <- fam_voix |>
+    dplyr::select(code_insee, famille, pct) |>
+    tidyr::pivot_wider(names_from = famille, values_from = pct, names_prefix = "pct_")
 
   fixes |>
     dplyr::left_join(vainqueur,       by = "code_insee") |>
@@ -207,8 +222,80 @@ aggregate_commune <- function(df_long) {
     dplyr::left_join(pct_par_famille, by = "code_insee") |>
     dplyr::mutate(
       marge_vainqueur = pct_vainqueur - dplyr::coalesce(pct_second, 0)
-    )
+    ) |>
+    # Aucun suffrage exprimé (ex. Geay 79131 au T2 : 0 exprimé dans le fichier source) : pas de
+    # vainqueur (NA), et non une famille choisie par défaut ; le tour 1 comblera (cf. combine).
+    dplyr::mutate(dplyr::across(
+      c(nuance_vainqueur, famille_vainqueur, voix_vainqueur, pct_vainqueur, marge_vainqueur),
+      ~ dplyr::if_else(is.na(exprimes) | exprimes <= 0L, .x[NA_integer_][1], .x)))
 }
+
+# ---- Harmonisation COG 2026 (audit M1/C2) ----
+# Le fichier du ministère est au COG 2024 et contient des codes qui ne sont pas des
+# communes (circonscriptions des Français de l'étranger ZZ…, COM 975/98x, ZX). On
+# somme les communes absorbées en 2024-2026 vers leur code 2026 (effectifs sommés,
+# pourcentages recalculés pondérés par les exprimés, abstention par les inscrits),
+# puis on ne garde que les communes COG 2026 (table 06_). Prérequis : 06_insee_populations.R.
+# Famille gagnante d'une commune fusionnée = famille aux voix cumulées les plus élevées
+# (voix = pct × exprimés / 100) ; la marge est l'écart entre les deux premières familles.
+# Les communes non fusionnées (≈99,8 %) ne sont pas touchées.
+FAMS <- c("NFP", "ENS", "LR", "RN", "Divers")
+harmonise_cog2026 <- function(agg, map, valid) {
+  # Cas unique hors table de mouvements (audit N5) : le fichier T1 du ministère porte une section
+  # « Cormicy » (dép. 02 Aisne, 31 inscrits) sous le code 02899, qui n'existe dans aucun COG ;
+  # Gernicourt (02344, ex-Aisne) est commune déléguée de Cormicy (51171, Marne) depuis 2017.
+  # Rattachée à Cormicy 51171 (libellé du fichier = « Cormicy »), additionnée à sa ligne propre.
+  manuel <- c(`02899` = "51171")
+  agg <- dplyr::mutate(agg, code_orig = code_insee,
+                       code_insee = to_cog2026(dplyr::coalesce(unname(manuel[code_insee]), code_insee), map))
+  # Garde-fou (audit N5) : seuls les codes qui ne sont pas des communes sont écartés
+  # (circonscriptions des Français de l'étranger ZZ/ZX..., COM 975-989). Tout autre code
+  # inconnu = commune réelle perdue -> erreur, pas un abandon silencieux.
+  inconnus <- setdiff(unique(agg$code_insee), valid)
+  reels <- inconnus[!grepl("^(Z|97[5-9]|98|99)", inconnus)]
+  if (length(reels) > 0L)
+    stop("Codes communes hors COG 2026 non remappés : ", paste(reels, collapse = ", "))
+  agg <- dplyr::filter(agg, code_insee %in% valid)
+  dup <- agg$code_insee[duplicated(agg$code_insee)]
+  if (length(dup) == 0L) return(dplyr::select(agg, -code_orig))
+  one <- agg |> dplyr::filter(!code_insee %in% dup)
+  mrg <- agg |> dplyr::filter(code_insee %in% dup)
+  fam_cols <- paste0("pct_", FAMS)
+  res <- mrg |>
+    dplyr::group_by(code_insee) |>
+    dplyr::group_modify(function(d, key) {
+      d <- d[order(-d$inscrits), ]                       # composante la plus peuplée = libellés
+      w <- d$exprimes
+      voix <- vapply(fam_cols, function(cn) {
+        v <- d[[cn]]; if (all(is.na(v))) NA_real_ else sum(v * w, na.rm = TRUE) }, numeric(1))
+      pct <- voix / sum(w)                                  # en % des exprimés
+      names(pct) <- fam_cols
+      ord <- order(-dplyr::coalesce(voix, -1))
+      out <- d[1, ]
+      out[c("inscrits", "votants", "exprimes", "abstentions")] <-
+        lapply(d[c("inscrits", "votants", "exprimes", "abstentions")], sum)
+      out$pct_abstention <- round(100 * out$abstentions / out$inscrits, 2)
+      out[fam_cols] <- as.list(round(pct, 2))
+      out$famille_vainqueur <- FAMS[ord[1]]
+      out$pct_vainqueur <- round(pct[ord[1]], 2)
+      out$pct_second <- round(dplyr::coalesce(pct[ord[2]], 0), 2)
+      out$marge_vainqueur <- out$pct_vainqueur - out$pct_second
+      out$voix_vainqueur <- as.integer(round(voix[ord[1]] / 100))
+      out$voix_second <- as.integer(round(dplyr::coalesce(voix[ord[2]], 0) / 100))
+      out$nuance_vainqueur <- d$nuance_vainqueur[match(TRUE, d$famille_vainqueur == out$famille_vainqueur)]
+      out
+    }) |>
+    dplyr::ungroup()
+  message(glue::glue("  Communes fusionnées recombinées : {nrow(res)} (depuis {nrow(mrg)} codes 2024)"))
+  dplyr::bind_rows(one, res) |> dplyr::select(-code_orig)
+}
+source(here::here("scripts", "cog_helpers.R"))
+cog_valid <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet")) |>
+  dplyr::filter(type_com == "COM") |> dplyr::pull(code_commune)
+# Depuis 2015 (et non 2024) : certaines sections communales du fichier portent d'anciens codes
+# de changement de département/commune (MOD 41, 2015-2018 : Le Fresne-sur-Loire 44060, Pont-Farcy 14513, Freigné 49144...
+# puis fusionnées en 2019-2024) ; elles étaient écartées à tort (audit N5).
+cog_m24 <- cog_map("2015-01-01")
 
 # ---- Chemins ----
 
@@ -234,11 +321,12 @@ if (!file.exists(t1_path) || file.size(t1_path) < 5e7) {
 
 # ---- Pipeline ----
 
-agg_t2 <- parse_tour(t2_path, "T2") |> aggregate_commune()
-agg_t1 <- parse_tour(t1_path, "T1") |> aggregate_commune()
+agg_t2 <- parse_tour(t2_path, "T2") |> aggregate_commune() |> harmonise_cog2026(cog_m24, cog_valid)
+agg_t1 <- parse_tour(t1_path, "T1") |> aggregate_commune() |> harmonise_cog2026(cog_m24, cog_valid)
 
 # Combine : T2 prioritaire, T1 comble les trous (circo décidée au T1).
 # La colonne `tour` permet de tracer quel tour est affiché par commune.
+agg_t2 <- dplyr::filter(agg_t2, !is.na(famille_vainqueur))   # T2 sans exprimé : le T1 prend le relais
 out <- dplyr::bind_rows(
   agg_t2,
   agg_t1 |> dplyr::anti_join(agg_t2, by = "code_insee")
@@ -264,11 +352,40 @@ agg_t1_extra <- agg_t1 |>
 out <- out |>
   dplyr::left_join(agg_t1_extra, by = "code_insee")
 
+# Couverture (audit r3 A) : le fichier du 2nd tour ne contient QUE les circonscriptions allées
+# au 2nd tour ; pour une commune coupée entre circonscriptions, le résultat « T2 » ne porte que
+# sur une partie de l'électorat (Paris : 9 députés NFP élus au 1er tour absents). Dénominateur =
+# inscrits de la commune au 1er tour (le fichier T1 couvre toutes les circonscriptions) ; numérateur
+# = inscrits du résultat affiché (T1 : tous, couverture = 1). Les arrondissements PLM héritent de la
+# valeur de leur ville (le fichier du ministère est au niveau de la ville).
+out <- out |>
+  dplyr::left_join(dplyr::transmute(agg_t1, code_insee, inscrits_t1 = inscrits), by = "code_insee") |>
+  dplyr::mutate(ratio = inscrits / inscrits_t1, inscrits_t1 = NULL,
+                # Les listes électorales bougent entre les deux dimanches (+0,3 % en médiane au plus) :
+                # ratio plafonné à 1 ; l'écart reste de quelques inscrits (petites communes) : au-delà de
+                # 25 % (2 % pour les communes de 500 inscrits et plus) ce n'est plus du bruit -> arrêt.
+                couverture_inscrits = round(pmin(1, ratio), 4))
+stopifnot(all(out$ratio < 1.25), all(out$ratio[out$inscrits >= 500] < 1.02))
+out$ratio <- NULL
+stopifnot(all(out$couverture_inscrits > 0 & out$couverture_inscrits <= 1, na.rm = TRUE),
+          !anyNA(out$couverture_inscrits))
+
+# Libellé officiel COG 2026 (le nom de la composante la plus peuplée serait faux pour
+# une commune nouvelle : « La Longeville » pour Pays-de-Montbenoît).
+cog_nm <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet")) |>
+  dplyr::filter(type_com == "COM") |> dplyr::select(code_insee = code_commune, nom_cog = nom_commune)
+out <- out |>
+  dplyr::left_join(cog_nm, by = "code_insee") |>
+  dplyr::mutate(nom_commune = dplyr::coalesce(nom_cog, nom_commune), nom_cog = NULL)
+stopifnot(!anyDuplicated(out$code_insee), all(out$code_insee %in% cog_valid))
+
 # ---- Écriture ----
 
 arrow::write_parquet(out, out_path)
 
 # ---- Rapport ----
+
+message(glue::glue("Couverture < 100 % : {sum(out$couverture_inscrits < 1)} communes ; < 50 % : {sum(out$couverture_inscrits < 0.5)}"))
 
 n_communes <- nrow(out)
 by_tour    <- out |> dplyr::count(tour, name = "n_communes")

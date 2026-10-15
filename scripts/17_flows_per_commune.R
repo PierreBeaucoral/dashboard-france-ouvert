@@ -7,7 +7,7 @@
 #   - Top 5 communes de destination des sortants (résidents d'ici qui vont
 #     travailler ailleurs)
 #
-# Source : MOBPRO 2019 (déjà téléchargé par scripts/14_mobilite.R).
+# Source : MOBPRO RP 2022 (déjà téléchargé par scripts/14_mobilite.R).
 # Consolidation PLM appliquée (Paris/Lyon/Marseille agrégés depuis
 # les arrondissements pour cohérence avec le panneau commune).
 #
@@ -23,22 +23,29 @@ suppressPackageStartupMessages({
   library(duckdb)
   library(DBI)
 })
+source(here::here("scripts", "cog_helpers.R"))
 
-csv_path <- here::here("data", "raw", "mobilite", "FD_MOBPRO_2019.csv")
+pq_path  <- here::here("data", "raw", "mobilite", "RP2022_mobpro.parquet")
 out_dir  <- here::here("data", "processed", "mobilite")
 out_path <- file.path(out_dir, "flows_per_commune.parquet")
 
-if (!file.exists(csv_path)) {
-  stop("MOBPRO CSV introuvable. Lancer scripts/14_mobilite.R d'abord.")
+if (!file.exists(pq_path)) {
+  stop("MOBPRO parquet introuvable. Lancer scripts/14_mobilite.R d'abord.")
 }
 
 con <- DBI::dbConnect(duckdb::duckdb())
 on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
+# Harmonisation COG 2024 (millésime du fichier) -> COG 2026 : on remappe les
+# codes AVANT d'agréger, donc les effectifs de communes fusionnées s'additionnent.
+cogmap <- cog_map("2024-01-01")
+DBI::dbWriteTable(con, "cogmap", cogmap)
 DBI::dbExecute(con, sprintf(
-  "CREATE TABLE mob AS SELECT * FROM read_csv('%s', delim=';', header=true, all_varchar=true)",
-  csv_path
-))
+  "CREATE TABLE mob AS SELECT COALESCE(a.code_2026, CAST(COMMUNE AS VARCHAR)) AS COMMUNE,
+          COALESCE(b.code_2026, CAST(DCLT AS VARCHAR)) AS DCLT, IPONDI
+   FROM read_parquet('%s') m
+   LEFT JOIN cogmap a ON CAST(m.COMMUNE AS VARCHAR) = a.code_avant
+   LEFT JOIN cogmap b ON CAST(m.DCLT AS VARCHAR) = b.code_avant", pq_path))
 
 # Vue PLM-consolidée
 DBI::dbExecute(con, "
@@ -131,3 +138,12 @@ cat("\nExemple Lyon (69123) :\n")
 print(flows |> dplyr::filter(code_focal == "69123") |>
         dplyr::arrange(direction, rang) |>
         dplyr::select(direction, rang, nom_counter, dept_counter, flux))
+
+# ---- Contrôles ----
+stopifnot(
+  !anyDuplicated(flows[c("code_focal", "direction", "rang")]),
+  all(flows$rang %in% 1:5), all(flows$flux >= 0),
+  abs(n_focal / 34000 - 1) < 0.10,
+  all(c("75056", "69123", "13055") %in% flows$code_focal)
+)
+cat("\n✔ stopifnot() OK\n")

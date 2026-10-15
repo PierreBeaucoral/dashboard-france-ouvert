@@ -61,3 +61,11 @@ quality_reports/
 **/plans/
 agent_outputs/
 
+
+# Généré au pré-rendu par R/build_web_assets.R (source : data/processed/)
+assets/geo/
+assets/data/
+assets/thumbs/
+
+# Captures Playwright locales
+.playwright-mcp/

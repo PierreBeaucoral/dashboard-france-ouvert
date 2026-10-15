@@ -11,6 +11,61 @@
 .palette_blue <- c("#F5F2EC", "#C9D4DE", "#8FA8BC", "#5A7D97", "#2A4D63")
 .socio_na_color <- "#E8E4DC"
 
+# ---- PLM : la géométrie est à l'arrondissement (751xx, 693xx, 132xx) alors que
+# plusieurs sources (DGFiP, carbone, mobilité, densité, Atmo, bio...) ne publient
+# que la ville (75056, 69123, 13055). `.plm_expand()` duplique la ligne ville sur
+# ses arrondissements ABSENTS de `values_df` (une vraie valeur d'arrondissement
+# n'est jamais écrasée). Affichage uniquement : ne pas agréger après expansion.
+.plm_arr_city <- data.frame(
+  arrond = c(sprintf("751%02d", 1:20), sprintf("693%02d", 81:89), sprintf("132%02d", 1:16)),
+  city   = c(rep("75056", 20), rep("69123", 9), rep("13055", 16)),
+  stringsAsFactors = FALSE
+)
+.plm_expand <- function(values_df, col = "code_commune") {
+  key <- values_df[[col]]
+  hit <- match(.plm_arr_city$city, key)
+  keep <- !is.na(hit) & !(.plm_arr_city$arrond %in% key)
+  add <- values_df[hit[keep], , drop = FALSE]
+  add[[col]] <- .plm_arr_city$arrond[keep]
+  rbind(values_df, add)
+}
+
+#' Poisson-gamma empirical-Bayes smoothing of event rates (small-area counts).
+#'
+#' Prior: rate ~ Gamma(a, b) with mean mu = sum(y)/sum(n) and variance estimated by
+#' the method of moments (Marshall 1991): v = s2 - mu / nbar, where s2 is the
+#' n-weighted variance of the raw rates and nbar the mean exposure. Posterior mean
+#' (y + a) / (n + b) = w * raw + (1 - w) * mu, with w = n / (n + b).
+#' If v <= 0 (no overdispersion) the prior is degenerate: b = Inf, every commune is
+#' shrunk fully to mu (w = 0), reported through `w`.
+#'
+#' @param y,n  events and exposure (same unit as the rate denominator), same length.
+#' @param group optional grouping vector: the prior is estimated within each group.
+#' @return data.frame(raw, eb, w, b) in events per unit of `n` (multiply by 1000 for per mille).
+eb_poisson_gamma <- function(y, n, group = NULL) {
+  stopifnot(length(y) == length(n))
+  if (is.null(group)) group <- rep(1L, length(y))
+  out <- data.frame(raw = NA_real_, eb = NA_real_, w = NA_real_, b = NA_real_)[rep(1L, length(y)), ]
+  rownames(out) <- NULL
+  ok <- is.finite(y) & is.finite(n) & n > 0 & !is.na(group)
+  for (g in unique(group[ok])) {
+    i <- which(ok & group == g)
+    if (length(i) < 30L) next                      # groupe trop petit pour un prior
+    mu <- sum(y[i]) / sum(n[i])
+    r  <- y[i] / n[i]
+    s2 <- sum(n[i] * (r - mu)^2) / sum(n[i])
+    v  <- s2 - mu / mean(n[i])
+    b  <- if (v > 0 && mu > 0) mu / v else Inf
+    a  <- if (is.finite(b)) mu * b else NA_real_
+    w  <- if (is.finite(b)) n[i] / (n[i] + b) else rep(0, length(i))
+    out$raw[i] <- r
+    out$eb[i]  <- if (is.finite(b)) (y[i] + a) / (n[i] + b) else mu
+    out$w[i]   <- w
+    out$b[i]   <- b
+  }
+  out
+}
+
 #' Choroplèthe générique pour un indicateur socio-éco (1 valeur par commune).
 #'
 #' @param com_sf      sf des communes (métropole), avec colonne `code`.
@@ -30,7 +85,7 @@ choropleth_socio <- function(com_sf, dep_sf, values_df,
                              breaks = NULL,
                              scale = c("quantile", "log_quantile", "linear")) {
   joined <- com_sf |>
-    dplyr::left_join(values_df, by = c("code" = "code_commune"))
+    dplyr::left_join(.plm_expand(values_df), by = c("code" = "code_commune"))
 
   vals <- joined$value
   scale <- match.arg(scale)
@@ -188,7 +243,7 @@ choropleth_socio_cat <- function(com_sf, dep_sf, values_df,
                                  levels, palette,
                                  legend_title = "Catégorie") {
   joined <- com_sf |>
-    dplyr::left_join(values_df, by = c("code" = "code_commune"))
+    dplyr::left_join(.plm_expand(values_df), by = c("code" = "code_commune"))
 
   ix <- match(as.character(joined$value), levels)
   fillcols <- ifelse(is.na(ix), .socio_na_color, palette[ix])

@@ -1,10 +1,14 @@
 ---
-title: "Départements · small multiples"
+title: "Départements"
+subtitle: "Une tuile par département, colorée par sa statistique communale de référence"
 format:
   dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
     orientation: rows
+    scrolling: true
 execute:
   echo: false
   warning: false
@@ -20,31 +24,15 @@ source(here::here("R", "setup_dashboard.R"))
 #| label: build-dept-aggregates
 #| include: false
 if (explorer_ready) {
-  # Agrège par département : médiane des indicateurs continus + parts
-  # électorales (vote dominant par département).
-  dept_agg <- merged |>
-    dplyr::filter(!is.na(code_dept)) |>
-    dplyr::group_by(code_dept, libelle_dept) |>
-    dplyr::summarise(
-      n_communes = dplyr::n(),
-      prix_app   = median(dvf_prix_app,    na.rm = TRUE),
-      revenu     = median(revenu_median,   na.rm = TRUE),
-      apl        = median(apl_medecins,    na.rm = TRUE),
-      chomage    = median(defm_taux_pop,   na.rm = TRUE),
-      # Délinquance + accidents : MEAN (pas median) car distribution
-      # bimodale. Secret stat SSMSI : ~half communes = NA + half = 0/faible
-      # urbaine = hauts. Median dégénère à 0 pour 86/96 départements. Mean
-      # capture la queue urbaine et différencie les départements.
-      delinq     = mean(del_total_pour_mille, na.rm = TRUE),
-      accidents  = mean(acc_taux_pop,      na.rm = TRUE),
-      carbone    = median(carb_hab_total,  na.rm = TRUE),
-      voiture    = median(mob_pct_voiture, na.rm = TRUE),
-      bio        = sum(bio_surface_ha,     na.rm = TRUE),
-      .groups = "drop"
-    ) |>
+  # Agrégats départementaux PONDÉRÉS par la population (scripts/05 -> departements_agg.parquet) :
+  # médianes pondérées (prix, revenu, APL, chômage, CO2, voiture), taux = Σ accidents / Σ population,
+  # moyenne pondérée pour la délinquance totale, somme pour la surface bio.
+  # La délinquance totale n'existe que pour 685 communes : elle n'est affichée que pour
+  # les départements où ces communes couvrent au moins 25 % de la population.
+  dept_agg <- arrow::read_parquet(here::here("data", "processed", "explorer", "departements_agg.parquet")) |>
+    dplyr::mutate(delinq_couv = delinq_pop_couverte,
+                  delinq = ifelse(!is.na(delinq_pop_couverte) & delinq_pop_couverte >= 0.25, delinq, NA_real_)) |>
     # Garde uniquement les 96 départements métropolitains (01-95 + 2A, 2B).
-    # Exclut DROM (97x, 98x) et codes pseudo-départements (ZX, ZZ français
-    # hors de France, etc.) qui apparaissent dans elec_clean.
     dplyr::filter(grepl("^(0[1-9]|[1-8][0-9]|9[0-5]|2[AB])$", code_dept))
   # Famille dominante par département (proportion de communes où elle gagne)
   fam_dom <- merged |>
@@ -61,27 +49,27 @@ if (explorer_ready) {
 ```
 
 
-## Row {height="14%"}
+## Row {height=230}
 
 ::: {.card title="Lecture"}
 ```{=html}
-<div style="padding:8px 14px;font-size:0.88rem;line-height:1.55;color:#2A2A2A;">
-<p style="margin:0 0 8px 0;"><strong>Une tuile = un département métropolitain</strong> (96 au total).
+<div class="note-block">
+<p><strong>Une tuile = un département métropolitain</strong> (96 au total).
 Chaque tuile est colorée par la statistique de référence ci-dessous, calculée à partir
 des communes du département.</p>
 
-<p style="margin:0 0 8px 0;"><strong>Statistique utilisée selon l'indicateur :</strong></p>
-<ul style="margin:0 0 8px 18px;padding:0;">
-  <li><strong>Médiane communale</strong> pour les variables continues à distribution monotone :
-  prix m², revenu médian, APL médecins, chômage ‰, CO₂/hab, % voiture.</li>
-  <li><strong>Moyenne</strong> pour la <strong>délinquance ‰</strong> et les <strong>accidents BAAC ‰</strong> —
-  les distributions sont bimodales (secret stat SSMSI rend nulles ~17 000 communes), donc la
-  médiane dégénère à 0 dans 86/96 départements. La moyenne capture la queue urbaine.</li>
+<p><strong>Statistique utilisée selon l'indicateur :</strong></p>
+<ul>
+  <li><strong>Médiane communale pondérée par la population</strong> : prix m², revenu médian, APL médecins,
+  chômage ‰, CO₂/hab, % voiture. Une commune de 20 habitants ne pèse plus autant que Marseille.</li>
+  <li><strong>Taux = Σ accidents / Σ population</strong> pour les <strong>accidents BAAC ‰</strong>.</li>
+  <li><strong>Moyenne pondérée</strong> pour la <strong>délinquance totale ‰</strong>, qui n'est publiée que pour 685 communes :
+  la tuile est grisée si ces communes couvrent moins de 25 % de la population du département.</li>
   <li><strong>Somme</strong> pour la <strong>surface bio</strong> (échelle départementale plutôt que communale).</li>
   <li><strong>Plurality</strong> (commune-vote majoritaire) pour la <strong>famille politique dominante</strong>.</li>
 </ul>
 
-<p style="margin:0;color:#4A4A4A;">Le sélecteur de tri (à droite) permet de basculer entre rang de valeur
+<p>Le sélecteur de tri (à droite) permet de basculer entre rang de valeur
 (top des départements en queue, ou vice-versa) et tri alphabétique par code. Les codes "ZX",
 "ZZ" (Français hors de France) et 97x/98x (DROM) sont exclus.</p>
 </div>
@@ -89,11 +77,11 @@ des communes du département.</p>
 :::
 
 
-## Row {height="6%"}
+## Row {height=130}
 
 ::: {.card}
 ```{=html}
-<div class="dvf-controls" style="padding:6px 12px;">
+<div class="dvf-controls">
   <div class="dvf-ctrl-group">
     <span class="dvf-ctrl-label">Indicateur</span>
     <div class="dvf-ctrl-radios" id="dept-radios">
@@ -101,17 +89,17 @@ des communes du département.</p>
       <label><input type="radio" name="dept-ind" value="prix_app"> Prix m² App</label>
       <label><input type="radio" name="dept-ind" value="revenu"> Revenu médian</label>
       <label><input type="radio" name="dept-ind" value="apl"> APL médecins</label>
-      <label><input type="radio" name="dept-ind" value="chomage"> Chômage ‰</label>
-      <label><input type="radio" name="dept-ind" value="delinq"> Délinquance ‰</label>
+      <label><input type="radio" name="dept-ind" value="chomage"> Demandeurs d’emploi (DEFM) ‰</label>
+      <label><input type="radio" name="dept-ind" value="delinq"> Délinquance totale ‰ (couverture partielle)</label>
       <label><input type="radio" name="dept-ind" value="accidents"> Accidents ‰</label>
       <label><input type="radio" name="dept-ind" value="carbone"> CO₂ t/hab</label>
       <label><input type="radio" name="dept-ind" value="voiture"> % voiture</label>
       <label><input type="radio" name="dept-ind" value="bio"> Surface bio (ha)</label>
     </div>
   </div>
-  <div class="dvf-ctrl-group" style="margin-left:auto;">
+  <div class="dvf-ctrl-group dept-sort">
     <span class="dvf-ctrl-label">Tri</span>
-    <select id="dept-sort" class="biv-select" style="font-size:0.85rem;">
+    <select id="dept-sort" class="biv-select">
       <option value="value-desc" selected>Valeur ↓</option>
       <option value="value-asc">Valeur ↑</option>
       <option value="code">Code département</option>
@@ -122,12 +110,11 @@ des communes du département.</p>
 :::
 
 
-## Row {height="80%"}
+## Row {height=980}
 
 ::: {.card title="96 départements métropolitains"}
 ```{=html}
-<div id="dept-grid"
-     style="display:grid;grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));gap:8px;padding:12px;width:100%;height:100%;overflow:auto;"></div>
+<div id="dept-grid" class="dept-grid"></div>
 ```
 
 ```{r}
@@ -145,6 +132,7 @@ if (explorer_ready) {
       apl       = round(apl, 2),
       chomage   = round(chomage, 1),
       delinq    = round(delinq, 1),
+      couv      = round(100 * delinq_couv),
       accidents = round(accidents, 2),
       carbone   = round(carbone, 2),
       voiture   = round(voiture, 1),
@@ -154,17 +142,16 @@ if (explorer_ready) {
 
   cat('<script>\n',
       'window.deptRaw = ', as.character(payload_json), ';\n',
-      "window.deptFamColors = {'NFP':'#C73659','ENS':'#E6B800','RN':'#1B3A57','LR':'#4A90D9','Divers':'#A18047'};\n",
-      'window.deptPalettes = {\n',
-      "  prix_app: ['#F5F2EC','#D9C896','#C0A05A','#92722A','#5E4615'],\n",
-      "  revenu:   ['#F5F2EC','#C9D4B0','#94B091','#5E876E','#2F5145'],\n",
-      "  apl:      ['#7A2424','#D49687','#F5F2EC','#94B091','#2F5145'],\n",
-      "  chomage:  ['#F5F2EC','#E8C3B0','#D49687','#B85F5E','#7A2424'],\n",
-      "  delinq:   ['#F5F2EC','#E8C3B0','#D49687','#B85F5E','#7A2424'],\n",
-      "  accidents:['#F5F2EC','#E8C3B0','#D49687','#B85F5E','#7A2424'],\n",
-      "  carbone:  ['#F5F2EC','#DDD8B3','#B8AE6E','#7E743E','#42391A'],\n",
-      "  voiture:  ['#F5F2EC','#C6DCD0','#85B2A1','#4A8071','#1F4F40'],\n",
-      "  bio:      ['#F5F2EC','#D9E0B4','#A8B870','#7A8740','#3D4A1F']\n",
+      'window.deptFamColors = ', as.character(jsonlite::toJSON(as.list(.mun_palette), auto_unbox = TRUE)), ';\n',
+      'window.deptPalettes = ', as.character(jsonlite::toJSON(list(
+        prix_app = PAL$green, revenu = PAL$green, apl = PAL$div, chomage = PAL$red,
+        delinq = PAL$red, accidents = PAL$red, carbone = PAL$ochre, voiture = PAL$green,
+        bio = PAL$green))), ';\n',
+      '// Texte noir ou blanc selon la luminance du fond (contraste >= 4,5:1)\n',
+      'window.deptTextOn = function(hex) {\n',
+      '  var c = [1, 3, 5].map(function (i) { var v = parseInt(hex.substr(i, 2), 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });\n',
+      '  var L = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];\n',
+      '  return (L + 0.05) / 0.05 >= 1.05 / (L + 0.05) ? "#16181B" : "#FFFFFF";\n',
       '};\n',
 
       'window.deptRender = function() {\n',
@@ -182,12 +169,12 @@ if (explorer_ready) {
       '    var pal = window.deptPalettes[ind];\n',
       '    data.forEach(function(d){\n',
       '      var v = d[ind];\n',
-      "      d._color = v == null ? '#E8E4DC' : (function(){ for (var i=1;i<5;i++){ if (v < brk[i]) return pal[i-1]; } return pal[4]; })();\n",
+      "      d._color = v == null ? null : (function(){ for (var i=1;i<5;i++){ if (v < brk[i]) return pal[i-1]; } return pal[4]; })();\n",
       '      d._sortKey = v == null ? -Infinity : v;\n',
       '    });\n',
       '  } else {\n',
       '    data.forEach(function(d){\n',
-      "      d._color = window.deptFamColors[d.fam] || '#E8E4DC';\n",
+      "      d._color = window.deptFamColors[d.fam] || null;\n",
       "      d._sortKey = ({NFP:1, ENS:2, LR:3, RN:4, Divers:5}[d.fam]) || 99;\n",
       '    });\n',
       '  }\n',
@@ -196,14 +183,11 @@ if (explorer_ready) {
       '  else data.sort(function(a,b){return a.code.localeCompare(b.code);});\n',
       "  var fmt = function(v){ if (v == null) return '—'; return Number(v).toLocaleString('fr-FR',{maximumFractionDigits:2}); };\n",
       "  grid.innerHTML = data.map(function(d){\n",
-      "    var sub = ind === 'famille' ? (d.fam || '—') : fmt(d[ind]);\n",
-      "    return '<div class=\"dept-tile\" style=\"background:' + d._color + ';padding:10px 12px;border-radius:5px;cursor:default;color:#1A1A1A;min-height:80px;display:flex;flex-direction:column;justify-content:space-between;\">' +\n",
-      "      '<div>' +\n",
-      "        '<div style=\"font-family:IBM Plex Mono,monospace;font-size:0.72rem;opacity:0.65;letter-spacing:0.02em;\">' + d.code + '</div>' +\n",
-      "        '<div style=\"font-size:0.9rem;font-weight:600;margin-top:2px;line-height:1.22;\">' + d.nom + '</div>' +\n",
-      "      '</div>' +\n",
-      "      '<div style=\"font-family:IBM Plex Mono,monospace;font-size:0.85rem;margin-top:6px;\">' + sub + '</div>' +\n",
-      "      '</div>';\n",
+      "    var sub = ind === 'famille' ? (d.fam || '\u2014') : fmt(d[ind]) + (ind === 'delinq' && d[ind] != null ? ' (couv. ' + d.couv + ' %)' : '');\n",
+      "    var st = d._color ? 'background:' + d._color + ';color:' + window.deptTextOn(d._color) : '';\n",
+      "    return '<div class=\"dept-tile' + (d._color ? '' : ' dept-tile-na') + '\" style=\"' + st + '\">' +\n",
+      "      '<div><div class=\"dept-code\">' + d.code + '</div><div class=\"dept-name\">' + d.nom + '</div></div>' +\n",
+      "      '<div class=\"dept-val\">' + sub + '</div></div>';\n",
       "  }).join('');\n",
       '};\n',
 

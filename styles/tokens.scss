@@ -1,0 +1,117 @@
+/*-- scss:defaults --*/
+
+// ============================================================
+// styles/tokens.scss : SOURCE UNIQUE des couleurs du site.
+//
+// Lu par :
+//   - Sass (custom.scss)  -> variables $xxx et propriétés CSS --xxx
+//   - R/theme.R           -> parse les lignes `$nom: #RRGGBB;` ci-dessous
+// Une seule valeur par ligne, format strict `$nom: #RRGGBB;` (le parseur R
+// n'accepte rien d'autre). Ne pas dupliquer ces hex ailleurs.
+//
+// Règle de design : l'interface (chrome) est achromatique ; la couleur est
+// réservée aux données. Aucune teinte rouge/bleue dans le chrome (lecture
+// partisane en France).
+// ============================================================
+
+// ---- Chrome (neutres) ----
+$paper:        #F6F6F3;   // fond de page
+$surface:      #FFFFFF;   // cartes, plaque de carte
+$surface-2:    #EEEEEA;   // en-têtes de tableau, piste des contrôles
+$rule:         #DEDED8;   // filets
+$rule-strong:  #BDBDB6;   // bordures de contrôle
+$ink:          #16181B;   // texte principal (16,4:1 sur paper)
+$ink-2:        #45494F;   // texte secondaire (8,4:1)
+$ink-3:        #62666D;   // légendes, sources (5,3:1)
+$warn-bg:      #FFF4D6;   // bandeaux de lacune de données uniquement
+$warn-ink:     #7A4B00;
+
+// ---- Données manquantes ("non publié" / secret statistique) ----
+// Hachures grises froides, hors de toutes les rampes.
+$na-fill:      #E9EBED;
+$na-line:      #7C8188;   // 4,1:1 sur la plaque blanche
+
+// ---- Rampes séquentielles (5 classes, clair -> foncé) ----
+$seq-green-1:  #E3EBDD;   // grandeur : prix, revenus, bio, mobilité
+$seq-green-2:  #B3CDA9;
+$seq-green-3:  #7FAC86;
+$seq-green-4:  #4D8466;
+$seq-green-5:  #255746;
+$seq-red-1:    #F2DDD6;   // risque : délinquance, accidents
+$seq-red-2:    #E0AE9F;
+$seq-red-3:    #C7786A;
+$seq-red-4:    #9E4542;
+$seq-red-5:    #6B1F24;
+$seq-blue-1:   #E0E8F0;   // finances communales
+$seq-blue-2:   #B3C7DA;
+$seq-blue-3:   #84A3C3;
+$seq-blue-4:   #517AA2;
+$seq-blue-5:   #284F7A;
+$seq-ochre-1:  #EFE6D2;   // énergie / carbone
+$seq-ochre-2:  #DCC79B;
+$seq-ochre-3:  #C2A164;
+$seq-ochre-4:  #96733A;
+$seq-ochre-5:  #5E4521;
+
+// ---- Divergente brun -> sarcelle (APL autour du seuil 2,5), sûre daltonisme ----
+$div-1:        #8C510A;
+$div-2:        #D8B365;
+$div-3:        #F1EEE6;
+$div-4:        #5AB4AC;
+$div-5:        #01665E;
+
+// ---- Catégorielle : typologie de densité INSEE (rural -> urbain) ----
+$dens-1:       #E6EDE1;
+$dens-2:       #BFD3B5;
+$dens-3:       #8FB596;
+$dens-4:       #5E9A82;
+$dens-5:       #357669;
+$dens-6:       #174F50;
+
+// ---- Couleurs politiques (convention, cartes uniquement) ----
+$pol-nfp:      #C73659;
+$pol-ens:      #E6B800;
+$pol-rn:       #1B3A57;
+$pol-lr:       #4A90D9;
+$pol-divers:   #8A8A8A;
+$pol-divers-mun: #A18047;
+
+// ---- Bivariée Stevens 3x3 (lignes Y1..Y3, colonnes X1..X3) ----
+$biv-11: #E8E8E8;
+$biv-12: #B0D5DF;
+$biv-13: #64ACBE;
+$biv-21: #E4ACAC;
+$biv-22: #AD9EA5;
+$biv-23: #627F8C;
+$biv-31: #C85A5A;
+$biv-32: #985356;
+$biv-33: #574249;
+
+// ---- Indice ATMO officiel (exception réglementaire) ----
+$atmo-0: #BBBBBB;
+$atmo-1: #50F0E6;
+$atmo-2: #50CCAA;
+$atmo-3: #F0E641;
+$atmo-4: #FF5050;
+$atmo-5: #960032;
+$atmo-6: #7D2181;
+
+// ---- Mode sombre : chrome uniquement ----
+// Les cartes gardent leur plaque claire ($plate) : les rampes de données (tokens
+// seq-*, div-*, dens-*, biv-*, atmo-*) sont conçues pour un fond clair et ne changent pas.
+// Contrastes (sur $dk-surface) : ink 14,6:1 ; ink-2 8,9:1 ; ink-3 5,6:1.
+$plate:           #FFFFFF;
+$dk-paper:        #121417;
+$dk-surface:      #1B1E22;
+$dk-surface-2:    #262B30;
+$dk-rule:         #30353B;
+$dk-rule-strong:  #4B525A;
+$dk-ink:          #ECEDEE;
+$dk-ink-2:        #B9BDC2;
+$dk-ink-3:        #8F959C;
+$dk-warn-bg:      #3A2F12;
+$dk-warn-ink:     #F0C879;
+
+// ---- Échelle (mirroir CSS dans custom.scss) ----
+$r-1: 2px;
+$r-2: 4px;

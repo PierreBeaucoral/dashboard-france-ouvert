@@ -177,7 +177,7 @@ if (elec_ready) {
       dplyr::slice_max(pop_latest, n = 1L, with_ties = FALSE,
                        na_rm = TRUE) |>
       dplyr::ungroup() |>
-      dplyr::transmute(code_commune, pop_latest, strate_pop)
+      dplyr::transmute(code_commune, pop_latest, pop_millesime, strate_pop)
   }
   demo_ready <- pop_ready_alt && densite_ready  # DEFM optionnel
 
@@ -307,8 +307,11 @@ if (dvf_ready) {
   dvf       <- arrow::read_parquet(dvf_path)
   dvf_breaks <- compute_dvf_breaks(dvf)
 
-  YEAR_DEFAULT <- max(dvf$annee)
-  TYPE_DEFAULT <- "Appartement"
+  # 2025 est publié mais provisoire (millésime en cours de consolidation) : la vue
+  # par défaut reste la dernière année pleine, 2024.
+  YEAR_LAST    <- max(dvf$annee)
+  YEAR_DEFAULT <- min(2024L, YEAR_LAST)
+  TYPE_DEFAULT <- "Maison"   # ~14 000 communes couvertes contre ~3 400 pour les appartements
 
   dvf_default_year <- dvf |>
     dplyr::filter(annee == YEAR_DEFAULT, type_local == TYPE_DEFAULT,
@@ -334,7 +337,7 @@ atmo_path  <- here::here("data", "processed", "air", "atmo_snapshot.parquet")
 atmo_ready <- file.exists(atmo_path) && elec_ready
 if (atmo_ready) {
   atmo       <- arrow::read_parquet(atmo_path)
-  atmo_date  <- unique(atmo$date_ech)[1]
+  atmo_date  <- unique(atmo$date_fenetre)[1]
 }
 
 # ---- Explorer ----
@@ -348,4 +351,8 @@ if (explorer_ready) {
   merged       <- arrow::read_parquet(merged_path)
   correlations <- arrow::read_parquet(corr_path)
   bivariate    <- arrow::read_parquet(biv_path)
+  # Registre unique des indicateurs (libellé, groupe, unité, décimales) : alimente
+  # Explorer, Carte bivariée et Classements. Écrit par scripts/05_merge_and_explore.R.
+  ind_meta <- arrow::read_parquet(file.path(explorer_dir, "indicator_meta.parquet")) |>
+    dplyr::filter(var %in% names(merged))
 }

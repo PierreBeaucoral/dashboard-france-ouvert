@@ -69,22 +69,35 @@ jobs:
         run: Rscript scripts/04_air_atmo.R
         continue-on-error: true   # si Atmo down ce mois-ci, on continue
 
-      - name: Refresh sources annuelles
+      # Ordre = dépendances. 06 (COG 2026 + populations) en premier : tout ce qui suit
+      # (élections 02, dénominateurs des scripts 19-28, fusion 05) en dépend. AUCUN `|| true` :
+      # un script en échec arrête le job et RIEN n'est commité (données partiellement
+      # rafraîchies = dénominateurs et numérateurs de millésimes différents).
+      # Chaque script télécharge lui-même ses fichiers bruts (data/raw/ est vide sur un runner neuf).
+      # Hors refresh automatique :
+      #   - 01 (contours communaux, change avec l'édition du COG), 03, 12, 14, 16-18 (lourds, sans dénominateur) ;
+      #   - 08 (APL DREES) : les 5 XLSX ne sont pas téléchargeables de façon stable (anciennes ressources
+      #     data.gouv supprimées, nouvelle mise en page) -> relance manuelle, parquet commité conservé.
+      #   - 15 (Agence Bio) : les URL datées codées dans le script renvoient 404 depuis la republication de
+      #     septembre 2026 (fichiers renommés, opérateurs en CSV à virgule, millésime 2025) : à migrer à la
+      #     main (changement de millésime affiché) -> parquet commité conservé.
+      # -> workflow_dispatch / exécution locale.
+      - name: Refresh sources annuelles (ordre des dépendances)
         run: |
-          Rscript scripts/06_insee_populations.R || true
-          Rscript scripts/07_ssmsi_dgfip.R || true
-          Rscript scripts/08_drees_apl.R || true
-          Rscript scripts/09_esperance_vie.R || true
-          Rscript scripts/10_filosofi_densite_defm.R || true
-          Rscript scripts/11_baac.R || true
-          Rscript scripts/13_energie_carbone.R || true
-          Rscript scripts/15_agriculture_bio.R || true
-        # || true : si une source est temporairement indisponible, on continue
-        # les autres au lieu de tout bloquer.
+          set -e
+          for n in 06 07 09 10 11 13 02 19 20 21 22 23 24 25 26 27 28; do
+            echo "::group::scripts/${n}"
+            Rscript scripts/${n}_*.R
+            echo "::endgroup::"
+          done
 
       - name: Rebuild explorer artifacts (merge + correlations + bivariate)
         run: Rscript scripts/05_merge_and_explore.R
-        continue-on-error: true
+
+      # Garde-fou : le validateur DOIT passer avant tout commit (cadre COG 2026, PLM,
+      # unités SSMSI, totaux nationaux...). S'il échoue, le job échoue et rien n'est poussé.
+      - name: Validate data
+        run: Rscript scripts/99_validate_data.R
 
       - name: Commit changed parquets
         run: |
