@@ -1,0 +1,165 @@
+---
+title: "Logement"
+subtitle: "Résidences secondaires, vacance, propriétaires, ménages sans voiture (INSEE, RP 2022) et DPE (ADEME)"
+format:
+  dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
+    include-after-body:
+      - _includes/after-body.html
+    orientation: rows
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+source(here::here("R", "page_helpers.R"))
+
+rp  <- arrow::read_parquet(here::here("data", "processed", "insee_extra", "rp2022_logement_emploi.parquet"))
+dpe <- arrow::read_parquet(here::here("data", "processed", "insee_extra", "dpe_commune.parquet"))
+# DPE : part publiée seulement si au moins 30 diagnostics (règle du script 26)
+dpe <- dpe |> dplyr::mutate(dpe_pct_fg = ifelse(dpe_n >= 30, dpe_pct_fg, NA_real_),
+                            dpe_pct_ab = ifelse(dpe_n >= 30, dpe_pct_ab, NA_real_))
+lg <- dplyr::full_join(rp, dpe[c("code_commune", "dpe_n", "dpe_pct_fg", "dpe_pct_ab")], by = "code_commune") |>
+  th_plm()
+lg_ready <- exists("com_metro_only") && nrow(lg) > 0
+
+pals <- list(seq = PAL$green)
+NAL <- "Non publié (moins de 50 logements ou ménages)"
+fields <- list(
+  rsec = list(col = "pct_res_secondaires", key = "rsec", label = "Résidences secondaires",
+              title = "Résidences secondaires, % des logements", unit = "%", digits = 1, pal = "seq",
+              scale = "quantile", na = NAL, sub = "Recensement 2022"),
+  vac  = list(col = "pct_vacants", key = "vac", label = "Logements vacants",
+              title = "Logements vacants, % des logements", unit = "%", digits = 1, pal = "seq",
+              scale = "quantile", na = NAL, sub = "Recensement 2022"),
+  prop = list(col = "pct_proprietaires", key = "prop", label = "Propriétaires",
+              title = "Propriétaires, % des résidences principales", unit = "%", digits = 1, pal = "seq",
+              scale = "quantile", na = NAL, sub = "Recensement 2022"),
+  nocar = list(col = "pct_menages_sans_voiture", key = "nocar", label = "Ménages sans voiture",
+              title = "Ménages sans voiture, % des ménages", unit = "%", digits = 1, pal = "seq",
+              scale = "quantile", na = NAL, sub = "Recensement 2022"),
+  dpe  = list(col = "dpe_pct_fg", key = "dpe", label = "DPE classés F ou G",
+              title = "Part des DPE classés F ou G, %", unit = "%", digits = 1, pal = "seq",
+              scale = "quantile", na = "Moins de 30 DPE : non publié",
+              sub = "Diagnostics depuis 07/2021",
+              note = "Échantillon de DPE (ventes et locations), pas le parc de logements : non représentatif.")
+)
+panel <- list(
+  empty = "Pas de données de recensement pour cette commune.",
+  sections = list(
+    list(h = "Parc de logements (RP 2022)",
+         def = "Parts calculées sur l'ensemble des logements ; <strong>non publié si moins de 50 logements</strong>. Une résidence secondaire inclut les logements occasionnels.",
+         rows = list(list(l = "Logements", k = "rlog", d = 0),
+                     list(l = "Résidences secondaires", k = "rsec", d = 1, u = "%"),
+                     list(l = "Logements vacants", k = "vac", d = 1, u = "%"),
+                     list(l = "Maisons", k = "mai", d = 1, u = "%"))),
+    list(h = "Ménages (RP 2022)",
+         def = "Parts des résidences principales ; non publié si moins de 50 ménages.",
+         rows = list(list(l = "Propriétaires", k = "prop", d = 1, u = "%"),
+                     list(l = "Sans voiture", k = "nocar", d = 1, u = "%"))),
+    list(h = "Diagnostics de performance énergétique", show = "dpen",
+         def = "<strong>Échantillon non représentatif du parc</strong> : un DPE est établi à la vente ou à la location, et la méthode a changé le 1<sup>er</sup> juillet 2024. À lire comme « part des DPE réalisés depuis 07/2021 », pas comme part des logements. Publié à partir de 30 diagnostics.",
+         rows = list(list(l = "DPE réalisés", k = "dpen", d = 0),
+                     list(l = "Classés F ou G", k = "dpe", d = 1, u = "%", na = "moins de 30 DPE"),
+                     list(l = "Classés A ou B", k = "dpeab", d = 1, u = "%", na = "moins de 30 DPE")))
+  )
+)
+```
+
+```{=html}
+<script src="/assets/thematic.js"></script>
+```
+
+```{r}
+#| label: inject-logement
+#| results: asis
+if (lg_ready) {
+  th_emit("log", "updateLogPanel", lg,
+          keys = c(rsec = "pct_res_secondaires", vac = "pct_vacants", prop = "pct_proprietaires",
+                   nocar = "pct_menages_sans_voiture", dpe = "dpe_pct_fg", dpen = "dpe_n",
+                   dpeab = "dpe_pct_ab", rlog = "rp_log", mai = "pct_maisons"),
+          dec = list(dpen = 0, rlog = 0, dpe = 1, dpeab = 1, rsec = 1, vac = 1, prop = 1, nocar = 1, mai = 1),
+          fields = fields, panel = panel, pals = pals, first = "rsec")
+}
+```
+
+## Row {height="77%"}
+
+::: {.card title="Logement par commune" width="72%"}
+```{r}
+#| label: radios-log
+if (lg_ready) th_radios("log", fields)
+```
+
+```{r}
+#| label: map-log
+if (lg_ready) {
+  vals0 <- th_values(lg, fields$rsec)
+  st_log <- th_breaks(vals0, fields$rsec)
+  th_map("log", fields$rsec, vals0, st_log, pals)
+} else {
+  htmltools::HTML("<p class='js-loading'>Logement non chargé. Lancer Rscript scripts/20_rp2022_logement_emploi.R.</p>")
+}
+```
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
+<div id="log-panel" class="commune-panel">
+  <div id="log-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir son parc de logements et ses ménages.</p>
+      <p class="cp-hint">Résidences secondaires, vacance, propriétaires, voiture, DPE.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Sources</strong> · INSEE, recensement 2022 (base communale logement et emploi) ; ADEME, DPE logements existants depuis 07/2021 (extraction du jour).<br>
+    Mayotte absente du recensement 2022. Parts non publiées sous 50 logements ou ménages.
+    <strong>Le DPE n'est pas représentatif du parc</strong> : seuls les logements vendus ou loués sont diagnostiqués ; part F/G publiée à partir de 30 diagnostics.
+  </div>
+</div>
+```
+:::
+
+## Row {height="23%" .drom-row}
+
+```{r}
+#| label: drom-prep-log
+#| include: false
+if (lg_ready) drom_vals <- th_values(lg, fields$rsec)
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (lg_ready) th_inset("971", fields$rsec, drom_vals, st_log, pals)
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (lg_ready) th_inset("972", fields$rsec, drom_vals, st_log, pals)
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (lg_ready) th_inset("973", fields$rsec, drom_vals, st_log, pals)
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (lg_ready) th_inset("974", fields$rsec, drom_vals, st_log, pals)
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (lg_ready) th_inset("976", fields$rsec, drom_vals, st_log, pals)
+```
+:::

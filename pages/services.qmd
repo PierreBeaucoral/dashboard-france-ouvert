@@ -1,0 +1,172 @@
+---
+title: "Services et numérique"
+subtitle: "Équipements de la vie courante (BPE 2025, INSEE) et fibre optique (ARCEP, 2026 T2)"
+format:
+  dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
+    include-after-body:
+      - _includes/after-body.html
+    orientation: rows
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+#| include: false
+source(here::here("R", "setup_dashboard.R"))
+source(here::here("R", "page_helpers.R"))
+
+bpe <- arrow::read_parquet(here::here("data", "processed", "insee_extra", "bpe_equipements.parquet"))
+arc <- arrow::read_parquet(here::here("data", "processed", "insee_extra", "arcep_fibre.parquet"))
+# Familles du panier -> libellés lisibles (colonne bpe_panier_manquants : codes séparés par des virgules)
+FAM <- c(medecin_gen = "médecin généraliste", pharmacie = "pharmacie", boulangerie = "boulangerie",
+         alimentation = "alimentation générale", ecole = "école", poste = "poste", banque = "banque",
+         coiffure = "coiffure", restaurant = "restaurant", dentiste = "dentiste")
+lab_manq <- function(x) vapply(strsplit(ifelse(is.na(x), "", x), ",", fixed = TRUE),
+                               function(v) if (length(v) == 0L) "aucun" else paste(FAM[v], collapse=", "), character(1))
+bpe$manq <- lab_manq(bpe$bpe_panier_manquants)
+sv <- dplyr::full_join(bpe, arc[c("code_commune", "arcep_pct_ftth", "arcep_locaux")], by = "code_commune") |> th_plm()
+sv_ready <- exists("com_metro_only") && nrow(sv) > 0
+
+pals <- list(seq = PAL$blue)
+fields <- list(
+  panier = list(col = "bpe_panier_score", key = "panier", label = "Panier de services (0-10)",
+                title = "Panier de la vie courante : familles présentes sur 10", pal = "seq",
+                breaks = c(0, 2, 4, 6, 8, 11), cats = c("0 ou 1 famille", "2 ou 3", "4 ou 5", "6 ou 7", "8 à 10 familles"),
+                na = "Non renseigné", sub = "BPE 2025 · 10 familles listées sous le panneau",
+                note = "Présence dans la commune, pas accès : une commune voisine peut être à quelques minutes."),
+  sante = list(col = "bpe_sante_pour1000", key = "sante", label = "Équipements de santé",
+                title = "Équipements de santé pour 1 000 habitants", unit = "", digits = 1, pal = "seq",
+                scale = "quantile", na = "Non publié (moins de 50 habitants)", sub = "BPE 2025",
+                note = "Tous équipements du domaine santé (cabinets, pharmacies, laboratoires, établissements)."),
+  ftth = list(col = "arcep_pct_ftth", key = "ftth", label = "Fibre optique (FttH)",
+                title = "Locaux raccordables à la fibre jusqu'à l'abonné, %", unit = "%", digits = 1, pal = "seq",
+                breaks = c(0, 50, 80, 95, 99.5, 100.01),
+                cats = c("Moins de 50 %", "50 à 80 %", "80 à 95 %", "95 à 99,5 %", "99,5 % et plus"),
+                na = "Non renseigné", sub = "ARCEP, 2026 T2 · France : 95,3 %")
+)
+panel <- list(
+  empty = "Pas de donnée d'équipements pour cette commune.",
+  sections = list(
+    list(h = "Panier de la vie courante (BPE 2025)",
+         def = "Nombre de familles de services présentes <strong>dans la commune</strong>, sur 10. Une commune à 0 n'a aucun des dix services ; présence n'est pas accès.",
+         rows = list(list(l = "Familles présentes", k = "panier", d = 0, u = "/ 10"),
+                     list(l = "Absentes", k = "manq", d = -3))),
+    list(h = "Santé de proximité", 
+         rows = list(list(l = "Équipements de santé / 1 000 hab.", k = "sante", d = 1, na = "non publié"),
+                     list(l = "Médecins généralistes", k = "nmg", d = 0),
+                     list(l = "Pharmacies", k = "nph", d = 0),
+                     list(l = "Chirurgiens-dentistes", k = "nde", d = 0),
+                     list(l = "Maison de santé", k = "nms", d = 0))),
+    list(h = "Autres équipements",
+         rows = list(list(l = "Commerces / 1 000 hab.", k = "com", d = 1, na = "non publié"),
+                     list(l = "Enseignement / 1 000 hab.", k = "ens", d = 1, na = "non publié"),
+                     list(l = "Total des équipements", k = "ntot", d = 0),
+                     list(l = "Point France services", k = "nfs", d = 0))),
+    list(h = "Numérique (ARCEP, 2026 T2)", show = "ftth",
+         def = "Part des locaux de la commune <strong>raccordables</strong> à la fibre jusqu'à l'abonné (FttH). Raccordable ne signifie pas abonné.",
+         rows = list(list(l = "Locaux raccordables FttH", k = "ftth", d = 1, u = "%"),
+                     list(l = "Locaux recensés", k = "loc", d = 0)))
+  )
+)
+```
+
+```{=html}
+<script src="/assets/thematic.js"></script>
+```
+
+```{r}
+#| label: inject-services
+#| results: asis
+if (sv_ready) {
+  th_emit("svc", "updateSvcPanel", sv,
+          keys = c(panier = "bpe_panier_score", manq = "manq", sante = "bpe_sante_pour1000",
+                   nmg = "bpe_n_medecin_gen", nph = "bpe_n_pharmacie", nde = "bpe_n_dentiste",
+                   nms = "bpe_n_maison_sante", com = "bpe_commerces_pour1000",
+                   ens = "bpe_enseignement_pour1000", ntot = "bpe_n_total", nfs = "bpe_n_france_services",
+                   ftth = "arcep_pct_ftth", loc = "arcep_locaux"),
+          dec = list(panier = 0, sante = 1, nmg = 0, nph = 0, nde = 0, nms = 0, com = 1, ens = 1, ntot = 0,
+                     nfs = 0, ftth = 1, loc = 0),
+          fields = fields, panel = panel, pals = pals, first = "panier")
+}
+```
+
+## Row {height="77%"}
+
+::: {.card title="Services et numérique par commune" width="72%"}
+```{r}
+#| label: radios-svc
+if (sv_ready) th_radios("svc", fields)
+```
+
+```{r}
+#| label: map-svc
+if (sv_ready) {
+  vals0 <- th_values(sv, fields$panier)
+  st_svc <- th_breaks(vals0, fields$panier)
+  th_map("svc", fields$panier, vals0, st_svc, pals)
+} else {
+  htmltools::HTML("<p class='js-loading'>Services non chargés. Lancer Rscript scripts/22_bpe_equipements.R et scripts/24_arcep_fibre.R.</p>")
+}
+```
+:::
+
+::: {.card title="Territoire sélectionné" width="28%"}
+```{=html}
+<div id="svc-panel" class="commune-panel">
+  <div id="svc-content" class="cp-content">
+    <div class="cp-placeholder">
+      <p><strong>Cliquez sur une commune</strong> pour voir les services présents sur place et sa couverture en fibre.</p>
+      <p class="cp-hint">Panier de 10 services de la vie courante, équipements de santé, fibre FttH.</p>
+    </div>
+  </div>
+  <div class="cp-source">
+    <strong>Sources</strong> · INSEE, Base permanente des équipements 2025 (au 01/01/2025) ; ARCEP, déploiements FttH par commune, 2026 T2.<br>
+    <strong>Panier (0 à 10)</strong> : nombre de familles présentes dans la commune parmi médecin généraliste, pharmacie, boulangerie-pâtisserie, alimentation générale, école, poste, banque, coiffure, restaurant, chirurgien-dentiste.
+    Présence dans la commune n'est pas accès : une commune sans pharmacie peut en avoir une à deux minutes. Paris, Lyon et Marseille sont comptées en commune entière.
+    Taux pour 1 000 habitants non publiés sous 50 habitants.
+  </div>
+</div>
+```
+:::
+
+## Row {height="23%" .drom-row}
+
+```{r}
+#| label: drom-prep-svc
+#| include: false
+if (sv_ready) drom_vals <- th_values(sv, fields$panier)
+```
+
+::: {.card title="Guadeloupe (971)"}
+```{r}
+if (sv_ready) th_inset("971", fields$panier, drom_vals, st_svc, pals)
+```
+:::
+
+::: {.card title="Martinique (972)"}
+```{r}
+if (sv_ready) th_inset("972", fields$panier, drom_vals, st_svc, pals)
+```
+:::
+
+::: {.card title="Guyane (973)"}
+```{r}
+if (sv_ready) th_inset("973", fields$panier, drom_vals, st_svc, pals)
+```
+:::
+
+::: {.card title="La Réunion (974)"}
+```{r}
+if (sv_ready) th_inset("974", fields$panier, drom_vals, st_svc, pals)
+```
+:::
+
+::: {.card title="Mayotte (976)"}
+```{r}
+if (sv_ready) th_inset("976", fields$panier, drom_vals, st_svc, pals)
+```
+:::

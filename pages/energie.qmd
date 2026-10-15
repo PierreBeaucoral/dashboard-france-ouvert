@@ -1,7 +1,10 @@
 ---
-title: "Énergie · Empreinte carbone"
+title: "Énergie et carbone"
+subtitle: "Empreinte carbone par habitant (RARE / CITEPA, 2018) et consommation résidentielle d'électricité et de gaz (Agence ORE, 2024)"
 format:
   dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
     orientation: rows
@@ -14,162 +17,162 @@ execute:
 ```{r setup}
 #| include: false
 source(here::here("R", "setup_dashboard.R"))
-```
+source(here::here("R", "page_helpers.R"))
 
-```{r}
-#| label: inject-commune-names
-#| results: asis
-#| echo: false
-emit_commune_names_js()
-```
+ore <- arrow::read_parquet(here::here("data", "processed", "energie_ore", "energie_ore_commune.parquet"))
+ol  <- arrow::read_parquet(here::here("data", "processed", "energie_ore", "conso_commune_long.parquet"))
+YR <- max(ore$annee_ore, na.rm = TRUE)
+# Évolution : NA si une cellule RÉSIDENTIELLE est masquée en 2019 ou en dernière année (borne basse)
+masq <- function(en) unique(ol$code_commune[ol$secteur == "residentiel" & ol$energie == en & ol$secret_partiel &
+                                              ol$annee %in% c(2019L, YR)])
+ore <- ore |> dplyr::mutate(
+  gaz_hab  = ifelse(gaz_res_publie, gaz_res_mwh_hab, NA_real_),
+  gaz_part = ifelse(gaz_res_publie, part_gaz_res * 100, NA_real_),
+  ev_elec  = ifelse(code_commune %in% masq("elec"), NA_real_, evol_elec_res_19_last_pct),
+  ev_gaz   = ifelse(code_commune %in% masq("gaz") | !gaz_res_publie, NA_real_, evol_gaz_res_19_last_pct))
+en <- dplyr::full_join(carb_data[c("code_commune", "carb_hab_total")],
+                       ore[c("code_commune", "elec_res_mwh_hab", "elec_res_mwh_pdl", "gaz_hab", "gaz_part",
+                             "ev_elec", "ev_gaz", "gaz_res_publie")], by = "code_commune") |> th_plm()
+en_ready <- carb_ready && exists("com_metro_only")
 
-```{r}
-#| label: inject-carb-data
-#| results: asis
-#| echo: false
-if (carb_ready) {
-  carb_for_js <- carb_data |>
-    dplyr::transmute(
-      code = code_commune,
-      tot  = round(carb_hab_total, 2)
-    )
-  carb_json <- jsonlite::toJSON(carb_for_js, auto_unbox = TRUE, na = "null")
-  pal_js    <- jsonlite::toJSON(c("#F5F2EC", "#DDD8B3", "#B8AE6E",
-                                  "#7E743E", "#42391A"))
-  cat('<script>\n',
-      'window.carbRaw = ', as.character(carb_json), ';\n',
-      'window.carbPalette = ', as.character(pal_js), ';\n',
-      'window.carbData = {};\n',
-      'window.carbRaw.forEach(function(r) { window.carbData[r.code] = r; });\n',
-      'window.updateCarbPanel = function(code) {\n',
-      '  var el = document.getElementById("carb-content");\n',
-      '  if (!el) return;\n',
-      '  var d = window.carbData[code];\n',
-      '  var elec = window.communeLookup && window.communeLookup[code];\n',
-      '  var alt  = window.communeNames && window.communeNames[code];\n',
-      '  var nom  = elec ? elec.nom_commune : (alt ? alt.nom : code);\n',
-      '  var dept = elec ? (elec.libelle_dept + " (" + elec.code_dept + ")") : (alt ? ("Dépt " + alt.dept) : "");\n',
-      '  if (!d) {\n',
-      '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Pas d\\\'estimation publiée pour cette commune.</div>\';\n',
-      '    return;\n',
-      '  }\n',
-      '  function fmt(x) { if (x == null) return "—"; return Number(x).toFixed(2); }\n',
-      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
-      '    \'<div class="cp-section"><h4>Empreinte carbone (approche conso)</h4>\' +\n',
-      '    \'<p class="cp-def">Tonnes <strong>CO₂eq émises pour produire</strong> les biens/services consommés par les ménages, où qu\\\'ils soient produits (≠ émissions territoriales). Médiane FR <strong>≈ 7,9 t/hab</strong>. Cible Accord de Paris : <strong>2 t/hab d\\\'ici 2050</strong>. Méthode EXIOBASE × CITEPA, allocation par revenu/dépense locale.</p>\' +\n',
-      '    \'<div class="cp-kvs">\' +\n',
-      '    \'<div class="cp-kv"><span>Par habitant</span><span class="cp-num">\' + fmt(d.tot) + \' tCO₂eq/an</span></div>\' +\n',
-      '    \'</div>\' +\n',
-      '    \'</div>\';\n',
-      '};\n',
-      '</script>\n',
-      sep = ""
+pals <- list(seq = PAL$ochre)
+fields <- list(
+  carb = list(col = "carb_hab_total", key = "carb", label = "Empreinte carbone (2018)",
+              title = "Empreinte carbone, tCO₂eq par habitant et par an", unit = "t", digits = 2, pal = "seq",
+              scale = "quantile", na = "Non estimée", sub = "RARE / CITEPA 2018",
+              note = "Modèle territorialisé : peu de valeurs distinctes, la carte montre surtout la typologie du modèle."),
+  elec = list(col = "elec_res_mwh_hab", key = "elec", label = "Électricité résidentielle",
+              title = paste0("Électricité résidentielle, MWh par habitant (", YR, ")"), unit = "MWh", digits = 2,
+              pal = "seq", scale = "quantile", na = "Non publié", sub = "Agence ORE · habitants INSEE 2021"),
+  gaz  = list(col = "gaz_hab", key = "gaz", label = "Gaz résidentiel",
+              title = paste0("Gaz résidentiel, MWh par habitant (", YR, ")"), unit = "MWh", digits = 2,
+              pal = "seq", scale = "quantile", na = "Commune non desservie ou non publiée",
+              sub = "Communes raccordées au gaz seulement"),
+  gpart = list(col = "gaz_part", key = "gpart", label = "Part du gaz",
+              title = "Part du gaz dans l'énergie résidentielle (électricité + gaz), %", unit = "%", digits = 0,
+              pal = "seq", scale = "quantile", na = "Commune non desservie ou non publiée",
+              sub = "Communes raccordées au gaz seulement"),
+  epdl = list(col = "elec_res_mwh_pdl", key = "epdl", label = "Électricité par compteur",
+              title = paste0("Électricité résidentielle, MWh par point de livraison (", YR, ")"), unit = "MWh",
+              digits = 1, pal = "seq", scale = "quantile", na = "Non publié", sub = "Agence ORE"),
+  eve  = list(col = "ev_elec", key = "eve", label = "Évolution électricité 2019-24",
+              title = paste0("Électricité résidentielle, évolution 2019 à ", YR, ", %"), unit = "%", digits = 1,
+              pal = "seq", scale = "quantile", na = "Non publié (cellule masquée)",
+              sub = "Seulement sans cellule masquée aux deux dates",
+              note = "Rupture de série en 2018 : aucune comparaison avant 2019. Cellules masquées = borne basse, donc exclues."),
+  evg  = list(col = "ev_gaz", key = "evg", label = "Évolution gaz 2019-24",
+              title = paste0("Gaz résidentiel, évolution 2019 à ", YR, ", %"), unit = "%", digits = 1,
+              pal = "seq", scale = "quantile", na = "Non publié (cellule masquée)",
+              sub = "Seulement sans cellule masquée aux deux dates",
+              note = "Rupture de série en 2018 : aucune comparaison avant 2019. Non corrigée du climat.")
+)
+panel <- list(
+  empty = "Pas d'estimation publiée pour cette commune.",
+  sections = list(
+    list(h = "Empreinte carbone (approche consommation)", show = "carb",
+         def = "Tonnes <strong>CO₂eq émises pour produire</strong> les biens et services consommés par les ménages, où qu'ils soient produits (≠ émissions territoriales). Médiane FR ≈ 7,9 t/hab. Cible : 2 t/hab d'ici 2050. Méthode EXIOBASE × CITEPA.",
+         rows = list(list(l = "Par habitant", k = "carb", d = 2, u = "tCO₂eq/an"))),
+    list(h = paste0("Consommation résidentielle (ORE, ", YR, ")"),
+         def = "Électricité et gaz livrés aux logements, rapportés aux habitants (INSEE 2021) ou aux points de livraison (compteurs). Les cellules sous secret statistique sont masquées.",
+         rows = list(list(l = "Électricité / habitant", k = "elec", d = 2, u = "MWh"),
+                     list(l = "Électricité / compteur", k = "epdl", d = 1, u = "MWh"),
+                     list(l = "Gaz / habitant", k = "gaz", d = 2, u = "MWh", na = "non desservie ou non publié"),
+                     list(l = "Part du gaz", k = "gpart", d = 0, u = "%", na = "non desservie ou non publié"))),
+    list(h = paste0("Évolution 2019 à ", YR),
+         def = "Rupture de série en 2018 (nouvelle méthode ORE) : <strong>pas de comparaison avant 2019</strong>. Publiée seulement si aucune cellule résidentielle n'est masquée à l'une des deux dates (sinon, borne basse). Non corrigée de la météo ni du prix de l'énergie.",
+         rows = list(list(l = "Électricité", k = "eve", d = 1, u = "%", na = "non publié"),
+                     list(l = "Gaz", k = "evg", d = 1, u = "%", na = "non publié")))
   )
+)
+```
+
+```{=html}
+<script src="/assets/thematic.js"></script>
+```
+
+```{r}
+#| label: inject-energie
+#| results: asis
+if (en_ready) {
+  th_emit("en", "updateCarbPanel", en,
+          keys = c(carb = "carb_hab_total", elec = "elec_res_mwh_hab", epdl = "elec_res_mwh_pdl",
+                   gaz = "gaz_hab", gpart = "gaz_part", eve = "ev_elec", evg = "ev_gaz"),
+          dec = list(carb = 2, elec = 2, epdl = 1, gaz = 2, gpart = 0, eve = 1, evg = 1),
+          fields = fields, panel = panel, pals = pals, first = "carb")
 }
 ```
 
+## Row {height="77%"}
 
-## Row {height="82%"}
-
-::: {.card title="Empreinte carbone par habitant · approche consommation" width="72%"}
+::: {.card title="Énergie et carbone par commune" width="72%"}
 ```{r}
-#| label: map-carb
-if (carb_ready) {
-  vals0 <- carb_data |>
-    dplyr::transmute(code_commune, value = carb_hab_total)
-  m <- choropleth_socio(com_metro_only, dep_metro, vals0,
-                        palette = c("#F5F2EC", "#DDD8B3", "#B8AE6E",
-                                    "#7E743E", "#42391A"),
-                        legend_title = "tCO₂eq/hab/an",
-                        value_unit   = "t",
-                        value_fmt    = function(x) format(round(x, 2), nsmall = 2))
-  m |>
-    htmlwidgets::onRender(
-      "function(el, x) {
-         window.carbMap = this;
-         var self = this;
-         this.on('click', function(e) {
-           if (e.layer && e.layer.options && e.layer.options.layerId) {
-             if (window.updateCarbPanel) window.updateCarbPanel(e.layer.options.layerId);
-           }
-         });
-         function attach() {
-           self.eachLayer(function(layer) {
-             if (layer.options && layer.options.layerId && !layer._carbClickOn) {
-               layer._carbClickOn = true;
-               layer.on('click', function(e) {
-                 if (window.updateCarbPanel) window.updateCarbPanel(e.target.options.layerId);
-               });
-             }
-           });
-         }
-         setTimeout(attach, 60);
-         setTimeout(attach, 500);
-         setTimeout(attach, 2000);
-         self.on('layeradd', function() { setTimeout(attach, 0); });
-       }"
-    )
+#| label: radios-en
+if (en_ready) th_radios("en", fields)
+```
+
+```{r}
+#| label: map-en
+if (en_ready) {
+  vals0 <- th_values(en, fields$carb)
+  st_en <- th_breaks(vals0, fields$carb)
+  th_map("en", fields$carb, vals0, st_en, pals)
 } else {
-  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>Empreinte carbone non chargée. Lancer <code>Rscript scripts/13_energie_carbone.R</code>.</p>")
+  htmltools::HTML("<p class='js-loading'>Empreinte carbone non chargée. Lancer Rscript scripts/13_energie_carbone.R.</p>")
 }
 ```
 :::
 
 ::: {.card title="Territoire sélectionné" width="28%"}
 ```{=html}
-<div id="carb-panel" class="commune-panel">
-  <div id="carb-content" class="cp-content">
+<div id="en-panel" class="commune-panel">
+  <div id="en-content" class="cp-content">
     <div class="cp-placeholder">
-      <p><strong>Cliquez sur une commune</strong> pour voir son empreinte carbone par habitant.</p>
-      <p class="cp-hint">Empreinte de consommation (méthode EXIOBASE × CITEPA, RARE 2018).</p>
+      <p><strong>Cliquez sur une commune</strong> pour voir son empreinte carbone et sa consommation résidentielle.</p>
+      <p class="cp-hint">Empreinte 2018 (RARE) ; électricité et gaz par habitant, évolution 2019-2024 (ORE).</p>
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · Réseau RARE / CITEPA · empreinte territorialisée 2018.<br>
-    tCO₂eq/hab/an. Approche conso (≠ émissions territoriales). DROM partiellement couverts.
+    <strong>Sources</strong> · Réseau RARE / CITEPA, empreinte territorialisée 2018 (tCO₂eq/hab/an, approche consommation, DROM partiellement couverts) ; Agence ORE, consommation annuelle d'électricité et de gaz par commune (LO 2.0, mise à jour 2026-01).<br>
+    ORE : <strong>rupture de série en 2018</strong>, cellules sous secret masquées, évolutions publiées sans cellule masquée seulement (borne basse sinon). Le gaz ne concerne que les communes raccordées. Habitants INSEE 2021 pour les valeurs par habitant. Total ORE non utilisé : il inclut ~57 TWh de clients industriels RTE.
   </div>
 </div>
 ```
 :::
 
-## Row {height="18%" .fill}
+## Row {height="23%" .drom-row}
 
 ```{r}
-#| label: drom-carb-prep
+#| label: drom-prep-en
 #| include: false
-if (carb_ready) {
-  carb_drom_vals <- carb_data |>
-    dplyr::transmute(code_commune, value = carb_hab_total)
-  .carb_drom_palette <- c("#F5F2EC", "#DDD8B3", "#B8AE6E", "#7E743E", "#42391A")
-}
+if (en_ready) drom_vals <- th_values(en, fields$carb)
 ```
 
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
-if (carb_ready) choropleth_drom_socio_inset(com_drom_only, "971", carb_drom_vals, palette = .carb_drom_palette) else if (data_ready) drom_inset(dep_drom, "971")
+if (en_ready) th_inset("971", fields$carb, drom_vals, st_en, pals)
 ```
 :::
 
 ::: {.card title="Martinique (972)"}
 ```{r}
-if (carb_ready) choropleth_drom_socio_inset(com_drom_only, "972", carb_drom_vals, palette = .carb_drom_palette) else if (data_ready) drom_inset(dep_drom, "972")
+if (en_ready) th_inset("972", fields$carb, drom_vals, st_en, pals)
 ```
 :::
 
 ::: {.card title="Guyane (973)"}
 ```{r}
-if (carb_ready) choropleth_drom_socio_inset(com_drom_only, "973", carb_drom_vals, palette = .carb_drom_palette) else if (data_ready) drom_inset(dep_drom, "973")
+if (en_ready) th_inset("973", fields$carb, drom_vals, st_en, pals)
 ```
 :::
 
 ::: {.card title="La Réunion (974)"}
 ```{r}
-if (carb_ready) choropleth_drom_socio_inset(com_drom_only, "974", carb_drom_vals, palette = .carb_drom_palette) else if (data_ready) drom_inset(dep_drom, "974")
+if (en_ready) th_inset("974", fields$carb, drom_vals, st_en, pals)
 ```
 :::
 
 ::: {.card title="Mayotte (976)"}
 ```{r}
-if (carb_ready) choropleth_drom_socio_inset(com_drom_only, "976", carb_drom_vals, palette = .carb_drom_palette) else if (data_ready) drom_inset(dep_drom, "976")
+if (en_ready) th_inset("976", fields$carb, drom_vals, st_en, pals)
 ```
 :::

@@ -1,7 +1,10 @@
 ---
-title: "Élections · Législatives 2024"
+title: "Législatives 2024"
+subtitle: "Famille gagnante par commune au tour décisif"
 format:
   dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
     orientation: rows
@@ -14,6 +17,7 @@ execute:
 ```{r setup}
 #| include: false
 source(here::here("R", "setup_dashboard.R"))
+source(here::here("R", "page_helpers.R"))
 ```
 
 ```{r}
@@ -21,18 +25,66 @@ source(here::here("R", "setup_dashboard.R"))
 #| results: asis
 #| echo: false
 if (elec_ready) {
-  lookup_json <- jsonlite::toJSON(
-    commune_lookup_df, auto_unbox = TRUE, na = "null",
-    digits  = 2
-  )
+  # Les ~35 000 fiches communales ne sont plus dans le HTML : fichier colonnes
+  # téléchargé au premier clic (assets/data/elections_lookup.json), puis en cache.
+  dir.create(here::here("assets", "data"), recursive = TRUE, showWarnings = FALSE)
+  # Participation : séries d'abstention 2002-2026 (participation_long) + vues carte (participation_commune)
+  pl <- arrow::read_parquet(here::here("data", "processed", "elections", "participation_long.parquet"))
+  SER <- c("2002_pres_t1", "2007_pres_t1", "2012_pres_t1", "2017_pres_t1", "2022_pres_t1",
+           "2002_legi_t1", "2007_legi_t1", "2012_legi_t1", "2017_legi_t1", "2022_legi_t1", "2024_legi_t1",
+           "2004_euro_t1", "2009_euro_t1", "2014_euro_t1", "2019_euro_t1", "2024_euro_t1",
+           "2014_muni_t1", "2020_muni_t1", "2026_muni_t1")
+  ser <- pl |> dplyr::filter(id_election %in% SER) |>
+    dplyr::mutate(part_abstention = round(part_abstention, 1)) |>
+    dplyr::select(code_commune, id_election, part_abstention) |>
+    tidyr::pivot_wider(names_from = id_election, values_from = part_abstention, names_prefix = "s_")
+  pc <- arrow::read_parquet(here::here("data", "processed", "elections", "participation_commune.parquet")) |>
+    dplyr::select(code_commune, abst_pres22_t1, abst_euro24, abst_muni26_t1, abst_delta_pres02_pres22) |>
+    dplyr::mutate(dplyr::across(-code_commune, ~ round(.x, 1)))
+  part <- dplyr::left_join(pc, ser, by = "code_commune") |> th_plm()
+  lkdf <- commune_lookup_df |> dplyr::left_join(part, by = c("code" = "code_commune"))
+  lk <- c(list(c = lkdf$code),
+          as.list(lkdf[setdiff(names(lkdf), "code")]))
+  writeLines(jsonlite::toJSON(lk, na = "null", digits = NA),
+             here::here("assets", "data", "elections_lookup.json"), useBytes = TRUE)
 
+  # Synthèse communes vs inscrits (France entière, famille gagnante au tour décisif)
+  nat <- elec |> dplyr::filter(!is.na(famille_vainqueur)) |>
+    dplyr::group_by(famille_vainqueur) |>
+    dplyr::summarise(n = dplyr::n(), i = sum(inscrits, na.rm = TRUE), .groups = "drop") |>
+    dplyr::mutate(pc = 100 * n / sum(n), pi = 100 * i / sum(i))
+  nat_l <- c(stats::setNames(lapply(seq_len(nrow(nat)), function(k) list(pc = nat$pc[k], pi = nat$pi[k])), nat$famille_vainqueur),
+             list(n = sum(nat$n)))
+  PF <- list(seq = PAL$blue, div = PAL$div)
+  VF <- list(
+    abst_pres22_t1 = list(col = "abst_pres22_t1", title = "Abstention, présidentielle 2022 (1er tour), %", unit = "%", digits = 1,
+                          pal = "seq", sub = "% des inscrits"),
+    abst_euro24 = list(col = "abst_euro24", title = "Abstention, européennes 2024, %", unit = "%", digits = 1, pal = "seq",
+                       sub = "% des inscrits"),
+    abst_muni26_t1 = list(col = "abst_muni26_t1", title = "Abstention, municipales 2026 (1er tour), %", unit = "%", digits = 1,
+                          pal = "seq", sub = "% des inscrits"),
+    abst_delta = list(col = "abst_delta_pres02_pres22", title = "Évolution de l'abstention, présidentielle 2002 à 2022, points", unit = "pts",
+                      digits = 1, pal = "div", breaks = c(-100, -8, -3, 0, 5, 100),
+                      cats = c("Baisse de plus de 8 pts", "Baisse de 3 à 8", "Baisse de 0 à 3", "Hausse de 0 à 5", "Hausse de plus de 5 pts"),
+                      sub = "1er tour, points de pourcentage")
+  )
+  cat('<script src="/assets/elections-views.js"></script>\n',
+      '<script>window.elecNatl = ', as.character(jsonlite::toJSON(nat_l, auto_unbox = TRUE)), ';\n',
+      'window.elecVF = ', as.character(jsonlite::toJSON(VF, auto_unbox = TRUE)), ';\n',
+      'window.elecPF = ', as.character(jsonlite::toJSON(PF)), ';</script>\n', sep = "")
   cat('<script>\n',
-      'window.communeData = ', as.character(lookup_json), ';\n',
-      'window.communeLookup = {};\n',
-      'window.communeData.forEach(function(d) { window.communeLookup[d.code] = d; });\n',
-      'window.fammilleColors = {"NFP":"#C73659","ENS":"#E6B800",',
-      '"RN":"#1B3A57","LR":"#4A90D9","Divers":"#8A8A8A"};\n',
-      'window.updateCommunePanel = function(code) {\n',
+      'window.fammilleColors = ', as.character(jsonlite::toJSON(as.list(.famille_colors), auto_unbox = TRUE)), ';\n',
+      'window.communeLookup = null;\n',
+      'window.elecLoad = function () {\n',
+      '  if (!window.elecP) window.elecP = CMap.getJSON(CMap.base + "data/elections_lookup.json").then(function (t) {\n',
+      '    var o = {}, ks = Object.keys(t);\n',
+      '    for (var i = 0; i < t.c.length; i++) { var r = { code: t.c[i] }; for (var j = 0; j < ks.length; j++) if (ks[j] !== "c") r[ks[j]] = t[ks[j]][i]; o[t.c[i]] = r; }\n',
+      '    window.communeLookup = o; return o;\n',
+      '  });\n',
+      '  return window.elecP;\n',
+      '};\n',
+      'window.updateCommunePanel = function (code) { window.elecLoad().then(function () { window.updateCommunePanelNow(code); }); };\n',
+      'window.updateCommunePanelNow = function(code) {\n',
       '  var el = document.getElementById("commune-content");\n',
       '  if (!el) return;\n',
       '  var d = window.communeLookup ? window.communeLookup[code] : null;\n',
@@ -40,7 +92,7 @@ if (elec_ready) {
       '    el.innerHTML = \'<div class="cp-header"><h3>\' + code + \'</h3><div class="cp-meta">Pas de résultat Législatives publié pour cette commune.</div></div>\';\n',
       '    return;\n',
       '  }\n',
-      '  var color = window.fammilleColors[d.famille_vainqueur] || "#E8E4DC";\n',
+      '  var color = window.fammilleColors[d.famille_vainqueur] || "var(--na-fill)";\n',
       '  function fmt(x, dec) { if (x === null || x === undefined) return "—"; return Number(x).toFixed(dec || 1); }\n',
       '  function fmtInt(x) { if (x === null || x === undefined) return "—"; return Number(x).toLocaleString("fr-FR"); }\n',
       '  function bar(label, val, c) {\n',
@@ -65,13 +117,13 @@ if (elec_ready) {
       '  // Section T1 universelle (toutes les communes votent à T1)\n',
       '  var t1Section = (d.pct_NFP_t1 != null || d.pct_ENS_t1 != null || d.pct_RN_t1 != null) ?\n',
       '    \'<div class="cp-section"><h4>Voix par famille · 1er tour\' +\n',
-      '    (d.pct_abstention_t1 != null ? \' <span style="font-weight:400;color:#7A7A7A;">(abstention \' + fmt(d.pct_abstention_t1,1) + \'%)</span>\' : \'\') +\n',
+      '    (d.pct_abstention_t1 != null ? \' <span class="cp-meta">(abstention \' + fmt(d.pct_abstention_t1,1) + \'%)</span>\' : \'\') +\n',
       '    \'</h4>\' + bars("_t1") + \'</div>\' :\n',
       '    \'\';\n',
       '  // Pour les communes T1-only (élues au 1er tour), on n\\u0027affiche que T1\n',
       '  // car les colonnes \"main\" reflètent déjà T1\n',
       '  if (tour === "T1") {\n',
-      '    t1Section = \'<div class="cp-section"><h4>Voix par famille · 1er tour <span style="font-weight:400;color:#7A7A7A;">(décisif)</span></h4>\' +\n',
+      '    t1Section = \'<div class="cp-section"><h4>Voix par famille · 1er tour <span class="cp-meta">(décisif)</span></h4>\' +\n',
       '      bars("") + \'</div>\';\n',
       '    t2Section = \'\';\n',
       '  }\n',
@@ -81,13 +133,28 @@ if (elec_ready) {
       '    \'<div class="cp-pct">\' + fmt(d.pct_vainqueur,1) + \'% &nbsp;·&nbsp; marge \' + fmt(d.marge_vainqueur,1) + \' pt</div></div></div>\' +\n',
       '    \'<div class="cp-section cp-kvs">\' +\n',
       '    (d.pop_latest != null ? \'<div class="cp-kv"><span>Population</span><span class="cp-num">\' + fmtInt(d.pop_latest) + \' hab.</span></div>\' : "") +\n',
-      '    (d.strate_pop ? \'<div class="cp-kv"><span>Strate</span><span class="cp-num" style="font-family:Inter;font-size:0.78rem;">\' + d.strate_pop + \'</span></div>\' : "") +\n',
+      '    (d.strate_pop ? \'<div class="cp-kv"><span>Strate</span><span class="cp-num">\' + d.strate_pop + \'</span></div>\' : "") +\n',
       '    \'<div class="cp-kv"><span>Inscrits</span><span class="cp-num">\' + fmtInt(d.inscrits) + \'</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Exprimés</span><span class="cp-num">\' + fmtInt(d.exprimes) + \'</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Abstention</span><span class="cp-num">\' + fmt(d.pct_abstention,1) + \'%</span></div>\' +\n',
       '    \'</div>\' +\n',
       '    t2Section + t1Section;\n',
-      '  el.innerHTML = html;\n',
+      r"---(
+  function ser(label, ks) {
+    var o = [];
+    ks.forEach(function (k) { var v = d["s_" + k]; if (v != null) o.push(k.slice(0, 4) + " : " + fmt(v, 1) + " %"); });
+    return o.length ? "<p class='cp-def'><strong>" + label + "</strong><br>" + o.join(" · ") + "</p>" : "";
+  }
+  var sp = ser("Présidentielle, 1er tour", ["2002_pres_t1", "2007_pres_t1", "2012_pres_t1", "2017_pres_t1", "2022_pres_t1"]) +
+    ser("Législatives, 1er tour", ["2002_legi_t1", "2007_legi_t1", "2012_legi_t1", "2017_legi_t1", "2022_legi_t1", "2024_legi_t1"]) +
+    ser("Européennes", ["2004_euro_t1", "2009_euro_t1", "2014_euro_t1", "2019_euro_t1", "2024_euro_t1"]) +
+    ser("Municipales, 1er tour", ["2014_muni_t1", "2020_muni_t1", "2026_muni_t1"]);
+  if (sp) html += "<div class='cp-section'><h4>Abstention depuis 2002 (% des inscrits)</h4>" + sp +
+    (d.abst_delta_pres02_pres22 != null ? "<div class='cp-kvs'><div class='cp-kv'><span>Présidentielle 2002 à 2022</span><span class='cp-num'>" +
+      (d.abst_delta_pres02_pres22 > 0 ? "+" : "") + fmt(d.abst_delta_pres02_pres22, 1) + " pts</span></div></div>" : "") + "</div>";
+  el.innerHTML = html;
+)---",
+
       '};\n',
       '</script>\n',
       sep = ""
@@ -95,123 +162,50 @@ if (elec_ready) {
 }
 ```
 
-```{r}
-#| label: inject-dvf-data
-#| results: asis
-#| echo: false
-if (dvf_ready) {
-  # Sérialisation : tableau plat, indexé en JS pour minimiser la taille
-  dvf_json <- jsonlite::toJSON(dvf_nested, auto_unbox = TRUE, na = "null")
-  dvf_breaks_json <- jsonlite::toJSON(dvf_breaks, auto_unbox = FALSE)
-  dvf_palette_js  <- jsonlite::toJSON(.dvf_palette)
-  dvf_na_color_js <- jsonlite::toJSON(.dvf_na_color)
+## Row {height="77%"}
 
-  cat('<script>\n',
-      'window.dvfRaw = ', as.character(dvf_json), ';\n',
-      'window.dvfBreaks = ', as.character(dvf_breaks_json), ';\n',
-      'window.dvfPalette = ', as.character(dvf_palette_js), ';\n',
-      'window.dvfNAColor = ', as.character(dvf_na_color_js), ';\n',
-      '// Indexer : window.dvfData[code][type][annee] = {pm, n}\n',
-      'window.dvfData = {};\n',
-      'window.dvfRaw.forEach(function(r) {\n',
-      '  if (!window.dvfData[r.code]) window.dvfData[r.code] = {};\n',
-      '  if (!window.dvfData[r.code][r.type]) window.dvfData[r.code][r.type] = {};\n',
-      '  window.dvfData[r.code][r.type][r.annee] = { pm: r.pm, n: r.n };\n',
-      '});\n',
-      '// Color picker selon le type et le prix\n',
-      'window.dvfColorFor = function(prix, type) {\n',
-      '  if (prix == null || prix === undefined) return window.dvfNAColor;\n',
-      '  var breaks = window.dvfBreaks[type];\n',
-      '  for (var i = 1; i < 5; i++) { if (prix < breaks[i]) return window.dvfPalette[i-1]; }\n',
-      '  return window.dvfPalette[4];\n',
-      '};\n',
-      '// Re-couleur tous les polygones de la carte DVF\n',
-      'window.dvfRecolor = function(year, type) {\n',
-      '  var map = window.dvfMap;\n',
-      '  if (!map) return;\n',
-      '  map.eachLayer(function(layer) {\n',
-      '    if (!layer.options || !layer.options.layerId) return;\n',
-      '    var code = layer.options.layerId;\n',
-      '    var ent = window.dvfData[code] && window.dvfData[code][type] && window.dvfData[code][type][year];\n',
-      '    var color = window.dvfColorFor(ent && ent.pm, type);\n',
-      '    layer.setStyle({ fillColor: color, fillOpacity: (ent ? 0.85 : 0.30) });\n',
-      '  });\n',
-      '  // Mettre à jour la légende\n',
-      '  var legendTitle = document.querySelector(".dvf-legend .lgd-title");\n',
-      '  if (legendTitle) legendTitle.textContent = "Prix m² · " + type + " · " + year;\n',
-      '};\n',
-      '// Panneau DVF\n',
-      'window.updateDvfPanel = function(code) {\n',
-      '  var el = document.getElementById("dvf-content");\n',
-      '  if (!el) return;\n',
-      '  var entries = window.dvfData[code];\n',
-      '  var elecInfo = window.communeLookup && window.communeLookup[code];\n',
-      '  var nom = elecInfo ? elecInfo.nom_commune : code;\n',
-      '  var dept = elecInfo ? (elecInfo.libelle_dept + " (" + elecInfo.code_dept + ")") : "";\n',
-      '  if (!entries) {\n',
-      '    el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div><div class="dvf-empty">Pas de transaction publiée (mono-local, App/Maison) sur 2021-2024.</div>\';\n',
-      '    return;\n',
-      '  }\n',
-      '  var years = [2021,2022,2023,2024];\n',
-      '  function trendBar(type) {\n',
-      '    var ent = entries[type];\n',
-      '    if (!ent) return "<div class=\\"dvf-trend-empty\\">Pas de " + type.toLowerCase() + "</div>";\n',
-      '    var vals = years.map(function(y){return ent[y] ? ent[y].pm : null;});\n',
-      '    var maxV = Math.max.apply(null, vals.filter(function(v){return v!=null;}));\n',
-      '    if (maxV <= 0 || !isFinite(maxV)) return "<div class=\\"dvf-trend-empty\\">Pas de " + type.toLowerCase() + "</div>";\n',
-      '    var bars = years.map(function(y,i){\n',
-      '      var v = vals[i];\n',
-      '      var h = v ? Math.round(v / maxV * 100) : 0;\n',
-      '      var lbl = v ? Math.round(v).toLocaleString("fr-FR") : "—";\n',
-      '      var nb = (ent[y] && ent[y].n) || 0;\n',
-      '      return "<div class=\\"dvf-bar-col\\"><div class=\\"dvf-bar-vert\\"><div class=\\"dvf-bar-fillv\\" style=\\"height:" + h + "%;\\" title=\\"" + lbl + " €/m² · " + nb + " ventes\\"></div></div><div class=\\"dvf-bar-y\\">" + y + "</div><div class=\\"dvf-bar-val\\">" + lbl + "</div></div>";\n',
-      '    }).join("");\n',
-      '    return "<div class=\\"dvf-trend\\"><div class=\\"dvf-trend-label\\">" + type + "</div><div class=\\"dvf-bars\\">" + bars + "</div></div>";\n',
-      '  }\n',
-      '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
-      '    \'<div class="cp-section"><h4>Prix m² médian (€) par année</h4>\' +\n',
-      '    trendBar("Appartement") + trendBar("Maison") + \'</div>\';\n',
-      '};\n',
-      '</script>\n',
-      sep = ""
-  )
-}
+::: {.card title="Famille gagnante, 2nd tour" width="72%"}
+```{=html}
+<div class="dvf-controls">
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Vue</span>
+    <div class="dvf-ctrl-radios" id="elec-radios">
+      <label><input type="radio" name="elec-view" value="famille" checked> Famille gagnante</label>
+      <label><input type="radio" name="elec-view" value="voters"> Électeurs (cercles)</label>
+    </div>
+  </div>
+  <div class="dvf-ctrl-group">
+    <span class="dvf-ctrl-label">Participation</span>
+    <div class="dvf-ctrl-radios">
+      <label><input type="radio" name="elec-view" value="abst_pres22_t1"> Abstention présidentielle 2022</label>
+      <label><input type="radio" name="elec-view" value="abst_euro24"> Européennes 2024</label>
+      <label><input type="radio" name="elec-view" value="abst_muni26_t1"> Municipales 2026</label>
+      <label><input type="radio" name="elec-view" value="abst_delta"> Évolution 2002 à 2022</label>
+    </div>
+  </div>
+</div>
+<script>
+  (function w(n) {
+    if (!(window.CMap && window.ElecViews && window.elecVF)) { if (n < 120) setTimeout(function () { w(n + 1); }, 50); return; }
+    ElecViews.init(window.elecVF, window.elecPF);
+    var el = document.getElementById("elec-natl");
+    if (el) ElecViews.summary(el, window.elecNatl, window.fammilleColors);
+  })(0);
+</script>
 ```
 
-# 
-
-## Row {height="82%"}
-
-::: {.card title="France · Législatives 2024 · 2nd tour · famille gagnante par commune" width="72%"}
 ```{r}
 #| label: map-metropole
 if (elec_ready) {
-  m <- choropleth_metropole(com_metro_results, dep_metro)
-  m |>
-    htmlwidgets::onRender(
-      "function(el, x) {
-         window.elecMap = this;
-         var self = this;
-         function attach() {
-           self.eachLayer(function(layer) {
-             if (layer.options && layer.options.layerId && !layer._cpClickOn) {
-               layer._cpClickOn = true;
-               layer.on('click', function(e) {
-                 if (window.updateCommunePanel) window.updateCommunePanel(e.target.options.layerId);
-               });
-             }
-           });
-         }
-         setTimeout(attach, 60);
-         setTimeout(attach, 500);
-         setTimeout(attach, 2000);
-         self.on('layeradd', function() { setTimeout(attach, 0); });
-       }"
-    )
+  m <- cmap_elections(com_metro_results, dep_metro)
+  cmap_on_render(m, "
+    window.elecMap = self;
+    CMap.pick(self, function (code) { if (window.updateCommunePanel) window.updateCommunePanel(code); });
+  ")
 } else if (data_ready) {
   base_map_metropole(dep_metro)
 } else {
-  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>Données manquantes.</p>")
+  htmltools::HTML("<p class='js-loading'>Données manquantes.</p>")
 }
 ```
 :::
@@ -225,42 +219,43 @@ if (elec_ready) {
       <p class="cp-hint">Famille gagnante, marge sur le second, abstention, répartition T1 et T2 par famille.</p>
     </div>
   </div>
+  <div id="elec-natl" class="cp-content"></div>
   <div class="cp-source">
-    <strong>Source</strong> · Min. Intérieur · Législatives 2024.<br>
-    NFP / ENS / LR / RN = familles regroupant les nuances officielles. T1/T2 = 1ᵉʳ / 2nd tour.
+    <strong>Sources</strong> : Min. Intérieur, Législatives 2024 ; participation 2002-2026 : élections agrégées par bureau de vote (data.gouv.fr), Français de l'étranger exclus.<br>
+    NFP / ENS / LR / RN = familles regroupant les nuances officielles. T1/T2 = 1ᵉʳ / 2nd tour. Abstention en % des inscrits ; avant 2016, blancs et nuls non distingués.
   </div>
 </div>
 ```
 :::
 
-## Row {height="18%" .fill}
+## Row {height="23%" .drom-row}
 
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
-if (elec_ready) choropleth_drom_inset(com_drom_results, "971") else if (data_ready) drom_inset(dep_drom, "971")
+if (elec_ready) cmap_elections_inset(com_drom_results, "971") else if (data_ready) drom_inset(dep_drom, "971")
 ```
 :::
 
 ::: {.card title="Martinique (972)"}
 ```{r}
-if (elec_ready) choropleth_drom_inset(com_drom_results, "972") else if (data_ready) drom_inset(dep_drom, "972")
+if (elec_ready) cmap_elections_inset(com_drom_results, "972") else if (data_ready) drom_inset(dep_drom, "972")
 ```
 :::
 
 ::: {.card title="Guyane (973)"}
 ```{r}
-if (elec_ready) choropleth_drom_inset(com_drom_results, "973") else if (data_ready) drom_inset(dep_drom, "973")
+if (elec_ready) cmap_elections_inset(com_drom_results, "973") else if (data_ready) drom_inset(dep_drom, "973")
 ```
 :::
 
 ::: {.card title="La Réunion (974)"}
 ```{r}
-if (elec_ready) choropleth_drom_inset(com_drom_results, "974") else if (data_ready) drom_inset(dep_drom, "974")
+if (elec_ready) cmap_elections_inset(com_drom_results, "974") else if (data_ready) drom_inset(dep_drom, "974")
 ```
 :::
 
 ::: {.card title="Mayotte (976)"}
 ```{r}
-if (elec_ready) choropleth_drom_inset(com_drom_results, "976") else if (data_ready) drom_inset(dep_drom, "976")
+if (elec_ready) cmap_elections_inset(com_drom_results, "976") else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::

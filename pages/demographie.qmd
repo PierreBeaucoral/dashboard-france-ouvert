@@ -1,7 +1,10 @@
 ---
-title: "Démographie & social"
+title: "Démographie et social"
+subtitle: "Population, typologie de densité INSEE et demandeurs d'emploi (DARES)"
 format:
   dashboard:
+    include-in-header:
+      - ../_includes/theme-init.html
     include-after-body:
       - _includes/after-body.html
     orientation: rows
@@ -17,19 +20,22 @@ source(here::here("R", "setup_dashboard.R"))
 ```
 
 ```{r}
-#| label: inject-commune-names
-#| results: asis
-#| echo: false
-emit_commune_names_js()
-```
-
-```{r}
 #| label: inject-demo-data
 #| results: asis
 #| echo: false
 if (demo_ready) {
   # On fusionne population, densité, chômage par commune.
+  # Croissance annuelle moyenne 2017 -> 2021 (RP), en %/an : (P21/P17)^(1/4) - 1.
+  growth_df <- arrow::read_parquet(pop_path_alt) |>
+    dplyr::filter(!is.na(code_commune)) |>
+    dplyr::group_by(code_commune) |>
+    dplyr::slice_max(pop_latest, n = 1L, with_ties = FALSE, na_rm = TRUE) |>
+    dplyr::ungroup() |>
+    dplyr::transmute(code_commune, p21 = pop_2021,
+                     g = ifelse(is.finite(pop_2017) & is.finite(pop_2021) & pop_2017 > 0 & pop_2021 > 0,
+                                ((pop_2021 / pop_2017)^(1 / 4) - 1) * 100, NA_real_))
   demo_for_js <- pop_data |>
+    dplyr::left_join(growth_df, by = "code_commune") |>
     dplyr::left_join(densite_data |>
                        dplyr::select(code_commune, densite_insee),
                      by = "code_commune") |>
@@ -42,7 +48,8 @@ if (demo_ready) {
       by = "code_commune"
     ) |>
     dplyr::mutate(
-      defm_pour_mille = ifelse(is.na(pop_latest) | pop_latest == 0,
+      # effectifs DARES arrondis à 5 : taux masqué sous 100 hab. (erreur ±25 ‰)
+      defm_pour_mille = ifelse(is.na(pop_latest) | pop_latest < 100,
                                NA_real_,
                                defm_abc / pop_latest * 1000)
     ) |>
@@ -52,111 +59,40 @@ if (demo_ready) {
       strate = strate_pop,
       dens   = densite_insee,
       defm   = defm_abc,
-      defmp  = round(defm_pour_mille, 1)
+      defmp  = round(defm_pour_mille, 1),
+      g      = round(g, 2),
+      p21    = p21
     )
-  demo_json <- jsonlite::toJSON(demo_for_js, auto_unbox = TRUE, na = "null")
+  emit_table("demoData", demo_for_js)
 
-  # Palette population & chômage = teal-vert (sequentielle).
-  demo_pop_palette <- c("#F5F2EC", "#C5D6CF", "#8FB3A7", "#5C8B7D", "#2F5E55")
-  pop_palette_js   <- jsonlite::toJSON(demo_pop_palette)
-  # Palette densité : ordinale rural → urbain.
+  # Typologie de densité INSEE : niveaux ordonnés, rural -> urbain
   dens_levels <- c("Rural non périurbain", "Rural périurbain",
                    "Petites villes", "Centres urbains intermédiaires",
                    "Ceintures urbaines", "Grands centres urbains")
-  dens_palette <- c("#F5F2EC", "#DCD3B8", "#C0A87D", "#9A7D4F",
-                    "#6D5634", "#3F311D")
-
-  # Pré-calcul des breaks log_quantile pour la légende (R-side pour précision)
-  pop_finite  <- pop_data$pop_latest[is.finite(pop_data$pop_latest)]
-  pop_breaks  <- unname(expm1(quantile(log1p(pop_finite[pop_finite >= 0]),
-                                       probs = seq(0, 1, by = 0.2),
-                                       na.rm = TRUE)))
-  defm_vec <- (defm_data$defm_abc /
-               pop_data$pop_latest[match(defm_data$code_commune,
-                                         pop_data$code_commune)] * 1000)
-  defm_finite <- defm_vec[is.finite(defm_vec) & defm_vec >= 0]
-  defm_breaks <- if (length(defm_finite) >= 5L) {
-    unname(expm1(quantile(log1p(defm_finite),
-                          probs = seq(0, 1, by = 0.2), na.rm = TRUE)))
-  } else {
-    seq(0, max(defm_finite, na.rm = TRUE) + 1, length.out = 6)
-  }
-  pop_breaks_js  <- jsonlite::toJSON(pop_breaks)
-  defm_breaks_js <- jsonlite::toJSON(defm_breaks)
 
   cat('<script>\n',
-      'window.demoRaw = ', as.character(demo_json), ';\n',
-      'window.demoPopPalette = ', as.character(pop_palette_js), ';\n',
+      'window.demoSeq = ', as.character(jsonlite::toJSON(PAL$green)), ';\n',
       'window.demoDensLevels = ', as.character(jsonlite::toJSON(dens_levels)), ';\n',
-      'window.demoDensPalette = ', as.character(jsonlite::toJSON(dens_palette)), ';\n',
-      'window.demoData = {};\n',
-      'window.demoRaw.forEach(function(r) { window.demoData[r.code] = r; });\n',
-      'window.demoFieldMap = { pop:"pop", defmp:"defmp" };\n',
-      '// Quantiles séparés par champ continu.\n',
-      'window.demoBreaks = {};\n',
-      'Object.keys(window.demoFieldMap).forEach(function(field) {\n',
-      '  var key = window.demoFieldMap[field];\n',
-      '  var vals = window.demoRaw.map(function(r) { return r[key]; })\n',
-      '             .filter(function(v) { return v != null && isFinite(v) && v >= 0; })\n',
-      '             .sort(function(a,b){return a-b;});\n',
-      '  var logVals = vals.map(function(v) { return Math.log1p(v); });\n',
-      '  var n = logVals.length;\n',
-      '  var qLog = [0, 0.2, 0.4, 0.6, 0.8, 1.0].map(function(p) { return logVals[Math.min(n-1, Math.floor(p * (n-1)))]; });\n',
-      '  window.demoBreaks[field] = qLog.map(function(q) { return Math.expm1(q); });\n',
-      '});\n',
-      'window.demoColorFor = function(v, field) {\n',
-      '  if (v == null) return "#E8E4DC";\n',
-      '  if (field === "dens") {\n',
-      '    var ix = window.demoDensLevels.indexOf(v);\n',
-      '    return ix < 0 ? "#E8E4DC" : window.demoDensPalette[ix];\n',
-      '  }\n',
-      '  var br = window.demoBreaks[field];\n',
-      '  for (var i = 1; i < 5; i++) { if (v < br[i]) return window.demoPopPalette[i-1]; }\n',
-      '  return window.demoPopPalette[4];\n',
+      'window.demoDensPalette = ', as.character(jsonlite::toJSON(PAL$dens)), ';\n',
+      'window.demoDiv = ', as.character(jsonlite::toJSON(PAL$div)), ';\n',
+      'window.demoFields = {\n',
+      '  pop:   { key: "pop",   scale: "log_quantile", unit: "hab.", digits: 0, title: "Population (échelle log)" },\n',
+      '  defmp: { key: "defmp", scale: "log_quantile", unit: "\u2030", digits: 1, title: "Demandeurs d\\u2019emploi, \u2030 de la population (échelle log)" },\n',
+      '  g:     { key: "g", breaks: [-100, -1, -0.25, 0.25, 1, 100], digits: 2, unit: "%/an", title: "Croissance démographique annuelle, 2017 à 2021",\n',
+      '           cats: ["baisse de plus de 1 %/an", "baisse de 0,25 à 1", "stable (±0,25)", "hausse de 0,25 à 1", "hausse de plus de 1 %/an"],\n',
+      '           note: "Taux annuel moyen entre les recensements 2017 et 2021. Communes de moins de 200 habitants estompées : taux très instable." },\n',
+      '  dens:  { key: "dens" }\n',
       '};\n',
       'window.demoRecolor = function(field) {\n',
-      '  if (!window.demoMap) return;\n',
-      '  var key = (field === "dens") ? "dens" : window.demoFieldMap[field];\n',
-      '  window.demoMap.eachLayer(function(layer) {\n',
-      '    if (!layer.options || !layer.options.layerId) return;\n',
-      '    var ent = window.demoData[layer.options.layerId];\n',
-      '    var v = ent ? ent[key] : null;\n',
-      '    layer.setStyle({ fillColor: window.demoColorFor(v, field), fillOpacity: (v != null ? 0.85 : 0.25) });\n',
-      '  });\n',
-      '};\n',
-      '// Légende dynamique : 3 variantes pré-construites swappées à la sélection.\n',
-      'window.demoPopBreaks  = ', as.character(pop_breaks_js), ';\n',
-      'window.demoDefmBreaks = ', as.character(defm_breaks_js), ';\n',
-      'window.demoBuildLegend = function(field) {\n',
-      "  function row(swatch, label, hex) { return '<div class=\"lgd-row\"><span class=\"lgd-swatch\" style=\"background:' + swatch + ';\"></span><span class=\"lgd-label\">' + label + '</span><span class=\"lgd-hex\">' + hex.toUpperCase() + '</span></div>'; }\n",
-      "  function naRow() { return '<div class=\"lgd-row\" style=\"margin-top:6px;border-top:1px dashed #DCD8CF;padding-top:6px;\"><span class=\"lgd-swatch\" style=\"background:#E8E4DC;\"></span><span class=\"lgd-label\" style=\"color:#7A7A7A;\">Non publié</span><span class=\"lgd-hex\">#E8E4DC</span></div>'; }\n",
-      "  function fmtInt(x) { return Number(Math.round(x)).toLocaleString('fr-FR'); }\n",
-      '  function fmtF1(x) { return Number(x).toFixed(1); }\n',
-      "  var title, rows = '';\n",
-      "  if (field === 'dens') {\n",
-      "    title = 'Densité INSEE (typologie)';\n",
-      '    for (var i = 0; i < window.demoDensLevels.length; i++) {\n',
-      '      rows += row(window.demoDensPalette[i], window.demoDensLevels[i], window.demoDensPalette[i]);\n',
-      '    }\n',
-      "  } else if (field === 'defmp') {\n",
-      "    title = 'Chômage DEFM \\u2030 (échelle log)';\n",
-      '    for (var j = 0; j < 5; j++) {\n',
-      "      var lab = fmtF1(window.demoDefmBreaks[j]) + ' – ' + fmtF1(window.demoDefmBreaks[j+1]) + ' \\u2030';\n",
-      '      rows += row(window.demoPopPalette[j], lab, window.demoPopPalette[j]);\n',
-      '    }\n',
-      '  } else {\n',
-      "    title = 'Population (échelle log)';\n",
-      '    for (var k = 0; k < 5; k++) {\n',
-      "      var lab2 = fmtInt(window.demoPopBreaks[k]) + ' – ' + fmtInt(window.demoPopBreaks[k+1]) + ' hab.';\n",
-      '      rows += row(window.demoPopPalette[k], lab2, window.demoPopPalette[k]);\n',
-      '    }\n',
-      '  }\n',
-      "  return '<details class=\"lgd-box\" open><summary class=\"lgd-title\">' + title + '</summary>' + rows + naRow() + '</details>';\n",
-      '};\n',
-      'window.demoSwapLegend = function(field) {\n',
-      "  var ctrl = document.querySelector('.socio-legend');\n",
-      '  if (!ctrl) return;\n',
-      '  ctrl.innerHTML = window.demoBuildLegend(field);\n',
+      '  var f = window.demoFields[field];\n',
+      '  var get = function (c) { var r = window.demoData[c]; return r ? r[f.key] : null; };\n',
+      '  if (field === "dens") CMap.recolor({ get: get, levels: window.demoDensLevels, palette: window.demoDensPalette,\n',
+      '    legend: { title: "Typologie de densité INSEE", naLabel: "Non classée" } });\n',
+      '  else if (field === "g") CMap.recolor({ get: get, breaks: f.breaks, palette: window.demoDiv,\n',
+      '    opacityOf: function (c) { var r = window.demoData[c]; return (r && r.p21 != null && r.p21 < 200) ? 0.35 : 0.9; },\n',
+      '    legend: { title: f.title, unit: f.unit, digits: f.digits, cats: f.cats, note: f.note, naLabel: "Non calculable" } });\n',
+      '  else CMap.recolor({ get: get, scale: f.scale, palette: window.demoSeq,\n',
+      '    legend: { title: f.title, unit: f.unit, digits: f.digits, naLabel: "Non publié" } });\n',
       '};\n',
       'window.updateDemoPanel = function(code) {\n',
       '  var el = document.getElementById("demo-content");\n',
@@ -196,15 +132,16 @@ if (demo_ready) {
 }
 ```
 
-## Row {height="82%"}
+## Row {height="77%"}
 
-::: {.card title="Démographie · population, densité INSEE, chômage" width="72%"}
+::: {.card title="Population, densité et chômage par commune" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
     <span class="dvf-ctrl-label">Indicateur</span>
     <div class="dvf-ctrl-radios" id="demo-radios">
       <label><input type="radio" name="demo-ind" value="pop" checked> Population</label>
+      <label><input type="radio" name="demo-ind" value="g"> Croissance 2017-2021</label>
       <label><input type="radio" name="demo-ind" value="dens"> Densité INSEE (typologie)</label>
       <label><input type="radio" name="demo-ind" value="defmp"> Chômage ‰ (DEFM A+B+C)</label>
     </div>
@@ -215,55 +152,17 @@ if (demo_ready) {
 ```{r}
 #| label: map-demo
 if (demo_ready) {
-  vals0 <- pop_data |>
-    dplyr::transmute(code_commune, value = pop_latest)
-  m <- choropleth_socio(com_metro_only, dep_metro, vals0,
-                        palette = c("#F5F2EC", "#C5D6CF", "#8FB3A7",
-                                    "#5C8B7D", "#2F5E55"),
-                        legend_title = "Population (échelle log)",
-                        value_unit   = "hab.",
-                        value_fmt    = function(x) format(round(x),
-                                                          big.mark = " "),
-                        scale        = "log_quantile")
-  m |>
-    htmlwidgets::onRender(
-      "function(el, x) {
-         window.demoMap = this;
-         var self = this;
-         this.on('click', function(e) {
-           if (e.layer && e.layer.options && e.layer.options.layerId) {
-             if (window.updateDemoPanel) window.updateDemoPanel(e.layer.options.layerId);
-           }
-         });
-         function attach() {
-           self.eachLayer(function(layer) {
-             if (layer.options && layer.options.layerId && !layer._demoClickOn) {
-               layer._demoClickOn = true;
-               layer.on('click', function(e) {
-                 if (window.updateDemoPanel) window.updateDemoPanel(e.target.options.layerId);
-               });
-             }
-           });
-         }
-         self._cpReattach = attach;
-         setTimeout(attach, 60);
-         setTimeout(attach, 500);
-         setTimeout(attach, 2000);
-         self.on('layeradd', function() { setTimeout(attach, 0); });
-         function onChange() {
-           var sel = document.querySelector('input[name=demo-ind]:checked');
-           if (sel && window.demoRecolor) window.demoRecolor(sel.value);
-           if (sel && window.demoSwapLegend) window.demoSwapLegend(sel.value);
-         }
-         setTimeout(function() {
-           document.querySelectorAll('input[name=demo-ind]').forEach(function(r) {
-             r.addEventListener('change', onChange);
-           });
-         }, 300);
-       }"
-    )
+  vals0 <- pop_data |> dplyr::transmute(code_commune, value = pop_latest)
+  st_demo <- cmap_breaks(vals0$value[vals0$code_commune %in% com_metro_only$code], "log_quantile")
+  m <- cmap_choropleth(com_metro_only, dep_metro, vals0, palette = PAL$green,
+                       legend_title = "Population (échelle log)", unit = "hab.", digits = 0L,
+                       scale = "log_quantile", breaks = st_demo, na_label = "Non publié")
+  cmap_on_render(m, cmap_page_hooks(
+    "demo", "updateDemoPanel", "demo-content", "demo-ind", "demoRecolor", "pop",
+    ctx = list(ctx_spec("ctx_log_pop", "Population", "hab.", 0L, log10 = TRUE),
+               ctx_spec("defm_taux_pop", "Demandeurs d'emploi", "‰", 1L))))
 } else {
-  htmltools::HTML("<p style='padding:2rem;color:#7A7A7A;'>Données démographiques non chargées.</p>")
+  htmltools::HTML("<p class='js-loading'>Données démographiques non chargées.</p>")
 }
 ```
 :::
@@ -278,81 +177,47 @@ if (demo_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · INSEE (population, grille densité 7 niveaux) · DARES (DEFM cat. A+B+C).<br>
-    Population : recensement le plus récent. Densité : classification INSEE. DEFM ‰ : demandeurs d'emploi rapportés à la population.
+    <strong>Source</strong> · INSEE (population, grille communale de densité) · DARES (DEFM cat. A+B+C, 2024-T4).<br>
+    Population : recensement le plus récent. Croissance : RP 2017 à RP 2021, taux annuel moyen. Densité : classification INSEE (6 niveaux de la grille communale). DEFM ‰ : demandeurs d'emploi rapportés à la population, masqué sous 100 habitants (effectifs DARES arrondis à 5).
   </div>
 </div>
 ```
 :::
 
-## Row {height="18%" .fill}
+## Row {height="23%" .drom-row}
+
+```{r}
+#| label: drom-prep
+#| include: false
+if (demo_ready) drom_vals <- pop_data |> dplyr::transmute(code_commune, value = pop_latest)
+```
 
 ::: {.card title="Guadeloupe (971)"}
 ```{r}
-#| label: drom-971
-if (demo_ready) {
-  vals_drom <- pop_data |> dplyr::transmute(code_commune, value = pop_latest)
-  choropleth_drom_socio_inset(
-    com_drom_only, "971", vals_drom,
-    palette = c("#F5F2EC", "#C5D6CF", "#8FB3A7", "#5C8B7D", "#2F5E55"),
-    scale   = "log_quantile"
-  )
-} else if (data_ready) drom_inset(dep_drom, "971")
+if (demo_ready) cmap_inset(com_drom_only, "971", drom_vals, PAL$green, st_demo) else if (data_ready) drom_inset(dep_drom, "971")
 ```
 :::
 
 ::: {.card title="Martinique (972)"}
 ```{r}
-#| label: drom-972
-if (demo_ready) {
-  vals_drom <- pop_data |> dplyr::transmute(code_commune, value = pop_latest)
-  choropleth_drom_socio_inset(
-    com_drom_only, "972", vals_drom,
-    palette = c("#F5F2EC", "#C5D6CF", "#8FB3A7", "#5C8B7D", "#2F5E55"),
-    scale   = "log_quantile"
-  )
-} else if (data_ready) drom_inset(dep_drom, "972")
+if (demo_ready) cmap_inset(com_drom_only, "972", drom_vals, PAL$green, st_demo) else if (data_ready) drom_inset(dep_drom, "972")
 ```
 :::
 
 ::: {.card title="Guyane (973)"}
 ```{r}
-#| label: drom-973
-if (demo_ready) {
-  vals_drom <- pop_data |> dplyr::transmute(code_commune, value = pop_latest)
-  choropleth_drom_socio_inset(
-    com_drom_only, "973", vals_drom,
-    palette = c("#F5F2EC", "#C5D6CF", "#8FB3A7", "#5C8B7D", "#2F5E55"),
-    scale   = "log_quantile"
-  )
-} else if (data_ready) drom_inset(dep_drom, "973")
+if (demo_ready) cmap_inset(com_drom_only, "973", drom_vals, PAL$green, st_demo) else if (data_ready) drom_inset(dep_drom, "973")
 ```
 :::
 
 ::: {.card title="La Réunion (974)"}
 ```{r}
-#| label: drom-974
-if (demo_ready) {
-  vals_drom <- pop_data |> dplyr::transmute(code_commune, value = pop_latest)
-  choropleth_drom_socio_inset(
-    com_drom_only, "974", vals_drom,
-    palette = c("#F5F2EC", "#C5D6CF", "#8FB3A7", "#5C8B7D", "#2F5E55"),
-    scale   = "log_quantile"
-  )
-} else if (data_ready) drom_inset(dep_drom, "974")
+if (demo_ready) cmap_inset(com_drom_only, "974", drom_vals, PAL$green, st_demo) else if (data_ready) drom_inset(dep_drom, "974")
 ```
 :::
 
 ::: {.card title="Mayotte (976)"}
 ```{r}
-#| label: drom-976
-if (demo_ready) {
-  vals_drom <- pop_data |> dplyr::transmute(code_commune, value = pop_latest)
-  choropleth_drom_socio_inset(
-    com_drom_only, "976", vals_drom,
-    palette = c("#F5F2EC", "#C5D6CF", "#8FB3A7", "#5C8B7D", "#2F5E55"),
-    scale   = "log_quantile"
-  )
-} else if (data_ready) drom_inset(dep_drom, "976")
+if (demo_ready) cmap_inset(com_drom_only, "976", drom_vals, PAL$green, st_demo) else if (data_ready) drom_inset(dep_drom, "976")
 ```
 :::
