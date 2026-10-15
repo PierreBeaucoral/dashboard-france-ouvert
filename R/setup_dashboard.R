@@ -177,7 +177,7 @@ if (elec_ready) {
       dplyr::slice_max(pop_latest, n = 1L, with_ties = FALSE,
                        na_rm = TRUE) |>
       dplyr::ungroup() |>
-      dplyr::transmute(code_commune, pop_latest, strate_pop)
+      dplyr::transmute(code_commune, pop_latest, pop_millesime, strate_pop)
   }
   demo_ready <- pop_ready_alt && densite_ready  # DEFM optionnel
 

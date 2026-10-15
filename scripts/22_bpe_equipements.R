@@ -102,6 +102,8 @@ for (c in c(dom_cols, "bpe_n_total")) {
   out[[sub("bpe_n_", "bpe_", paste0(c, "_pour1000"))]] <-
     ifelse(out$pop_latest >= 50, round(1000 * out[[c]] / out$pop_latest, 2), NA_real_)
 }
+out$pop_latest[out$code_commune %in% retablies_codes()] <- NA  # numérateur non scindé (cog_helpers)
+for (c in grep("_pour1000$", names(out), value = TRUE)) out[[c]][is.na(out$pop_latest)] <- NA_real_
 out <- select(out, -pop_latest)
 
 arrow::write_parquet(out, file.path(out_dir, "bpe_equipements.parquet"), compression = "zstd")

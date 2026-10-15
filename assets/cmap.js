@@ -121,6 +121,25 @@
     }
     return naPattern;
   }
+  /* Hachure « résultat partiel » (couverture des inscrits < 99 %) : traits sombres à 45°, posés SUR la
+     * couleur de la famille. Distincte de la hachure grise « non publié » (fond neutre, traits clairs 135°). */
+  var partPattern = null;
+  function hatchPart(ctx) {
+    if (!partPattern) {
+      var t = document.createElement("canvas");
+      t.width = t.height = 8;
+      var c = t.getContext("2d");
+      c.strokeStyle = css("--ink", "#16181B");
+      c.lineWidth = 1.6;
+      c.beginPath();
+      c.moveTo(-1, 9); c.lineTo(9, -1);
+      c.moveTo(-1, 1); c.lineTo(1, -1);
+      c.moveTo(7, 9); c.lineTo(9, 7);
+      c.stroke();
+      partPattern = ctx.createPattern(t, "repeat");
+    }
+    return partPattern;
+  }
   if (window.L && L.Canvas) {
     var origFS = L.Canvas.prototype._fillStroke;
     L.Canvas.include({
@@ -136,7 +155,12 @@
           o.fill = keep;
           return;
         }
-        return origFS.call(this, ctx, layer);
+        origFS.call(this, ctx, layer);
+        if (o.cmapPartial && o.fill) {
+          ctx.globalAlpha = 0.55;
+          ctx.fillStyle = hatchPart(ctx);
+          ctx.fill(o.fillRule || "evenodd");
+        }
       }
     });
   }
@@ -235,6 +259,7 @@
     rows += '<div class="lgd-row lgd-row-na"><span class="lgd-swatch lgd-swatch-na"></span>' +
             '<span class="lgd-label">' + esc(st.naLabel || "Non publié (secret statistique)") + "</span>" +
             (hasSt ? '<span class="lgd-pc">' + pct(sh.naC) + '</span><span class="lgd-pp">' + pct(sh.naP) + "</span>" : "") + "</div>";
+    if (st.partial) rows += '<div class="lgd-row"><span class="lgd-swatch lgd-swatch-part"></span><span class="lgd-label">' + esc(st.partial) + "</span></div>";
     var head = hasSt ? '<div class="lgd-head"><span class="lgd-label"></span><span class="lgd-pc" title="Part des communes de la classe">% comm.</span>' +
                '<span class="lgd-pp" title="Part de la population de France métropolitaine vivant dans ces communes">% pop.</span></div>' : "";
     var open = el.querySelector("details") ? el.querySelector("details").open : true;
@@ -384,7 +409,7 @@
         opacity: border.opacity == null ? 0.4 : border.opacity,
         fill: true, fillColor: na ? naFill : s.fill[k],
         fillOpacity: na ? 1 : (Array.isArray(s.op) ? s.op[k] : (s.op == null ? 0.9 : s.op)),
-        smoothFactor: 0.4, layerId: s.codes[k], cmapNA: na, _gi: gi,
+        smoothFactor: 0.4, layerId: s.codes[k], cmapNA: na, cmapPartial: !na && !!(s.part && s.part[k]), _gi: gi,
         interactive: !d.inset || d.interactive === true
       });
       p._tip = s.tip ? s.tip[k] : null;

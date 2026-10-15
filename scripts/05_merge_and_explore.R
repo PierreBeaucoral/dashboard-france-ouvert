@@ -184,6 +184,9 @@ elec_clean <- elec |>
     elec_abstention = pct_abstention_t1,
     elec_marge      = marge_vainqueur,  # T2 : marge du vainqueur (qui a gagné)
     famille_vainqueur,
+    # Part des inscrits de la commune portée par le résultat « tour décisif » (< 1 : circonscriptions
+    # élues au 1er tour exclues du fichier T2, audit r3 A). Voir scripts/02_elections.R.
+    elec_couverture_inscrits = couverture_inscrits,
     ctx_inscrits    = inscrits
   )
 
@@ -429,6 +432,18 @@ merged <- merged |>
                  "Grande ville (≥ 50 000)"))
   )
 
+# [2026-10-15] Communes rétablies 2024-2025 et leurs parents (pop_millesime 2023, cf. 06_) :
+# la population est scindée (popleg 2023) mais les numérateurs restent sur la commune
+# fusionnée (ex. DEFM : 60054 libellé "Les Hauts-Talican" toutes années, pas de ligne
+# 60694/85165/85212/15141) -> taux par habitant masqués, effectifs conservés (audit R3-B).
+pop_rate_cols <- intersect(c("acc_taux_pop", "defm_taux_pop", "bpe_sante_pour1000",
+                             "caf_pct_pop_rsa", "caf_pct_pop_al",
+                             "enaf_ha_par_1000hab_2011_2025"), names(merged))
+# (ORE : dénominateur pop_2021, non scindé comme le numérateur -> non concerné)
+retablies <- if (!is.null(pop)) pop$code_commune[pop$pop_millesime %in% 2023L] else character(0)
+merged[merged$code_commune %in% retablies, pop_rate_cols] <- NA
+message(glue::glue("  Rétablies : {length(retablies)} communes, {length(pop_rate_cols)} taux / hab. masqués"))
+
 stopifnot(!anyDuplicated(merged$code_commune))  # 1 ligne / commune
 arrow::write_parquet(merged, file.path(out_dir, "commune_merged.parquet"))
 message(glue::glue("✔ commune_merged.parquet : {nrow(merged)} communes"))
@@ -449,7 +464,7 @@ INDICATOR_META <- tibble::tribble(
   "elec_pct_lr",                   "% LR (législ. 2024, T1)",       "Élections",      "%",        1,
   "elec_pct_divers",               "% Divers (législ. 2024, T1)",   "Élections",      "%",        1,
   "elec_abstention",               "Abstention (législ. 2024, T1)", "Élections",      "%",        1,
-  "elec_marge",                    "Marge du vainqueur (T2)",       "Élections",      "pts",      1,
+  "elec_marge",                    "Marge du vainqueur (2nd tour, partiel)",       "Élections",      "pts",      1,
   "abst_pres22_t1",                "Abstention prés. 2022 T1",      "Élections",      "%",        1,
   "abst_euro24",                   "Abstention européennes 2024",   "Élections",      "%",        1,
   "abst_muni26_t1",                "Abstention municipales 2026 T1","Élections",      "%",        1,

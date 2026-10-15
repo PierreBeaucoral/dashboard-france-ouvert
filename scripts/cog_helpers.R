@@ -45,3 +45,11 @@ to_cog2026 <- function(x, map) {
   m <- match(x, map$code_avant)
   ifelse(is.na(m), x, map$code_2026[m])
 }
+
+#' Communes rétablies 2024-2025 et leurs parents (pop_latest = populations légales 2023, cf. 06_).
+#' Leur population est scindée mais les numérateurs des sources restent sur la commune fusionnée :
+#' tout taux calculé avec `pop_latest` doit être masqué pour ces codes (audit round 3, B).
+retablies_codes <- function() {
+  p <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet"))
+  p$code_commune[p$pop_millesime %in% 2023L]
+}

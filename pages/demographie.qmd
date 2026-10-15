@@ -49,7 +49,8 @@ if (demo_ready) {
     ) |>
     dplyr::mutate(
       # effectifs DARES arrondis à 5 : taux masqué sous 100 hab. (erreur ±25 ‰)
-      defm_pour_mille = ifelse(is.na(pop_latest) | pop_latest < 100,
+      # + communes rétablies 2024-2025 (pop 2023 scindée, DEFM non scindé : cf. scripts/cog_helpers.R)
+      defm_pour_mille = ifelse(is.na(pop_latest) | pop_latest < 100 | pop_millesime %in% 2023L,
                                NA_real_,
                                defm_abc / pop_latest * 1000)
     ) |>

@@ -105,7 +105,7 @@ cmap_num <- function(x, digits = 0L) {
 cmap_widget <- function(com_sf, dep_sf = NULL, codes = com_sf$code,
                         fill, op = 0.9, tip = NULL, legend = NULL,
                         inset = FALSE, main = !inset, border = .CM_BORDER,
-                        bc = NULL, bw = NULL,
+                        bc = NULL, bw = NULL, part = NULL,
                         pad = if (inset) c(4, 4) else c(8, 8)) {
   opts <- if (inset) {
     leaflet::leafletOptions(
@@ -138,6 +138,7 @@ cmap_widget <- function(com_sf, dep_sf = NULL, codes = com_sf$code,
                   tip = if (is.null(tip)) NULL else I(tip),
                   bc = if (is.null(bc)) NULL else I(bc),     # contour par commune (option)
                   bw = if (is.null(bw)) NULL else I(bw),
+                  part = if (is.null(part)) NULL else I(as.logical(part)),   # hachure « résultat partiel »
                   border = border),
     legend = legend
   )
@@ -263,16 +264,25 @@ cmap_inset_empty <- function(label = "Non couvert") {
   ifelse(is.na(marge), 0.3, pmin(0.92, 0.45 + (marge / 100) * 1.1))
 }
 
+# Couverture des inscrits (audit r3 A) : hachure sous .COV_HATCH ; mention dans l'infobulle sous
+# .COV_NOTE (0,99 : au-dessus, l'écart n'est que la révision des listes entre les deux dimanches).
+.COV_HATCH <- 0.99  # = .COV_NOTE : tout résultat partiel est hachuré (Paris 0,5035 compris)
+.COV_NOTE  <- 0.99
+
 cmap_elections <- function(com_sf, dep_sf) {
   fam  <- as.character(com_sf$famille_vainqueur)
   fill <- unname(.famille_colors[fam])
+  cov  <- com_sf$couverture_inscrits
   tip  <- ifelse(is.na(fam), "Pas de résultat publié",
                  paste0(ifelse(is.na(com_sf$nuance_vainqueur), fam, com_sf$nuance_vainqueur),
-                        " · ", cmap_num(com_sf$pct_vainqueur, 1), " %",
-                        " · abstention ", cmap_num(com_sf$pct_abstention, 1), " %"))
+                        " · ", cmap_num(com_sf$pct_vainqueur, 1), " %",
+                        " · abstention ", cmap_num(com_sf$pct_abstention, 1), " %",
+                        ifelse(!is.na(cov) & cov < .COV_NOTE,
+                               paste0(" · résultat sur ", cmap_num(100 * cov, 0), " % des inscrits"), "")))
   cmap_widget(com_sf, dep_sf, fill = fill, op = .margin_opacity(com_sf$marge_vainqueur),
-              tip = tip,
-              legend = list(title = "Famille gagnante · 2nd tour",
+              tip = tip, part = !is.na(fam) & !is.na(cov) & cov < .COV_HATCH,
+              legend = list(title = "Famille gagnante · 2nd tour, ou 1er tour si aucun 2nd tour",
+                            partial = "Résultat partiel (circonscriptions élues au 1er tour exclues)",
                             palette = unname(.famille_colors),
                             cats = I(unname(.famille_labels[names(.famille_colors)])),
                             naLabel = "Pas de résultat publié",

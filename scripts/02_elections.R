@@ -20,6 +20,9 @@
 #   - On combine : si une commune existe au T2, on garde le résultat T2.
 #     Sinon (commune dans une circo décidée au T1), on prend le résultat T1.
 #   - La colonne `tour` trace si le résultat affiché vient de T1 ou T2.
+#   - `couverture_inscrits` = part des inscrits de la commune (T1, toutes circonscriptions)
+#     portée par le résultat affiché : < 1 pour les communes coupées entre circonscriptions dont
+#     une partie a été élue au 1er tour (le fichier T2 ne contient que les 2nd tours).
 #
 # Produit : data/processed/elections/legislatives_2024_t2.parquet
 #   1 ligne / commune, ~36 000 lignes (couverture quasi-totale).
@@ -349,6 +352,24 @@ agg_t1_extra <- agg_t1 |>
 out <- out |>
   dplyr::left_join(agg_t1_extra, by = "code_insee")
 
+# Couverture (audit r3 A) : le fichier du 2nd tour ne contient QUE les circonscriptions allées
+# au 2nd tour ; pour une commune coupée entre circonscriptions, le résultat « T2 » ne porte que
+# sur une partie de l'électorat (Paris : 9 députés NFP élus au 1er tour absents). Dénominateur =
+# inscrits de la commune au 1er tour (le fichier T1 couvre toutes les circonscriptions) ; numérateur
+# = inscrits du résultat affiché (T1 : tous, couverture = 1). Les arrondissements PLM héritent de la
+# valeur de leur ville (le fichier du ministère est au niveau de la ville).
+out <- out |>
+  dplyr::left_join(dplyr::transmute(agg_t1, code_insee, inscrits_t1 = inscrits), by = "code_insee") |>
+  dplyr::mutate(ratio = inscrits / inscrits_t1, inscrits_t1 = NULL,
+                # Les listes électorales bougent entre les deux dimanches (+0,3 % en médiane au plus) :
+                # ratio plafonné à 1 ; l'écart reste de quelques inscrits (petites communes) : au-delà de
+                # 25 % (2 % pour les communes de 500 inscrits et plus) ce n'est plus du bruit -> arrêt.
+                couverture_inscrits = round(pmin(1, ratio), 4))
+stopifnot(all(out$ratio < 1.25), all(out$ratio[out$inscrits >= 500] < 1.02))
+out$ratio <- NULL
+stopifnot(all(out$couverture_inscrits > 0 & out$couverture_inscrits <= 1, na.rm = TRUE),
+          !anyNA(out$couverture_inscrits))
+
 # Libellé officiel COG 2026 (le nom de la composante la plus peuplée serait faux pour
 # une commune nouvelle : « La Longeville » pour Pays-de-Montbenoît).
 cog_nm <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet")) |>
@@ -363,6 +384,8 @@ stopifnot(!anyDuplicated(out$code_insee), all(out$code_insee %in% cog_valid))
 arrow::write_parquet(out, out_path)
 
 # ---- Rapport ----
+
+message(glue::glue("Couverture < 100 % : {sum(out$couverture_inscrits < 1)} communes ; < 50 % : {sum(out$couverture_inscrits < 0.5)}"))
 
 n_communes <- nrow(out)
 by_tour    <- out |> dplyr::count(tour, name = "n_communes")

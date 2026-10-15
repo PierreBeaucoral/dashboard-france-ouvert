@@ -66,3 +66,6 @@ agent_outputs/
 assets/geo/
 assets/data/
 assets/thumbs/
+
+# Captures Playwright locales
+.playwright-mcp/

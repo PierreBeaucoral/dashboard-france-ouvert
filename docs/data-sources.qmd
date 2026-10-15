@@ -249,7 +249,7 @@ Polygones IGN/OSM simplifiés pour les cartes leaflet.
   <div class="field"><span class="field-label">Couverture</span><span class="field-value">31 392 communes au T2 + 6 026 T1-only via fallback = ~37 400 entrées</span></div>
   <div class="field"><span class="field-label">Snapshot</span><span class="field-value">2024-07-10 (publication MI)</span></div>
   <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/02_elections.R</code></span></div>
-  <div class="caveat">Les ~6 000 communes décidées au 1er tour sont récupérées via le fichier T1 (~77 MB) et basculées sur le résultat T1. La colonne <code>tour</code> trace la nature du résultat affiché.</div>
+  <div class="caveat">Les ~6 000 communes décidées au 1er tour sont récupérées via le fichier T1 (~77 MB) et basculées sur le résultat T1. La colonne <code>tour</code> trace la nature du résultat affiché. <strong>Résultat partiel</strong> : le fichier T2 ne contient que les circonscriptions allées au 2nd tour ; pour une commune coupée entre circonscriptions, le résultat « T2 » ne porte que sur leurs inscrits. <code>couverture_inscrits</code> = inscrits du résultat affiché ÷ inscrits de la commune au 1er tour : 2 295 communes &lt; 1 (dont 194 &lt; 0,99, le reste étant la révision des listes entre les deux dimanches), 6 &lt; 0,5 (Paris 0,50 ; Marseille 0,75 ; Toulon 0,68 ; Courbevoie 0,15). Les arrondissements PLM héritent de la valeur de leur ville.</div>
 </div>
 
 <div class="src-card cat-pol">

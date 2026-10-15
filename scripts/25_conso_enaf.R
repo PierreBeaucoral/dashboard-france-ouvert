@@ -68,7 +68,7 @@ out <- d |> transmute(
   enaf_part_habitat_pct = ifelse(naf11art25 >= 1e4, round(100 * art11hab25 / naf11art25, 1), NA_real_),
   enaf_variation_vs_ref_pct = ifelse(naf11art21 >= 5e4,
                                      round(100 * ((naf21art25 / 4) / (naf11art21 / 10) - 1), 1), NA_real_),
-  enaf_ha_par_1000hab_2011_2025 = ifelse(pop_latest >= 50, round(1000 * naf11art25 / 1e4 / pop_latest, 3), NA_real_),
+  enaf_ha_par_1000hab_2011_2025 = ifelse(pop_latest >= 50 & !code_commune %in% retablies_codes(), round(1000 * naf11art25 / 1e4 / pop_latest, 3), NA_real_),
   enaf_hab_m2_par_nouveau_menage_1122 = ifelse(men22 - men11 >= 10, round(art11hab22 / (men22 - men11), 0), NA_real_)
 )
 

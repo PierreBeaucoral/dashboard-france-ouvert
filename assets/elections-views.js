@@ -24,7 +24,7 @@
     if (saved) return;
     saved = true;
     eachLayer(function (m, c, l) {
-      l._o = { fc: l.options.fillColor, fo: l.options.fillOpacity, na: l.options.cmapNA, tip: l._tip };
+      l._o = { fc: l.options.fillColor, fo: l.options.fillOpacity, na: l.options.cmapNA, pt: l.options.cmapPartial, tip: l._tip };
     });
     CMap.main._lgd0 = CMap.main._cmapLegend;
   }
@@ -32,7 +32,7 @@
     if (circles) { CMap.main.removeLayer(circles); circles = null; }
     if (!saved) return;
     eachLayer(function (m, c, l) {
-      l.options.cmapNA = l._o.na; l._tip = l._o.tip;
+      l.options.cmapNA = l._o.na; l.options.cmapPartial = l._o.pt; l._tip = l._o.tip;
       l.setStyle({ fillColor: l._o.fc, fillOpacity: l._o.fo });
     });
     var slot = CMap.main.getContainer().querySelector(".cmap-lgd");
@@ -72,7 +72,7 @@
     circles.addTo(map);
     var slot = map.getContainer().querySelector(".cmap-lgd");
     if (slot) CMap.drawLegend(slot, { title: "Un cercle par commune : surface ∝ inscrits",
-      sub: "Couleur : famille gagnante au tour décisif", palette: FAM.map(function (f) { return pal[f]; }),
+      sub: "Couleur : famille gagnante (2nd tour, ou 1er tour si aucun 2nd tour dans la commune)", palette: FAM.map(function (f) { return pal[f]; }),
       cats: FAMLAB, naLabel: "Pas de résultat" });
   }
 
@@ -81,6 +81,7 @@
     window.elecLoad().then(function (lk) {
       save(); restore();
       if (view === "famille") return;
+      eachLayer(function (m, c, l) { l.options.cmapPartial = false; });   // hachure "partiel" : vue famille seulement
       if (view === "voters") return voters(lk);
       var f = V.fields[view];
       CMap.recolor({ get: function (c) { var d = lk[c]; return d ? d[f.col] : null; }, palette: V.pals[f.pal],
@@ -103,8 +104,8 @@
     }).join("");
     el.innerHTML = '<div class="cp-section"><h4>Communes ou électeurs ?</h4><table class="cp-natl"><thead><tr><th></th>' +
       '<th title="Part des communes gagnées">communes</th><th title="Part des inscrits vivant dans ces communes">inscrits</th></tr></thead><tbody>' +
-      rows + '</tbody></table><p class="cp-def">Famille gagnante au tour décisif, ' + CMap.fmt(nat.n, 0) +
-      " communes de France entière. Une carte à l'aire donne le même poids à une commune de 50 habitants et à Marseille : " +
+      rows + '</tbody></table><p class="cp-def">Famille gagnante (2nd tour, ou 1er tour si aucun 2nd tour dans la commune), ' + CMap.fmt(nat.n, 0) +
+      " communes de France entière ; pour " + CMap.fmt(nat.npart || 0, 0) + " d'entre elles le résultat ne porte que sur une partie des inscrits (circonscriptions élues au 1er tour exclues). Une carte à l'aire donne le même poids à une commune de 50 habitants et à Marseille : " +
       "la vue « Électeurs » corrige ce biais.</p></div>";
   };
 })();

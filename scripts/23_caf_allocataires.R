@@ -78,7 +78,8 @@ mere <- bind_rows(lapply(seq_len(nrow(plm)), \(i) {
 d <- bind_rows(filter(d, !code_commune %in% plm$mere), mere)
 
 out <- d |> inner_join(pop, "code_commune") |>
-  mutate(caf_annee = annee, caf_taux_affiche = !is.na(pop_latest) & pop_latest >= 1000)
+  mutate(caf_annee = annee, caf_taux_affiche = !is.na(pop_latest) & pop_latest >= 1000 &
+           !code_commune %in% retablies_codes())  # rétablies : numérateur non scindé
 for (k in names(pres)) {
   out[[paste0("caf_pct_pop_", k)]] <-
     ifelse(out$caf_taux_affiche, round(100 * out[[paste0("caf_pers_", k)]] / out$pop_latest, 2), NA_real_)

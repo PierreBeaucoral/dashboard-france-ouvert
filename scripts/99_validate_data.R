@@ -29,8 +29,8 @@ SPEC <- list(
 
   "elections/legislatives_2024_t2.parquet" = list(
     min_rows = 30000, max_rows = 36000,
-    cols = c("code_insee", "nom_commune", "famille_vainqueur", "pct_abstention"),
-    ranges = list(pct_abstention = c(0, 100))
+    cols = c("code_insee", "nom_commune", "famille_vainqueur", "pct_abstention", "couverture_inscrits"),
+    ranges = list(pct_abstention = c(0, 100), couverture_inscrits = c(1e-6, 1))
   ),
   "municipales_2026/resultats.parquet" = list(
     min_rows = 2500, max_rows = 4000,
@@ -276,7 +276,11 @@ tryCatch({
   # C4 : accidents = 0 (pas NA) pour les communes couvertes
   chk(!anyNA(ba$n_accidents_2024), "accidents NA")
   chk(sum(ba$n_accidents_2024 == 0) > 15000, "trop peu de communes à 0 accident")
-  chk(!anyNA(mg$acc_taux_pop[!is.na(mg$ctx_pop_latest) & mg$ctx_pop_latest > 0]), "acc_taux_pop NA pour commune couverte")
+  # (hors 10 communes rétablies 2024-2025 : taux masqué, numérateur non scindé — audit R3-B)
+  ret_acc <- with(arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet")),
+                  code_commune[pop_millesime %in% 2023L])
+  chk(!anyNA(mg$acc_taux_pop[!is.na(mg$ctx_pop_latest) & mg$ctx_pop_latest > 0 & !mg$code_commune %in% ret_acc]),
+      "acc_taux_pop NA pour commune couverte")
 
   # C7 / PLM : clés ville présentes avec une population et des données
   plm <- c("75056", "69123", "13055")
@@ -390,6 +394,13 @@ tryCatch({
         "15141", "15031", "15035", "15047", "15171")] == 2023L), "rétablies 2024-2025 : pop_millesime != 2023")
   # N9 : PLM = somme des arrondissements, millésime 2021 (et non une somme de colonnes pop_*)
   chk(all(cogc$pop_millesime[cogc$code_commune %in% c("75056", "69123", "13055")] == 2021L), "PLM : pop_millesime != 2021")
+  # Rétablies : population scindée, numérateurs non scindés -> aucun taux / hab. publié (audit R3-B)
+  m_ret <- arrow::read_parquet(here::here("data", "processed", "explorer", "commune_merged.parquet"))
+  ret <- cogc$code_commune[cogc$pop_millesime %in% 2023L]
+  rate_cols <- intersect(c("acc_taux_pop", "defm_taux_pop", "bpe_sante_pour1000", "caf_pct_pop_rsa",
+                           "caf_pct_pop_al", "enaf_ha_par_1000hab_2011_2025"), names(m_ret))
+  chk(length(ret) == 10 && all(is.na(as.matrix(m_ret[m_ret$code_commune %in% ret, rate_cols]))),
+      "rétablies 2024-2025 : taux par habitant publiés sur un numérateur non scindé")
 
   # C3 : PLM : valeur ville = ligne OFFICIELLE de la source lorsqu'elle la publie (FiLoSoFi)
   fl <- rd("filosofi/revenus_communes.parquet")
@@ -432,6 +443,24 @@ tryCatch({
   chk(all(best[tops == 1L] == el$famille_vainqueur[tops == 1L]),
       paste0("élections : famille_vainqueur != famille de part maximale (", sum(best[tops == 1L] != el$famille_vainqueur[tops == 1L]), " communes)"))
   chk(!anyNA(el$pct_vainqueur) && all(el$pct_vainqueur >= el$pct_second - 1e-9, na.rm = TRUE), "élections : part du vainqueur < part du second")
+
+  # Audit r3 A : couverture des inscrits du résultat affiché, dans (0, 1], et Paris recalculé depuis
+  # les fichiers bruts du ministère (inscrits du fichier T2 / inscrits du fichier T1 ; pas de constante).
+  chk(!anyNA(el$couverture_inscrits) && all(el$couverture_inscrits > 0 & el$couverture_inscrits <= 1), "élections : couverture_inscrits hors de (0, 1]")
+  chk(isTRUE(all.equal(mg$elec_couverture_inscrits[match(el$code_insee, mg$code_commune)], el$couverture_inscrits)), "commune_merged : elec_couverture_inscrits != parquet élections")
+  cat(sprintf("  élections : %d communes avec couverture < 1 (%d < 0,99 ; %d < 0,5)\n", sum(el$couverture_inscrits < 1),
+              sum(el$couverture_inscrits < 0.99), sum(el$couverture_inscrits < 0.5)))
+  rt1 <- here::here("data", "raw", "elections", "resultats-2024-t1-par-commune.csv")
+  rt2 <- here::here("data", "raw", "elections", "resultats-2024-t2-par-commune.csv")
+  if (file.exists(rt1) && file.exists(rt2)) {
+    insc <- function(f) { r <- readr::read_delim(f, delim = ";", col_types = readr::cols(.default = "c"),
+                                                 col_select = c(`Code commune`, Inscrits), progress = FALSE)
+                          as.numeric(r$Inscrits[r$`Code commune` == "75056"]) }
+    i1 <- insc(rt1); i2 <- insc(rt2)
+    chk(length(i1) == 1 && length(i2) == 1 && abs(el$couverture_inscrits[el$code_insee == "75056"] - i2 / i1) < 1e-4,
+        "Paris : couverture != inscrits T2 / inscrits T1 des fichiers bruts")
+    cat(sprintf("  Paris : couverture %.4f = %s / %s inscrits (fichiers bruts)\n", i2 / i1, format(i2, big.mark = " "), format(i1, big.mark = " ")))
+  } else cat("  [ignoré] Paris couverture vs fichiers bruts : data/raw absent (CI de déploiement)\n")
 
   # N3 : accidents BAAC remappés au COG 2026 : Σ des communes du cadre = accidents bruts dont le code
   # (remappé) est une commune ou un arrondissement du cadre (comparaison même périmètre, même fichier).

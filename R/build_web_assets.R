@@ -277,9 +277,10 @@ build_elections_lookup <- function() {
   r2 <- c("pct_vainqueur", "marge_vainqueur", "pct_abstention", paste0("pct_", c("NFP", "ENS", "RN", "LR", "Divers")),
           paste0("pct_", c("NFP", "ENS", "RN", "LR", "Divers"), "_t1"), "pct_abstention_t1")
   d[r2] <- lapply(d[r2], round, 2)
+  d$couverture_inscrits <- round(d$couverture_inscrits, 3)   # PLM : valeur de la ville
   d$nom_commune <- ifelse(is.na(d$nom_commune), d$nom, d$nom_commune)
   keep <- c("nom_commune", "libelle_dept", "code_dept", "tour", "famille_vainqueur", "nuance_vainqueur", r2,
-            "voix_vainqueur", "voix_second", "inscrits", "exprimes", "abstentions", "pop_latest", "strate_pop",
+            "couverture_inscrits", "voix_vainqueur", "voix_second", "inscrits", "exprimes", "abstentions", "pop_latest", "strate_pop",
             setdiff(names(part), "code_commune"))
   lk <- c(list(c = d$code), as.list(d[keep]))
   writeLines(jsonlite::toJSON(lk, na = "null", digits = NA), out, useBytes = TRUE)

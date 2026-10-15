@@ -342,6 +342,10 @@ pre.sourceCode { background: var(--surface); border: 1px solid var(--rule); bord
     repeating-linear-gradient(135deg, transparent 0 3px, rgb(124 129 136 / .42) 3px 4px),
     $na-fill;
 }
+.lgd-swatch-part {
+  // Hachure « résultat partiel », jumelle de cmap.js::hatchPart (traits sombres à 45°)
+  background: repeating-linear-gradient(45deg, transparent 0 3px, rgb(22 24 27 / .6) 3px 4px), $na-fill;
+}
 .lgd-row-na { margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--rule); color: var(--ink-2); }
 .lgd-label { flex: 1 1 auto; }
 .lgd-sub { font-size: 0.75rem; color: var(--ink-3); margin-bottom: 6px; }
@@ -895,3 +899,6 @@ h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 { color: var(--ink); }
   .cs-field .biv-select { max-width: 100%; }
   .cs-detail { min-height: 0; }
 }
+
+// Résultat partiel (couverture des inscrits < 99 %) dans le panneau commune des Législatives
+.cp-alert { margin: 8px 0; padding: 6px 8px; border-left: 3px solid var(--ink); background: var(--na-fill); font-size: .8rem; line-height: 1.35; }

@@ -229,7 +229,8 @@ message(glue::glue("  Mayotte : {nrow(my)} communes, pop 2017 = {sum(my$pop17)}"
 # les-Nonains / Les Hauts-Talican, Neussargues-Moissac + 4 villages du Cantal) (audit N4).
 # Les populations légales 2017-2021 ne connaissent que la commune fusionnée : le parent garde
 # une population qui inclut encore ses ex-communes déléguées, et les rétablies n'ont pas de
-# population, alors que les numérateurs COG >= 2024 (DEFM...) sont déjà scindés.
+# population. Les numérateurs (DEFM, BAAC, CAF...) restent sur la commune fusionnée : les taux
+# par habitant de ces 10 communes sont masqués dans 05_merge (audit round 3, B).
 # On prend pour ces communes (parents compris) la population municipale des populations légales
 # 2023 (INSEE, géographie 2025) dans `pop_latest`, avec pop_millesime = 2023. `pop_2021`
 # (RP 2021 harmonisé, utilisé pour le total national 67 408 052) n'est pas modifié.
