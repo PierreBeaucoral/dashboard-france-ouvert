@@ -223,14 +223,27 @@ if (elec_ready) {
     city = c(rep("75056", 20), rep("69123",  9), rep("13055", 16))
   )
 
+  # Élections : Paris, Lyon, Marseille ont un résultat PAR ARRONDISSEMENT (scripts/02_elections.R,
+  # 45 lignes ; la ligne ville de `elec` en est la somme et reste la clé de tout ce qui est par
+  # commune : classements, explorateur, constellation). Seule la jointure carte / fiche communale
+  # utilise la ligne arrondissement ; `elec` (synthèse nationale de la page) n'est pas modifié.
+  elec_arr_path <- file.path(dirname(elec_path), "legislatives_2024_arrondissements.parquet")
+  elec_geo <- elec
+  if (file.exists(elec_arr_path)) {
+    elec_arr <- arrow::read_parquet(elec_arr_path)
+    if (exists("pop_insee")) elec_arr <- dplyr::left_join(elec_arr, pop_insee, by = "code_insee")
+    elec_geo <- dplyr::bind_rows(elec, elec_arr)
+    stopifnot(!anyDuplicated(elec_geo$code_insee))
+  }
+
   com_results <- com |>
     mutate(
-      join_code = dplyr::coalesce(
-        plm_map$city[match(code, plm_map$arrond)],
-        code
+      join_code = dplyr::if_else(
+        code %in% elec_geo$code_insee, code,
+        dplyr::coalesce(plm_map$city[match(code, plm_map$arrond)], code)
       )
     ) |>
-    left_join(elec, by = c("join_code" = "code_insee"))
+    left_join(elec_geo, by = c("join_code" = "code_insee"))
 
   com_metro_results <- com_results |>
     filter(!substr(code, 1, 3) %in% DROM_CODES)

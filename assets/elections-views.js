@@ -52,7 +52,7 @@
       var city = /^751\d\d$/.test(c) ? "75056" : /^693\d\d$/.test(c) ? "69123" : /^132\d\d$/.test(c) ? "13055" : null;
       var ctr = map._cmapLayers[c].getBounds().getCenter();
       if (city) {                                        // une seule bulle pour la ville PLM
-        var g = groups[city] || (groups[city] = { d: d, la: 0, ln: 0, n: 0 });
+        var g = groups[city] || (groups[city] = { d: lk[city] || d, la: 0, ln: 0, n: 0 });
         g.la += ctr.lat; g.ln += ctr.lng; g.n++;
       } else items.push({ d: d, ll: ctr });
     });
@@ -72,7 +72,7 @@
     circles.addTo(map);
     var slot = map.getContainer().querySelector(".cmap-lgd");
     if (slot) CMap.drawLegend(slot, { title: "Un cercle par commune : surface ∝ inscrits",
-      sub: "Couleur : famille gagnante (2nd tour, ou 1er tour si aucun 2nd tour dans la commune)", palette: FAM.map(function (f) { return pal[f]; }),
+      sub: "Couleur : famille gagnante (tour décisif de chaque circonscription)", palette: FAM.map(function (f) { return pal[f]; }),
       cats: FAMLAB, naLabel: "Pas de résultat" });
   }
 
@@ -104,8 +104,9 @@
     }).join("");
     el.innerHTML = '<div class="cp-section"><h4>Communes ou électeurs ?</h4><table class="cp-natl"><thead><tr><th></th>' +
       '<th title="Part des communes gagnées">communes</th><th title="Part des inscrits vivant dans ces communes">inscrits</th></tr></thead><tbody>' +
-      rows + '</tbody></table><p class="cp-def">Famille gagnante (2nd tour, ou 1er tour si aucun 2nd tour dans la commune), ' + CMap.fmt(nat.n, 0) +
-      " communes de France entière ; pour " + CMap.fmt(nat.npart || 0, 0) + " d'entre elles le résultat ne porte que sur une partie des inscrits (circonscriptions élues au 1er tour exclues). Une carte à l'aire donne le même poids à une commune de 50 habitants et à Marseille : " +
+      rows + '</tbody></table><p class="cp-def">Famille gagnante (tour décisif de chaque circonscription, agrégé par bureau de vote), ' + CMap.fmt(nat.n, 0) +
+      " communes de France entière ; " + CMap.fmt(nat.nmixte || 0, 0) + " d'entre elles, coupées entre des circonscriptions élues à des tours différents, mélangent des voix du 1er et du 2nd tour" +
+      ((nat.npart || 0) > 0 ? " et " + CMap.fmt(nat.npart, 0) + " ne portent que sur une partie des inscrits (hachurées)" : "") + ". Une carte à l'aire donne le même poids à une commune de 50 habitants et à Marseille : " +
       "la vue « Électeurs » corrige ce biais.</p></div>";
   };
 })();

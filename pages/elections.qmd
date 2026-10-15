@@ -1,6 +1,6 @@
 ---
 title: "Législatives 2024"
-subtitle: "Famille gagnante par commune : 2nd tour, ou 1er tour là où aucun 2nd tour n'a eu lieu dans la commune"
+subtitle: "Famille gagnante par commune : pour chaque circonscription, le tour qui a élu le député (1er ou 2nd tour)"
 format:
   dashboard:
     include-in-header:
@@ -29,13 +29,14 @@ if (elec_ready) {
   # téléchargé au premier clic (assets/data/elections_lookup.json), puis en cache.
   # (assets/data/elections_lookup.json est produit au pré-rendu par R/build_web_assets.R)
 
-  # Synthèse communes vs inscrits (France entière, famille gagnante : 2nd tour, ou 1er tour si aucun 2nd tour dans la commune)
+  # Synthèse communes vs inscrits (France entière, famille gagnante : tour décisif de chaque circonscription, agrégé par bureau de vote)
   nat <- elec |> dplyr::filter(!is.na(famille_vainqueur)) |>
     dplyr::group_by(famille_vainqueur) |>
     dplyr::summarise(n = dplyr::n(), i = sum(inscrits, na.rm = TRUE), .groups = "drop") |>
     dplyr::mutate(pc = 100 * n / sum(n), pi = 100 * i / sum(i))
   nat_l <- c(stats::setNames(lapply(seq_len(nrow(nat)), function(k) list(pc = nat$pc[k], pi = nat$pi[k])), nat$famille_vainqueur),
-             list(n = sum(nat$n), npart = sum(elec$couverture_inscrits < 0.99, na.rm = TRUE)))
+             list(n = sum(nat$n), nmixte = sum(elec$tour == "mixte", na.rm = TRUE),
+                  npart = sum(elec$couverture_inscrits < 0.8, na.rm = TRUE)))   # 0 : tous les bureaux sont couverts (seuil = .COV_HATCH)
   PF <- list(seq = PAL$blue, div = PAL$div)
   VF <- list(
     abst_pres22_t1 = list(col = "abst_pres22_t1", title = "Abstention, présidentielle 2022 (1er tour), %", unit = "%", digits = 1,
@@ -91,9 +92,12 @@ if (elec_ready) {
       '           bar("LR",  d["pct_LR" +prefix], window.fammilleColors.LR)  +\n',
       '           bar("Divers", d["pct_Divers"+prefix], window.fammilleColors.Divers);\n',
       '  }\n',
-      '  // Section T2 affichée seulement si le 2nd tour a eu lieu pour cette commune\n',
+      '  // Résultat décisif : T2 (toutes les circonscriptions de la commune allées au 2nd tour) ou « mixte »\n',
+      '  // (circonscriptions élues au 1er tour ET au 2nd tour : les parts mélangent les deux tours)\n',
       '  var t2Section = (tour === "T2") ?\n',
       '    \'<div class="cp-section"><h4>Voix par famille · 2nd tour</h4>\' + bars("") + \'</div>\' : \n',
+      '    (tour === "mixte") ?\n',
+      '    \'<div class="cp-section"><h4>Voix par famille · tour décisif de chaque circonscription <span class="cp-meta">(1er et 2nd tours mêlés)</span></h4>\' + bars("") + \'</div>\' : \n',
       '    \'\';\n',
       '  // Section T1 universelle (toutes les communes votent à T1)\n',
       '  var t1Section = (d.pct_NFP_t1 != null || d.pct_ENS_t1 != null || d.pct_RN_t1 != null) ?\n',
@@ -104,12 +108,14 @@ if (elec_ready) {
       '  // Pour les communes T1-only (élues au 1er tour), on n\\u0027affiche que T1\n',
       '  // car les colonnes \"main\" reflètent déjà T1\n',
       '  if (tour === "T1") {\n',
-      '    t1Section = \'<div class="cp-section"><h4>Voix par famille · 1er tour <span class="cp-meta">(aucun 2nd tour dans la commune)</span></h4>\' +\n',
+      '    t1Section = \'<div class="cp-section"><h4>Voix par famille · 1er tour <span class="cp-meta">(\' + (d.repli_t1 ? "député élu au 2nd tour ; la source ne publie aucune voix exprimée à ce tour, 1er tour affiché" : "député élu au 1er tour") + \')</span></h4>\' +\n',
       '      bars("") + \'</div>\';\n',
       '    t2Section = \'\';\n',
       '  }\n',
       '  var cv = d.couverture_inscrits;\n',
-      '  var covNote = (cv != null && cv < 0.99) ? "<div class=\\"cp-alert\\" role=\\"note\\"><strong>Résultat partiel</strong> : résultat sur " + Math.round(100 * cv) + " % des inscrits de la commune (circonscriptions élues au 1er tour exclues)</div>" : "";\n',
+      '  // Mécanisme « résultat partiel » conservé (seuil 0,8 = .COV_HATCH) : aujourd\\u0027hui aucune commune, tous les bureaux sont couverts\n',
+      '  var covNote = (cv != null && cv < 0.8) ? "<div class=\\"cp-alert\\" role=\\"note\\"><strong>Résultat partiel</strong> : résultat sur " + Math.round(100 * cv) + " % des inscrits de la commune</div>" :\n',
+      '    (tour === "mixte") ? "<div class=\\"cp-alert\\" role=\\"note\\"><strong>Tours mêlés</strong> : cette commune est coupée entre des circonscriptions élues au 1er tour et d\\u0027autres au 2nd tour ; pour chacune on retient le tour qui a élu le député, les parts ci-dessous additionnent donc des voix des deux tours.</div>" : "";\n',
       '  var html = \'<div class="cp-header"><h3>\' + (d.nom_commune || code) + \'</h3>\' +\n',
       '    \'<div class="cp-meta">\' + (d.libelle_dept || "") + \' (\' + (d.code_dept || "") + \') · \' + d.code + (tour ? \' · <span class="cp-badge cp-badge-\' + tour.toLowerCase() + \'">\' + tour + \'</span>\' : "") + \'</div></div>\' +\n',
       '    \'<div class="cp-result"><div class="cp-swatch" style="background:\' + color + \'"></div><div><div class="cp-nuance">\' + (d.famille_vainqueur || "—") + \' · \' + (d.nuance_vainqueur || "—") + \'</div>\' +\n',
@@ -133,7 +139,10 @@ if (elec_ready) {
     ser("Législatives, 1er tour", ["2002_legi_t1", "2007_legi_t1", "2012_legi_t1", "2017_legi_t1", "2022_legi_t1", "2024_legi_t1"]) +
     ser("Européennes", ["2004_euro_t1", "2009_euro_t1", "2014_euro_t1", "2019_euro_t1", "2024_euro_t1"]) +
     ser("Municipales, 1er tour", ["2014_muni_t1", "2020_muni_t1", "2026_muni_t1"]);
-  if (sp) html += "<div class='cp-section'><h4>Abstention depuis 2002 (% des inscrits)</h4>" + sp +
+  // Arrondissement PLM : la série de participation n'existe qu'à l'échelle de la ville.
+  var plmArr = CMap.plmCity(String(d.code || "")) !== String(d.code || "");
+  if (sp) html += "<div class='cp-section'><h4>Abstention depuis 2002 (% des inscrits)</h4>" +
+    (plmArr ? "<p class='cp-def'><em>Série de la ville entière</em> (non publiée par arrondissement) : elle peut différer de l'abstention de l'arrondissement ci-dessus.</p>" : "") + sp +
     (d.abst_delta_pres02_pres22 != null ? "<div class='cp-kvs'><div class='cp-kv'><span>Présidentielle 2002 à 2022</span><span class='cp-num'>" +
       (d.abst_delta_pres02_pres22 > 0 ? "+" : "") + fmt(d.abst_delta_pres02_pres22, 1) + " pts</span></div></div>" : "") + "</div>";
   el.innerHTML = html;
@@ -148,7 +157,7 @@ if (elec_ready) {
 
 ## Row {height="77%"}
 
-::: {.card title="Famille gagnante (2nd tour, ou 1er tour)" width="72%"}
+::: {.card title="Famille gagnante (tour décisif de chaque circonscription)" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
@@ -181,7 +190,8 @@ if (elec_ready) {
 ```{r}
 #| label: map-metropole
 if (elec_ready) {
-  m <- cmap_elections(com_metro_results, dep_metro)
+  m <- cmap_elections(com_metro_results, dep_metro,
+                      city = elec[elec$code_insee %in% c("75056", "69123", "13055"), ])
   cmap_on_render(m, "
     window.elecMap = self;
     CMap.pick(self, function (code) { if (window.updateCommunePanel) window.updateCommunePanel(code); });
@@ -200,13 +210,13 @@ if (elec_ready) {
   <div id="commune-content" class="cp-content">
     <div class="cp-placeholder">
       <p><strong>Cliquez sur une commune</strong> pour voir le détail des résultats Législatives 2024.</p>
-      <p class="cp-hint">Famille gagnante, marge sur le second, abstention, répartition T1 et T2 par famille. Hachures sombres : résultat sur moins de la moitié des inscrits de la commune.</p>
+      <p class="cp-hint">Famille gagnante, marge sur le second, abstention, répartition T1 et T2 par famille. Hachures sombres : résultat sur moins de 80 % des inscrits de la commune (aucune commune aujourd'hui). Paris, Lyon et Marseille : un résultat par arrondissement.</p>
     </div>
   </div>
   <div id="elec-natl" class="cp-content"></div>
   <div class="cp-source">
     <strong>Sources</strong> : Min. Intérieur, Législatives 2024 ; participation 2002-2026 : élections agrégées par bureau de vote (data.gouv.fr), Français de l'étranger exclus.<br>
-    NFP / ENS / LR / RN = familles regroupant les nuances officielles. T1/T2 = 1ᵉʳ / 2nd tour. Le fichier du 2nd tour ne contient que les circonscriptions où il y a eu un 2nd tour : pour une commune coupée entre plusieurs circonscriptions, le résultat affiché ne porte que sur les inscrits de ces circonscriptions (« résultat partiel »), les circonscriptions élues au 1ᵉʳ tour étant exclues. Abstention en % des inscrits ; avant 2016, blancs et nuls non distingués.
+    NFP / ENS / LR / RN = familles regroupant les nuances officielles. T1/T2 = 1ᵉʳ / 2nd tour. Résultats reconstruits bureau de vote par bureau de vote : chaque bureau compte avec le tour qui a élu le député de sa circonscription (1ᵉʳ tour si élu dès le 1ᵉʳ tour, sinon 2nd tour), voix cumulées par famille sur la commune. « mixte » = commune coupée entre des circonscriptions élues à des tours différents : ses parts mélangent les deux tours (Paris, Marseille, Lyon, Toulouse, Nice…). Le nombre d'inscrits publié diffère légèrement entre les deux tours dans certaines communes (jusqu'à 14 %, communes d'un seul bureau). Paris, Lyon, Marseille : résultat propre à chaque arrondissement (le bureau lyonnais « 0001 », 386 inscrits sans arrondissement, n'est compté que dans la ville). Reconquête et le PRG (RDG) sont classés dans Divers. Abstention en % des inscrits ; avant 2016, blancs et nuls non distingués.
   </div>
 </div>
 ```
