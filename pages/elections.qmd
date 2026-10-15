@@ -139,7 +139,10 @@ if (elec_ready) {
     ser("Législatives, 1er tour", ["2002_legi_t1", "2007_legi_t1", "2012_legi_t1", "2017_legi_t1", "2022_legi_t1", "2024_legi_t1"]) +
     ser("Européennes", ["2004_euro_t1", "2009_euro_t1", "2014_euro_t1", "2019_euro_t1", "2024_euro_t1"]) +
     ser("Municipales, 1er tour", ["2014_muni_t1", "2020_muni_t1", "2026_muni_t1"]);
-  if (sp) html += "<div class='cp-section'><h4>Abstention depuis 2002 (% des inscrits)</h4>" + sp +
+  // Arrondissement PLM : la série de participation n'existe qu'à l'échelle de la ville.
+  var plmArr = CMap.plmCity(String(d.code || "")) !== String(d.code || "");
+  if (sp) html += "<div class='cp-section'><h4>Abstention depuis 2002 (% des inscrits)</h4>" +
+    (plmArr ? "<p class='cp-def'><em>Série de la ville entière</em> (non publiée par arrondissement) : elle peut différer de l'abstention de l'arrondissement ci-dessus.</p>" : "") + sp +
     (d.abst_delta_pres02_pres22 != null ? "<div class='cp-kvs'><div class='cp-kv'><span>Présidentielle 2002 à 2022</span><span class='cp-num'>" +
       (d.abst_delta_pres02_pres22 > 0 ? "+" : "") + fmt(d.abst_delta_pres02_pres22, 1) + " pts</span></div></div>" : "") + "</div>";
   el.innerHTML = html;
@@ -187,7 +190,8 @@ if (elec_ready) {
 ```{r}
 #| label: map-metropole
 if (elec_ready) {
-  m <- cmap_elections(com_metro_results, dep_metro)
+  m <- cmap_elections(com_metro_results, dep_metro,
+                      city = elec[elec$code_insee %in% c("75056", "69123", "13055"), ])
   cmap_on_render(m, "
     window.elecMap = self;
     CMap.pick(self, function (code) { if (window.updateCommunePanel) window.updateCommunePanel(code); });

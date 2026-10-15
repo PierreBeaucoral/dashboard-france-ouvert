@@ -457,7 +457,8 @@
     var pal = lg.palette.map(function (c) { return String(c).toUpperCase(); }), fb = {};
     for (var i = 0; i < s.codes.length; i++) fb[s.codes[i]] = s.fill[i];
     legendStats(function (c) {
-      var f = fb[c] != null ? fb[c] : fb[ARR1[c]];
+      // Ville PLM : sa propre couleur (somme des arrondissements) si R la fournit, sinon 1er arrdt.
+      var f = fb[c] != null ? fb[c] : (lg.cityFill && lg.cityFill[c]) || fb[ARR1[c]];
       return f ? pal.indexOf(String(f).toUpperCase()) + 1 : 0;
     }, null, pal.length).then(function (stats) {
       if (map._recolored || map._cmapLegend !== lg) return;

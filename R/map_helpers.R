@@ -272,7 +272,9 @@ cmap_inset_empty <- function(label = "Non couvert") {
 .COV_HATCH <- 0.8  # = .COV_NOTE ; aucune commune hachurée aujourd'hui
 .COV_NOTE  <- 0.8
 
-cmap_elections <- function(com_sf, dep_sf) {
+# `city` : lignes ville PLM (75056/69123/13055, somme des arrondissements) ; leur couleur sert
+# aux parts « % communes / % pop. » de la légende, la carte étant dessinée par arrondissement.
+cmap_elections <- function(com_sf, dep_sf, city = NULL) {
   fam  <- as.character(com_sf$famille_vainqueur)
   fill <- unname(.famille_colors[fam])
   cov  <- com_sf$couverture_inscrits
@@ -290,6 +292,8 @@ cmap_elections <- function(com_sf, dep_sf) {
                             palette = unname(.famille_colors),
                             cats = I(unname(.famille_labels[names(.famille_colors)])),
                             naLabel = "Pas de résultat publié",
+                            cityFill = if (is.null(city)) NULL else as.list(stats::setNames(
+                              unname(.famille_colors[as.character(city$famille_vainqueur)]), city$code_insee)),
                             note = "Teinte plus pâle = marge de victoire plus faible."))
 }
 
