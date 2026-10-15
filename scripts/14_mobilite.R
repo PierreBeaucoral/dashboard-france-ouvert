@@ -1,28 +1,28 @@
 # ============================================================
 # scripts/14_mobilite.R
 #
-# Bloc I — Mobilité domicile-travail INSEE 2019 (MOBPRO).
+# Bloc I — Mobilité domicile-travail INSEE, RP 2022 (MOBPRO).
 #
-# Source : INSEE / recensement 2019, fichier détail MOBPRO.
-#   data.gouv.fr ID : 63db95ccf8de145951fa5fa3
-#   Resource ZIP (82 MB) : f3f22487-22d0-45f4-b250-af36fc56ccd0
+# Source : INSEE / recensement 2022, fichier détail MOBPRO
+#   https://www.insee.fr/fr/statistiques/8589904
+#   RP2022_mobpro.parquet (66 MB, 7 388 023 lignes x 32 variables)
+#   varmod_mobpro_2022.csv (dictionnaire des modalités)
+#   Géographie : COG 2024 (cf. caveat harmonisation dans scripts/README.md)
 #
-# Le fichier contient ~5 M lignes (1 ligne = un individu actif occupé
-# pondéré IPONDI) avec :
-#   - COMMUNE : code commune résidence
-#   - DCLT    : code commune lieu de travail
+# 1 ligne = un individu actif occupé, pondéré IPONDI :
+#   - COMMUNE : commune de résidence (Paris/Lyon/Marseille = commune mère
+#               75056/69123/13055 ; l'arrondissement est dans ARM)
+#   - DCLT    : commune du lieu de travail (arrondissements PLM détaillés)
 #   - IPONDI  : pondération individuelle
-#   - TRANS   : mode transport RP 2019 (1=Pas, 2=Marche, 3=Vélo,
-#               4=2-roues mot., 5=Voiture/camion/fourgon, 6=Transports
-#               en commun)
+#   - TRANS   : mode de transport (varmod_mobpro_2022.csv, vérifié) :
+#               1=Pas de transport, 2=Marche, 3=Vélo (y c. VAE),
+#               4=Deux-roues motorisé, 5=Voiture/camion/fourgonnette,
+#               6=Transports en commun
 #
-# Agrégation par commune de résidence :
-#   - mob_n_actifs           : Σ IPONDI
-#   - mob_pct_emploi_local   : Σ IPONDI[COMMUNE==DCLT] / total
-#   - mob_pct_voiture        : Σ IPONDI[TRANS==4] / total
-#   - mob_pct_tc             : Σ IPONDI[TRANS==5] / total
-#   - mob_pct_actifs_velo    : Σ IPONDI[TRANS==2] / total
-#   - mob_top_destination    : code commune où le flux sortant est max
+# Agrégation par commune de résidence (schéma inchangé vs RP 2019) :
+#   - mob_n_actifs, mob_pct_emploi_local (COMMUNE==DCLT, PLM consolidé),
+#     mob_pct_voiture (TRANS 5), mob_pct_tc (6), mob_pct_velo (3),
+#     mob_pct_pied (2), mob_top_dest_code / mob_top_dest_flux
 #
 # Sortie : data/processed/mobilite/mobilite_commune.parquet
 # ============================================================
@@ -36,53 +36,63 @@ suppressPackageStartupMessages({
   library(duckdb)
   library(DBI)
 })
+source(here::here("scripts", "cog_helpers.R"))
 
-URL_MOBPRO <- paste0(
-  "https://static.data.gouv.fr/resources/",
-  "mobilites-professionnelles-des-individus-deplacements-commune-de-residence-",
-  "commune-de-travail-en-2019/20230202-115223/rp2019-mobpro-csv.zip"
-)
+URL_MOBPRO <- "https://www.insee.fr/fr/statistiques/fichier/8589904/RP2022_mobpro.parquet"
+URL_VARMOD <- "https://www.insee.fr/fr/statistiques/fichier/8589904/varmod_mobpro_2022.csv"
 
-raw_dir  <- here::here("data", "raw", "mobilite")
-out_dir  <- here::here("data", "processed", "mobilite")
-zip_path <- file.path(raw_dir, "rp2019-mobpro.zip")
-out_path <- file.path(out_dir, "mobilite_commune.parquet")
+raw_dir      <- here::here("data", "raw", "mobilite")
+out_dir      <- here::here("data", "processed", "mobilite")
+pq_path      <- file.path(raw_dir, "RP2022_mobpro.parquet")
+varmod_path  <- file.path(raw_dir, "varmod_mobpro_2022.csv")
+out_path     <- file.path(out_dir, "mobilite_commune.parquet")
 dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-if (!file.exists(zip_path) || file.size(zip_path) < 5e7) {
-  message("Téléchargement MOBPRO 2019 (82 MB)…")
-  curl::curl_download(URL_MOBPRO, zip_path, quiet = FALSE)
+dl_if_missing <- function(url, dest, min_bytes) {
+  if (file.exists(dest) && file.size(dest) >= min_bytes) {
+    message("  Cache : ", basename(dest)); return(invisible(NULL))
+  }
+  message("  Télécharge : ", url)
+  h <- curl::new_handle(useragent = "Mozilla/5.0")
+  curl::curl_download(url, dest, quiet = TRUE, handle = h)
 }
+dl_if_missing(URL_MOBPRO, pq_path, 5e7)
+dl_if_missing(URL_VARMOD, varmod_path, 1e6)
 
-# Unzip dans raw_dir
-csv_files <- unzip(zip_path, list = TRUE)
-message("Contenu du zip :")
-print(csv_files)
-csv_internal <- csv_files$Name[1]
-csv_path <- file.path(raw_dir, csv_internal)
-if (!file.exists(csv_path)) {
-  unzip(zip_path, files = csv_internal, exdir = raw_dir)
-}
-message(sprintf("→ CSV décompressé : %s (%.1f MB)",
-                csv_path, file.size(csv_path) / 1024 / 1024))
-
-# Inspection : 3 premières lignes
-preview <- readr::read_delim(csv_path, delim = ";",
-                              n_max = 3,
-                              col_types = readr::cols(.default = readr::col_character()),
-                              show_col_types = FALSE)
-message("Colonnes : ", paste(names(preview), collapse = ", "))
-print(preview)
+# Garde-fou : les codes TRANS doivent rester ceux supposés ci-dessous.
+vm <- readr::read_delim(varmod_path, delim = ";", show_col_types = FALSE,
+                        col_names = FALSE, col_types = readr::cols(.default = "c"))
+vm <- vm[vm[[1]] == "TRANS", ]
+expected <- c("1" = "Pas de transport", "2" = "Marche", "3" = "Vélo",
+              "4" = "Deux-roues", "5" = "Voiture", "6" = "Transports en commun")
+stopifnot(all(startsWith(vm[[4]][match(names(expected), vm[[3]])], expected)))
 
 # duckdb pour traiter ~5M lignes efficacement
 con <- DBI::dbConnect(duckdb::duckdb())
 on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
+# Harmonisation COG 2024 (millésime du fichier) -> COG 2026 : on remappe les
+# codes AVANT d'agréger, donc les effectifs de communes fusionnées s'additionnent.
+cogmap <- cog_map("2024-01-01")
+DBI::dbWriteTable(con, "cogmap", cogmap)
 DBI::dbExecute(con, sprintf(
-  "CREATE TABLE mob AS SELECT * FROM read_csv('%s', delim=';', header=true, all_varchar=true)",
-  csv_path
-))
+  "CREATE TABLE mob AS SELECT COALESCE(a.code_2026, CAST(COMMUNE AS VARCHAR)) AS COMMUNE,
+          COALESCE(b.code_2026, CAST(DCLT AS VARCHAR)) AS DCLT, IPONDI, CAST(TRANS AS INTEGER) AS TRANS
+   FROM read_parquet('%s') m
+   LEFT JOIN cogmap a ON CAST(m.COMMUNE AS VARCHAR) = a.code_avant
+   LEFT JOIN cogmap b ON CAST(m.DCLT AS VARCHAR) = b.code_avant", pq_path))
+# PLM : COMMUNE est déjà la commune mère, DCLT est détaillé par arrondissement
+DBI::dbExecute(con, "
+  CREATE VIEW mob_c AS
+  SELECT COMMUNE, IPONDI, TRANS,
+    CASE
+      WHEN DCLT LIKE '751%' THEN '75056'
+      WHEN DCLT LIKE '6938%' THEN '69123'
+      WHEN DCLT LIKE '132%' AND CAST(SUBSTRING(DCLT,4,2) AS INT) BETWEEN 1 AND 16 THEN '13055'
+      ELSE DCLT
+    END AS DCLT
+  FROM mob")
 n_rows <- DBI::dbGetQuery(con, "SELECT COUNT(*) AS n FROM mob")$n
 message(sprintf("→ %d lignes chargées dans duckdb", n_rows))
 
@@ -98,18 +108,18 @@ agg <- DBI::dbGetQuery(con, "
       DCLT,
       CAST(IPONDI AS DOUBLE) AS w,
       TRANS
-    FROM mob
+    FROM mob_c
     WHERE COMMUNE IS NOT NULL
   ),
   tot AS (
     SELECT COMMUNE,
            SUM(w) AS mob_n_actifs,
            SUM(CASE WHEN COMMUNE = DCLT THEN w ELSE 0 END) AS w_local,
-           -- TRANS RP 2019 : 5=voiture, 6=TC, 3=vélo, 2=marche, 1=pas
-           SUM(CASE WHEN TRANS = '5' THEN w ELSE 0 END) AS w_voiture,
-           SUM(CASE WHEN TRANS = '6' THEN w ELSE 0 END) AS w_tc,
-           SUM(CASE WHEN TRANS = '3' THEN w ELSE 0 END) AS w_velo,
-           SUM(CASE WHEN TRANS = '2' THEN w ELSE 0 END) AS w_pied
+           -- TRANS RP 2022 (codes inchangés vs 2019) : 5=voiture, 6=TC, 3=vélo, 2=marche, 1=pas
+           SUM(CASE WHEN TRANS = 5 THEN w ELSE 0 END) AS w_voiture,
+           SUM(CASE WHEN TRANS = 6 THEN w ELSE 0 END) AS w_tc,
+           SUM(CASE WHEN TRANS = 3 THEN w ELSE 0 END) AS w_velo,
+           SUM(CASE WHEN TRANS = 2 THEN w ELSE 0 END) AS w_pied
     FROM base
     GROUP BY COMMUNE
   )
@@ -129,8 +139,9 @@ message(sprintf("→ %d communes de résidence", nrow(agg)))
 top_dest <- DBI::dbGetQuery(con, "
   WITH flow AS (
     SELECT COMMUNE, DCLT, SUM(CAST(IPONDI AS DOUBLE)) AS w
-    FROM mob
+    FROM mob_c
     WHERE COMMUNE IS NOT NULL AND DCLT IS NOT NULL AND COMMUNE != DCLT
+      AND DCLT NOT IN ('99999','ZZZZZ')
     GROUP BY COMMUNE, DCLT
   ),
   ranked AS (
@@ -159,3 +170,15 @@ cat("\n% emploi local :\n")
 print(summary(out$mob_pct_emploi_local))
 cat("\n% voiture :\n")
 print(summary(out$mob_pct_voiture))
+
+# ---- Contrôles ----
+stopifnot(
+  !anyDuplicated(out$code_commune),
+  all(nchar(out$code_commune) == 5),
+  abs(sum(out$mob_n_actifs) / 28382871 - 1) < 0.001,   # Σ IPONDI du fichier
+  abs(nrow(out) / 34820 - 1) < 0.05,
+  all(out$mob_pct_voiture >= 0 & out$mob_pct_voiture <= 100),
+  all(out$mob_pct_emploi_local >= 0 & out$mob_pct_emploi_local <= 100),
+  all(c("75056", "69123", "13055") %in% out$code_commune)
+)
+cat("\n✔ stopifnot() OK\n")

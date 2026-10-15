@@ -54,7 +54,8 @@ indicators_short <- c(
   "Vols avec armes"                         = "del_vols_armes",
   "Vols violents sans arme"                 = "del_vols_violents",
   "Cambriolages de logement"                = "del_cambriolages",
-  "Vols de véhicules"                       = "del_vols_vehicules",
+  "Vols de véhicule"                        = "del_vols_vehicules",   # libellé éd. 2025
+  "Vols de véhicules"                       = "del_vols_vehicules",   # ancien libellé
   "Vols dans les véhicules"                 = "del_vols_dans_vehicules",
   "Vols d'accessoires sur véhicules"        = "del_vols_accessoires",
   "Destructions et dégradations volontaires" = "del_degradations",
@@ -62,12 +63,17 @@ indicators_short <- c(
   "Usage de stupéfiants"                    = "del_usage_stup"
 )
 
+# Le millésime du code géo change à chaque édition (CODGEO_2025, _2026...)
+codgeo_col <- grep("^CODGEO", names(ssmsi), value = TRUE)[1]
+
 ssmsi_filt <- ssmsi |>
   dplyr::filter(annee == latest_year, est_diffuse == "diff") |>
   dplyr::filter(indicateur %in% names(indicators_short)) |>
   dplyr::mutate(
-    var = unname(indicators_short[indicateur]),
-    code_commune = stringr::str_pad(CODGEO_2025, 5, "left", "0")
+    # as.character : `indicateur` est un facteur ; indexer par le facteur utiliserait
+    # ses codes entiers (mauvais libellés -> colonnes permutées)
+    var = unname(indicators_short[as.character(indicateur)]),
+    code_commune = stringr::str_pad(.data[[codgeo_col]], 5, "left", "0")
   ) |>
   dplyr::select(code_commune, var, taux_pour_mille, nombre, insee_pop)
 
@@ -88,13 +94,20 @@ if (any(na_named)) {
   ssmsi_wide <- ssmsi_wide[, !na_named, drop = FALSE]
 }
 
-# Taux global agrégé : somme des taux (vols + violences + dégradations + drogue)
+# Règle du secret statistique (SSMSI) : un décompte n'est diffusé que s'il vaut
+# 0 ou >= 5 ; les valeurs 1-4 sont "ndiff" (NA ici, jamais 0). Un 0 "diff" est
+# donc un vrai zéro. Conséquence : dans les petites communes, seules celles à
+# 0 apparaissent -> biais de sélection (voir docs/decisions.qmd).
+# Total = somme des 13 composantes SEULEMENT si toutes sont diffusées, sinon NA
+# (l'ancien rowSums(na.rm = TRUE) sommait des sous-ensembles différents).
+comp_cols <- unique(unname(indicators_short))
+comp_cols <- intersect(comp_cols, names(ssmsi_wide))
 ssmsi_wide <- ssmsi_wide |>
   dplyr::mutate(
-    del_total_pour_mille = rowSums(
-      dplyr::across(dplyr::starts_with("del_")),
-      na.rm = TRUE
-    )
+    del_n_publies = rowSums(!is.na(dplyr::across(dplyr::all_of(comp_cols)))),
+    del_total_pour_mille = ifelse(
+      del_n_publies == length(comp_cols),
+      rowSums(dplyr::across(dplyr::all_of(comp_cols))), NA_real_)
   )
 
 # Pop référence
@@ -132,12 +145,20 @@ clean_num <- function(x) {
 dgfip_clean <- dgfip |>
   dplyr::filter(an == max(an, na.rm = TRUE)) |>
   dplyr::mutate(
-    # Construire code commune INSEE 5 chars : drop leading zero du dept si <96,
-    # garder 3 chars pour DROM
-    dep_norm = ifelse(substr(dep, 1, 1) == "0" & nchar(dep) == 3 & !substr(dep, 2, 2) == "9",
+    # Construire code commune INSEE 5 chars : drop le zéro initial du département (001 -> 01, 02A -> 2A, 091 -> 91) ;
+    # les DROM (101-106) sont recodés plus bas
+    dep_norm = ifelse(substr(dep, 1, 1) == "0" & nchar(dep) == 3,
                       substr(dep, 2, 3), dep),
+    # DROM : la DGFiP code les départements d'outre-mer 101 à 106 (et non 971 à 976) ;
+    # icom DGFiP = 3 derniers chiffres du code INSEE (code = 97 + icom) (vérifié sur les noms : Matoury =
+    # 102/307 -> 97307, Pamandzi = 106/615 -> 97615). 101 Guadeloupe, 102 Guyane,
+    # 103 Martinique, 104 La Réunion, 106 Mayotte.
+    dep_norm = dplyr::recode(dep_norm, "101" = "971", "103" = "972", "102" = "973",
+                             "104" = "974", "106" = "976"),
     icom_norm = stringr::str_pad(icom, 3, "left", "0"),
-    code_commune = paste0(dep_norm, icom_norm),
+    # DROM : code INSEE = "97" + icom (icom DGFiP = chiffre du département + rang à 2 chiffres)
+    code_commune = ifelse(substr(dep_norm, 1, 2) == "97", paste0("97", icom_norm),
+                          paste0(dep_norm, icom_norm)),
     # Pad to 5 chars
     code_commune = stringr::str_pad(code_commune, 5, "left", "0")
   ) |>
@@ -145,12 +166,18 @@ dgfip_clean <- dgfip |>
     code_commune,
     annee_dgfip = as.integer(an),
     fin_pop_ref       = clean_num(pop1),
-    fin_recettes      = clean_num(prod),     # € par hab.
-    fin_charges       = clean_num(charge),
-    fin_dette         = clean_num(dette),
-    fin_caf           = clean_num(caf),       # capacité autofinancement
-    fin_invest        = clean_num(depinv),    # dépenses investissement
-    fin_emprunt       = clean_num(emp),
+    # Colonnes DGFiP préfixées "f" = EUROS PAR HABITANT (vérifié : prod*1000/pop1
+    # = fprod pour toutes les communes). Les montants bruts (prod, charge...) sont
+    # des TOTAUX EN MILLIERS D'EUROS -> conservés sous *_total_keur.
+    fin_recettes      = clean_num(fprod),    # €/hab (produits de fonctionnement)
+    fin_charges       = clean_num(fcharge),  # €/hab
+    fin_dette         = clean_num(fdette),   # €/hab (encours de dette)
+    fin_caf           = clean_num(fcaf),     # €/hab (capacité d'autofinancement)
+    fin_invest        = clean_num(fdepinv),  # €/hab (dépenses d'investissement)
+    fin_emprunt       = clean_num(femp),     # €/hab (emprunts)
+    fin_recettes_total_keur = clean_num(prod),
+    fin_charges_total_keur  = clean_num(charge),
+    fin_dette_total_keur    = clean_num(dette),
     # Taux des taxes locales (en %)
     fin_taux_taxe_hab = clean_num(tth),
     fin_taux_fonc_bati  = clean_num(tfb),
@@ -177,3 +204,4 @@ cat(glue::glue("
     {nrow(dgfip_clean)} communes
 "))
 print(dgfip_clean |> dplyr::select(fin_recettes, fin_charges, fin_dette, fin_taux_taxe_hab) |> summary())
+stopifnot(median(dgfip_clean$fin_recettes, na.rm = TRUE) < 5000)  # €/hab, pas k€ totaux

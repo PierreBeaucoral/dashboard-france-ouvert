@@ -113,14 +113,24 @@ message(glue::glue("Populations : {nrow(pop)} lignes (long format), cols : ",
 #   codgeo, libgeo, coddep, codreg, pmun, ptot, pcap, annee_rp
 # On pivote en wide : pop_2017, pop_2018, ..., pop_latest = pmun max(annee_rp).
 
-populations_wide <- pop |>
-  dplyr::filter(!is.na(pmun)) |>
-  dplyr::select(codgeo, libgeo, annee_rp, pmun) |>
+# Clé = codgeo SEUL. Avec libgeo dans la clé, une commune renommée entre deux
+# millésimes était éclatée en deux lignes (492 codes dupliqués). On garde le
+# libellé de l'année la plus récente.
+pop_ok <- pop |> dplyr::filter(!is.na(pmun))
+pop_lib <- pop_ok |>
+  dplyr::arrange(codgeo, dplyr::desc(annee_rp)) |>
+  dplyr::distinct(codgeo, .keep_all = TRUE) |>
+  dplyr::select(codgeo, libgeo)
+populations_wide <- pop_ok |>
+  dplyr::select(codgeo, annee_rp, pmun) |>
   tidyr::pivot_wider(
+    id_cols      = codgeo,
     names_from   = annee_rp,
     values_from  = pmun,
-    names_prefix = "pop_"
-  )
+    names_prefix = "pop_",
+    values_fn    = ~ .x[1]
+  ) |>
+  dplyr::left_join(pop_lib, by = "codgeo")
 
 # Identifier la dernière année disponible
 year_cols <- grep("^pop_\\d{4}$", names(populations_wide), value = TRUE)
@@ -167,6 +177,30 @@ out <- cog_main |>
     nom_commune = dplyr::coalesce(nom_commune, nom_pop)
   ) |>
   dplyr::select(-nom_pop)
+
+# PLM : les populations légales sont publiées par arrondissement ; la commune
+# 75056/69123/13055 (clé des élections, DGFiP, SSMSI...) y avait pop = NA.
+# On la reconstitue comme la somme de ses arrondissements.
+plm_city <- c(`751` = "75056", `693` = "69123", `132` = "13055")
+pop_cols <- grep("^pop_", names(out), value = TRUE)
+arr <- out |> dplyr::filter(type_com == "ARM") |>
+  dplyr::mutate(city = unname(plm_city[substr(code_commune, 1, 3)])) |>
+  dplyr::group_by(city) |>
+  dplyr::summarise(dplyr::across(dplyr::all_of(pop_cols), ~ sum(.x, na.rm = TRUE)),
+                   .groups = "drop")
+for (i in seq_len(nrow(arr))) {
+  r <- which(out$code_commune == arr$city[i])
+  out[r, pop_cols] <- arr[i, pop_cols]
+}
+out <- out |> dplyr::mutate(strate_pop = factor(dplyr::case_when(
+  pop_latest < 500 ~ "Très petite (< 500 hab.)",
+  pop_latest < 2000 ~ "Rurale (500-2 000)",
+  pop_latest < 10000 ~ "Bourg / périurbain (2 000-10 000)",
+  pop_latest < 50000 ~ "Ville moyenne (10 000-50 000)",
+  pop_latest >= 50000 ~ "Grande ville (≥ 50 000)"),
+  levels = levels(strate_pop)))
+
+stopifnot(!anyDuplicated(out$code_commune))  # 1 ligne par code commune
 
 # ---- Écriture ----
 

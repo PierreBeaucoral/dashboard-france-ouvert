@@ -40,6 +40,18 @@ baac_path  <- here::here("data", "processed", "baac", "accidents_commune.parquet
 carb_path  <- here::here("data", "processed", "energie", "carbone_commune.parquet")
 mob_path   <- here::here("data", "processed", "mobilite", "mobilite_commune.parquet")
 bio_path   <- here::here("data", "processed", "agriculture", "bio_commune.parquet")
+# ---- Nouvelles sources (vague 2) ----
+newsrc <- function(...) here::here("data", "processed", ...)
+part_path  <- newsrc("elections", "participation_commune.parquet")
+rp22_path  <- newsrc("insee_extra", "rp2022_logement_emploi.parquet")
+cat_path   <- newsrc("risques", "catnat_commune.parquet")
+bpe_path   <- newsrc("insee_extra", "bpe_equipements.parquet")
+caf_path   <- newsrc("insee_extra", "caf_allocataires.parquet")
+arc_path   <- newsrc("insee_extra", "arcep_fibre.parquet")
+enaf_path  <- newsrc("risques", "enaf_commune.parquet")
+dpe_path   <- newsrc("insee_extra", "dpe_commune.parquet")
+ore_path   <- newsrc("energie_ore", "energie_ore_commune.parquet")
+filo23_path <- newsrc("filosofi_2023", "filosofi_2023_communes.parquet")
 out_dir   <- here::here("data", "processed", "explorer")
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
@@ -59,6 +71,37 @@ carb  <- if (file.exists(carb_path))  arrow::read_parquet(carb_path)  else NULL
 mob   <- if (file.exists(mob_path))   arrow::read_parquet(mob_path)   else NULL
 bio   <- if (file.exists(bio_path))   arrow::read_parquet(bio_path)   else NULL
 
+
+# ---- PLM : sources publiées à l'ARRONDISSEMENT (751xx/693xx/132xx) ----
+# commune_merged est indexée sur le code VILLE (75056/69123/13055, clé des
+# élections). DVF, APL, FiLoSoFi et DEFM n'ont que les arrondissements -> Paris,
+# Lyon, Marseille restaient NA. On ajoute une ligne ville = agrégat des
+# arrondissements : somme (DEFM), moyenne pondérée par la population légale
+# (APL, FiLoSoFi) ou par le nb de transactions (DVF). APPROXIMATION documentée
+# (une médiane de médianes n'est pas la médiane de la ville).
+plm_city_of <- function(code) {
+  unname(c(`751` = "75056", `693` = "69123", `132` = "13055")[substr(code, 1, 3)])
+}
+plm_arr_codes <- c(sprintf("751%02d", 1:20), sprintf("693%02d", 81:89),
+                   sprintf("132%02d", 1:16))
+plm_consolidate <- function(df, w, how = c("wmean", "sum")) {
+  how <- match.arg(how)
+  arr <- df[df$code_commune %in% plm_arr_codes, , drop = FALSE]
+  if (nrow(arr) == 0) return(df)
+  arr$.city <- plm_city_of(arr$code_commune)
+  arr$.w <- w[match(arr$code_commune, names(w))]
+  num <- setdiff(names(arr)[vapply(arr, is.numeric, logical(1))], ".w")
+  city <- arr |>
+    dplyr::group_by(code_commune = .city) |>
+    dplyr::summarise(
+      dplyr::across(dplyr::all_of(num), ~ if (how == "sum") sum(.x, na.rm = TRUE)
+                    else stats::weighted.mean(.x, .w, na.rm = TRUE)),
+      .groups = "drop")
+  city[num] <- lapply(city[num], function(v) ifelse(is.nan(v), NA_real_, v))
+  dplyr::bind_rows(df[!df$code_commune %in% city$code_commune, ], city)
+}
+pop_w <- if (!is.null(pop)) stats::setNames(pop$pop_latest, pop$code_commune) else NULL
+
 # ---- Préparer DVF : pivot 2024 App + Maison ----
 dvf_2024 <- dvf |>
   dplyr::filter(annee == 2024, !estimation_insuffisante) |>
@@ -74,6 +117,10 @@ dvf_2024 <- dvf |>
     dvf_n_app    = n_transactions_Appartement,
     dvf_n_mai    = n_transactions_Maison
   )
+
+dvf_w <- stats::setNames(dplyr::coalesce(dvf_2024$dvf_n_app, 0) + dplyr::coalesce(dvf_2024$dvf_n_mai, 0) + 1,
+                         dvf_2024$code_commune)
+dvf_2024 <- plm_consolidate(dvf_2024, dvf_w)
 
 # ---- Préparer Air ----
 air_clean <- air |>
@@ -94,13 +141,17 @@ elec_clean <- elec |>
     code_dept,
     libelle_dept,
     tour_decisif    = tour,
-    elec_pct_nfp    = pct_NFP,
-    elec_pct_ens    = pct_ENS,
-    elec_pct_rn     = pct_RN,
-    elec_pct_lr     = pct_LR,
-    elec_pct_divers = pct_Divers,
-    elec_abstention = pct_abstention,
-    elec_marge      = marge_vainqueur,
+    # Mesure de soutien = parts du 1er TOUR (% des exprimés, famille RN = RN +
+    # UXD + EXD ; NFP, ENS, LR, Divers idem). Les parts du T2 (pct_RN...)
+    # dépendent de la configuration du duel (désistements, triangulaires) et
+    # ne sont définies que là où la famille s'est qualifiée : biais de sélection.
+    elec_pct_nfp    = pct_NFP_t1,
+    elec_pct_ens    = pct_ENS_t1,
+    elec_pct_rn     = pct_RN_t1,
+    elec_pct_lr     = pct_LR_t1,
+    elec_pct_divers = pct_Divers_t1,
+    elec_abstention = pct_abstention_t1,
+    elec_marge      = marge_vainqueur,  # T2 : marge du vainqueur (qui a gagné)
     famille_vainqueur,
     ctx_inscrits    = inscrits
   )
@@ -157,7 +208,8 @@ if (!is.null(dgfip)) {
 if (!is.null(filo)) {
   filo_clean <- filo |>
     dplyr::select(code_commune, revenu_median, revenu_d1, revenu_d9, gini,
-                  pct_imposes, part_prestations)
+                  pct_imposes, part_prestations) |>
+    plm_consolidate(pop_w)
   merged <- merged |> dplyr::left_join(filo_clean, by = "code_commune")
 }
 
@@ -171,7 +223,8 @@ if (!is.null(dens)) {
 # Bloc 3 — DEFM DARES (chômage absolu, à normaliser par pop)
 if (!is.null(defm)) {
   defm_clean <- defm |>
-    dplyr::select(code_commune, defm_abc)
+    dplyr::select(code_commune, defm_abc) |>
+    plm_consolidate(pop_w, "sum")
   merged <- merged |> dplyr::left_join(defm_clean, by = "code_commune")
 }
 
@@ -181,11 +234,14 @@ if (!is.null(apl)) {
     dplyr::select(code_commune,
                   dplyr::any_of(c("apl_medecins", "apl_medecins_jeunes",
                                   "apl_infirmieres", "apl_sagefemmes",
-                                  "apl_dentistes", "apl_kines")))
+                                  "apl_dentistes", "apl_kines"))) |>
+    plm_consolidate(pop_w)
   merged <- merged |> dplyr::left_join(apl_clean, by = "code_commune")
 }
 
-# Bloc C/I — BAAC accidents corporels (taux pour 1000 hab)
+# Bloc C/I — BAAC accidents corporels (taux pour 1000 hab).
+# Le fichier BAAC contient toutes les communes (0 = aucun accident enregistré).
+# Une seule définition du taux : acc_taux_pop = n_accidents_2024 / pop INSEE * 1000.
 if (!is.null(baac)) {
   merged <- merged |> dplyr::left_join(baac, by = "code_commune") |>
     dplyr::mutate(
@@ -227,11 +283,90 @@ if (!is.null(bio)) {
 if ("defm_abc" %in% names(merged) && "ctx_pop_latest" %in% names(merged)) {
   merged <- merged |>
     dplyr::mutate(
-      defm_taux_pop = ifelse(is.na(ctx_pop_latest) | ctx_pop_latest == 0,
+      # DARES arrondit les effectifs à 5 : sous 100 hab. l'erreur d'arrondi
+      # dépasse ±25 ‰ (médiane ~60 ‰) -> taux masqué (NA), effectif conservé.
+      defm_taux_pop = ifelse(is.na(ctx_pop_latest) | ctx_pop_latest < 100,
                              NA_real_,
                              defm_abc / ctx_pop_latest * 1000)
     )
 }
+
+
+# ============================================================
+# Vague 2 : nouvelles sources. Règles de publication (voir decisions.qmd) :
+#   CAF : taux seulement si pop >= 1 000 (comptes arrondis à 5, MSA exclue)
+#   DPE : part F/G seulement si n >= 30 diagnostics (échantillon non représentatif)
+#   ORE : évolution 2019->dernière année seulement si aucune cellule RÉSIDENTIELLE
+#         masquée aux deux dates (sinon borne basse ; plus fin que secret_tot), séries rupturées en 2018 : pas de pré-2018
+#   Filosofi 2023 : niveau seul, NON comparable à Filosofi 2021 (jamais de delta)
+# Seuls des taux / parts / densités sont ajoutés : aucun total brut (tautologie de taille).
+# ============================================================
+rd <- function(p) if (file.exists(p)) arrow::read_parquet(p) else NULL
+join_new <- function(merged, df, cols) {
+  if (is.null(df)) return(merged)
+  stopifnot(!anyDuplicated(df$code_commune))
+  merged |> dplyr::left_join(dplyr::select(df, code_commune, dplyr::all_of(cols)),
+                             by = "code_commune")
+}
+
+merged <- join_new(merged, rd(part_path),
+  c("abst_pres22_t1", "abst_euro24", "abst_muni26_t1", "abst_delta_pres02_pres22"))
+
+merged <- join_new(merged, rd(rp22_path),
+  c("pct_res_secondaires", "pct_vacants", "pct_proprietaires",
+    "pct_menages_sans_voiture", "taux_chomage_rp"))
+
+merged <- join_new(merged, rd(cat_path),
+  c("n_catnat_since_2015", "n_catnat_secheresse", "pprn_inondation_opposable"))
+
+merged <- join_new(merged, rd(bpe_path), c("bpe_panier_score", "bpe_sante_pour1000"))
+
+caf <- rd(caf_path)
+if (!is.null(caf)) {                       # re-garde : taux seulement si pop >= 1000
+  caf <- caf |> dplyr::mutate(
+    caf_pct_pop_rsa = ifelse(caf_taux_affiche, caf_pct_pop_rsa, NA_real_),
+    caf_pct_pop_al  = ifelse(caf_taux_affiche, caf_pct_pop_al,  NA_real_))
+}
+merged <- join_new(merged, caf, c("caf_pct_pop_rsa", "caf_pct_pop_al"))
+
+merged <- join_new(merged, rd(arc_path), "arcep_pct_ftth")
+merged <- join_new(merged, rd(enaf_path),
+  c("enaf_ha_par_1000hab_2011_2025", "enaf_variation_vs_ref_pct"))
+
+dpe <- rd(dpe_path)
+if (!is.null(dpe)) dpe <- dpe |> dplyr::mutate(dpe_pct_fg = ifelse(dpe_n >= 30, dpe_pct_fg, NA_real_))
+merged <- join_new(merged, dpe, "dpe_pct_fg")
+
+ore <- rd(ore_path)
+ore_long <- rd(newsrc("energie_ore", "conso_commune_long.parquet"))
+if (!is.null(ore)) {
+  # Masquage SPÉCIFIQUE au résidentiel (secret_tot, lui, agrège tous les secteurs
+  # et écarterait des communes dont le résidentiel est intact). Une évolution est
+  # une borne basse si une cellule résidentielle est masquée en 2019 ou en dernière année.
+  masq <- function(en) {
+    x <- ore_long[ore_long$secteur == "residentiel" & ore_long$energie == en &
+                    ore_long$annee %in% c(2019L, ore$annee_ore[1]), ]
+    unique(x$code_commune[x$secret_partiel])
+  }
+  ore <- ore |>
+    dplyr::mutate(
+      evol_elec_res_19_last_pct = ifelse(code_commune %in% masq("elec"), NA_real_, evol_elec_res_19_last_pct),
+      evol_gaz_res_19_last_pct  = ifelse(code_commune %in% masq("gaz") | !gaz_res_publie,
+                                         NA_real_, evol_gaz_res_19_last_pct),
+      gaz_res_mwh_hab = ifelse(gaz_res_publie, gaz_res_mwh_hab, NA_real_),
+      part_gaz_res    = ifelse(gaz_res_publie, part_gaz_res, NA_real_)) |>
+    dplyr::rename(ore_elec_res_mwh_hab = elec_res_mwh_hab,
+                  ore_elec_res_mwh_pdl = elec_res_mwh_pdl,
+                  ore_gaz_res_mwh_hab  = gaz_res_mwh_hab,
+                  ore_part_gaz_res     = part_gaz_res,
+                  ore_evol_elec_res_19_24_pct = evol_elec_res_19_last_pct,
+                  ore_evol_gaz_res_19_24_pct  = evol_gaz_res_19_last_pct)
+}
+merged <- join_new(merged, ore,
+  c("ore_elec_res_mwh_hab", "ore_elec_res_mwh_pdl", "ore_gaz_res_mwh_hab",
+    "ore_part_gaz_res", "ore_evol_elec_res_19_24_pct", "ore_evol_gaz_res_19_24_pct"))
+
+merged <- join_new(merged, rd(filo23_path), c("rev_median_2023", "taux_pauvrete_2023"))
 
 # Strates : quartiles de log(inscrits) — proxy taille (legacy)
 # + strate_pop INSEE (réelle, depuis recensement)
@@ -254,46 +389,107 @@ merged <- merged |>
                  "Grande ville (≥ 50 000)"))
   )
 
+stopifnot(!anyDuplicated(merged$code_commune))  # 1 ligne / commune
 arrow::write_parquet(merged, file.path(out_dir, "commune_merged.parquet"))
 message(glue::glue("✔ commune_merged.parquet : {nrow(merged)} communes"))
 
-# ---- Corrélations ----
-NUMERIC_VARS <- c(
-  # Élections
-  "elec_pct_nfp", "elec_pct_ens", "elec_pct_rn", "elec_pct_lr",
-  "elec_pct_divers", "elec_abstention", "elec_marge",
-  # Immobilier
-  "dvf_prix_app", "dvf_prix_mai",
-  # Qualité de l'air
-  "air_qual", "air_no2", "air_o3", "air_pm10", "air_pm25",
-  # Contexte démographique
-  "ctx_log_inscrits", "ctx_log_pop",
-  # Délinquance (Bloc 4 SSMSI)
-  "del_total_pour_mille", "del_cambriolages", "del_violences_sex",
-  "del_trafic_stup", "del_degradations", "del_vols_pers",
-  # Finances communales (Bloc 8 DGFiP)
-  "fin_recettes", "fin_charges", "fin_dette", "fin_caf",
-  "fin_taux_taxe_hab", "fin_taux_fonc_bati",
-  # Revenus (Bloc 1 FiLoSoFi)
-  "revenu_median", "revenu_d1", "revenu_d9", "gini",
-  "pct_imposes", "part_prestations",
-  # Désert médical (Bloc 5 APL DREES) — 5 professions
-  "apl_medecins", "apl_medecins_jeunes",
-  "apl_infirmieres", "apl_sagefemmes", "apl_dentistes", "apl_kines",
-  # Chômage (Bloc 3 DARES) — taux pour 1000 hab.
-  "defm_taux_pop",
-  # Accidents corporels BAAC 2024 — taux pour 1000 hab.
-  "acc_taux_pop",
-  # Typologie spatiale INSEE — rang 1 (rural) → 6 (grand centre urbain)
-  "densite_rang",
-  # Bloc G — Empreinte carbone (tCO2eq/hab/an)
-  "carb_hab_total",
-  # Bloc I — Mobilité (% du total commune)
-  "mob_pct_emploi_local", "mob_pct_voiture", "mob_pct_tc",
-  "mob_pct_velo", "mob_pct_pied",
-  # Bloc K — Agriculture biologique
-  "bio_surface_ha", "bio_n_exploit", "bio_n_operateurs"
+
+# ---- Registre des indicateurs (SOURCE UNIQUE) ----
+# 80 indicateurs numériques : libellé, groupe thématique, unité et décimales d'affichage.
+# Lu par l'Explorer (heatmap, nuage), la Carte bivariée et les Classements, et par
+# site_numbers.R (nombre d'indicateurs). Deux variables d'un même groupe = corrélation
+# triviale (filtrée du top inter-thématiques de l'Explorer). Filosofi 2023 est dans
+# « Revenus » : sa corrélation avec Filosofi 2021 (rho 0,93) est une tautologie.
+# Uniquement des taux, parts et densités (aucun total brut).
+INDICATOR_META <- tibble::tribble(
+  ~var,                            ~label,                          ~group,           ~unit,      ~dig,
+  "elec_pct_nfp",                  "% NFP (législ. 2024, T1)",      "Élections",      "%",        1,
+  "elec_pct_ens",                  "% Ensemble (législ. 2024, T1)", "Élections",      "%",        1,
+  "elec_pct_rn",                   "% RN (législ. 2024, T1)",       "Élections",      "%",        1,
+  "elec_pct_lr",                   "% LR (législ. 2024, T1)",       "Élections",      "%",        1,
+  "elec_pct_divers",               "% Divers (législ. 2024, T1)",   "Élections",      "%",        1,
+  "elec_abstention",               "Abstention (législ. 2024, T1)", "Élections",      "%",        1,
+  "elec_marge",                    "Marge du vainqueur (T2)",       "Élections",      "pts",      1,
+  "abst_pres22_t1",                "Abstention prés. 2022 T1",      "Élections",      "%",        1,
+  "abst_euro24",                   "Abstention européennes 2024",   "Élections",      "%",        1,
+  "abst_muni26_t1",                "Abstention municipales 2026 T1","Élections",      "%",        1,
+  "abst_delta_pres02_pres22",      "Δ abstention 2002→2022 (pts)",  "Élections",      "pts",      1,
+  "dvf_prix_app",                  "Prix m² appartement",           "Immobilier",     "€/m²",     0,
+  "dvf_prix_mai",                  "Prix m² maison",                "Immobilier",     "€/m²",     0,
+  "air_qual",                      "Indice ATMO global",            "Air",            "",         1,
+  "air_no2",                       "NO₂",                           "Air",            "µg/m³",    1,
+  "air_o3",                        "O₃",                            "Air",            "µg/m³",    1,
+  "air_pm10",                      "PM₁₀",                          "Air",            "µg/m³",    1,
+  "air_pm25",                      "PM₂.₅",                         "Air",            "µg/m³",    1,
+  "ctx_log_inscrits",              "log(inscrits)",                 "Démographie",    "",         2,
+  "ctx_log_pop",                   "log(population)",               "Démographie",    "",         2,
+  "densite_rang",                  "Densité INSEE (1 rural à 6 centre)", "Démographie", "",       0,
+  "del_total_pour_mille",          "Délinquance totale ‰",          "Sécurité",       "‰",        1,
+  "del_cambriolages",              "Cambriolages ‰",                "Sécurité",       "‰",        2,
+  "del_violences_sex",             "Violences sexuelles ‰",         "Sécurité",       "‰",        2,
+  "del_trafic_stup",               "Trafic de stupéfiants ‰",       "Sécurité",       "‰",        2,
+  "del_degradations",              "Dégradations ‰",                "Sécurité",       "‰",        2,
+  "del_vols_pers",                 "Vols sur personnes ‰",          "Sécurité",       "‰",        2,
+  "acc_taux_pop",                  "Accidents corporels BAAC ‰",    "Sécurité",       "‰",        2,
+  "fin_recettes",                  "Recettes €/hab",                "Finances",       "€/hab",    0,
+  "fin_charges",                   "Charges €/hab",                 "Finances",       "€/hab",    0,
+  "fin_dette",                     "Dette €/hab",                   "Finances",       "€/hab",    0,
+  "fin_caf",                       "CAF €/hab",                     "Finances",       "€/hab",    0,
+  "fin_taux_taxe_hab",             "Taxe d'habitation (%)",         "Finances",       "%",        1,
+  "fin_taux_fonc_bati",            "Foncier bâti (%)",              "Finances",       "%",        1,
+  "revenu_median",                 "Revenu médian €",               "Revenus",        "€",        0,
+  "revenu_d1",                     "Revenu D1 €",                   "Revenus",        "€",        0,
+  "revenu_d9",                     "Revenu D9 €",                   "Revenus",        "€",        0,
+  "gini",                          "Indice de Gini",                "Revenus",        "",         3,
+  "pct_imposes",                   "% ménages imposés",             "Revenus",        "%",        1,
+  "part_prestations",              "Part prestations (%)",          "Revenus",        "%",        1,
+  "caf_pct_pop_rsa",               "RSA (% pop.)",                  "Revenus",        "%",        1,
+  "caf_pct_pop_al",                "Aides au logement (% pop.)",    "Revenus",        "%",        1,
+  "rev_median_2023",               "Revenu médian 2023 €",          "Revenus",        "€",        0,
+  "taux_pauvrete_2023",            "Pauvreté 2023 (%)",             "Revenus",        "%",        1,
+  "apl_medecins",                  "APL médecins",                  "Santé",          "c/an/hab", 2,
+  "apl_medecins_jeunes",           "APL médecins ≤65 ans",          "Santé",          "c/an/hab", 2,
+  "apl_infirmieres",               "APL infirmières",               "Santé",          "c/an/hab", 2,
+  "apl_sagefemmes",                "APL sages-femmes",              "Santé",          "c/an/hab", 2,
+  "apl_dentistes",                 "APL dentistes",                 "Santé",          "c/an/hab", 2,
+  "apl_kines",                     "APL kinésithérapeutes",         "Santé",          "c/an/hab", 2,
+  "defm_taux_pop",                 "Chômage DEFM ‰",                "Chômage",        "‰",        1,
+  "taux_chomage_rp",               "Chômage RP 2022 (%)",           "Chômage",        "%",        1,
+  "carb_hab_total",                "Empreinte CO₂ (t/hab)",         "Énergie",        "tCO₂/hab", 2,
+  "ore_elec_res_mwh_hab",          "Électricité rés. MWh/hab.",     "Énergie",        "MWh/hab.", 2,
+  "ore_elec_res_mwh_pdl",          "Électricité rés. MWh/PDL",      "Énergie",        "MWh/PDL",  2,
+  "ore_gaz_res_mwh_hab",           "Gaz rés. MWh/hab.",             "Énergie",        "MWh/hab.", 2,
+  "ore_part_gaz_res",              "Part du gaz (rés.)",            "Énergie",        "%",        1,
+  "ore_evol_elec_res_19_24_pct",   "Évol. élec. rés. 2019-24 (%)",  "Énergie",        "%",        1,
+  "ore_evol_gaz_res_19_24_pct",    "Évol. gaz rés. 2019-24 (%)",    "Énergie",        "%",        1,
+  "mob_pct_emploi_local",          "% emploi local",                "Mobilité",       "%",        1,
+  "mob_pct_voiture",               "% voiture",                     "Mobilité",       "%",        1,
+  "mob_pct_tc",                    "% transports en commun",        "Mobilité",       "%",        1,
+  "mob_pct_velo",                  "% vélo",                        "Mobilité",       "%",        1,
+  "mob_pct_pied",                  "% marche",                      "Mobilité",       "%",        1,
+  "bio_surface_ha",                "Surface bio (ha)",              "Agriculture",    "ha",       0,
+  "bio_n_exploit",                 "Nb exploitations bio",          "Agriculture",    "",         0,
+  "bio_n_operateurs",              "Nb opérateurs bio",             "Agriculture",    "",         0,
+  "pct_res_secondaires",           "% résidences secondaires",      "Logement",       "%",        1,
+  "pct_vacants",                   "% logements vacants",           "Logement",       "%",        1,
+  "pct_proprietaires",             "% propriétaires",               "Logement",       "%",        1,
+  "pct_menages_sans_voiture",      "% ménages sans voiture",        "Logement",       "%",        1,
+  "dpe_pct_fg",                    "% DPE F/G (échantillon)",       "Logement",       "%",        1,
+  "n_catnat_since_2015",           "Arrêtés CatNat depuis 2015",    "Risques et sols","",         0,
+  "n_catnat_secheresse",           "Arrêtés sécheresse",            "Risques et sols","",         0,
+  "pprn_inondation_opposable",     "PPRN inondation opposable",     "Risques et sols","",         0,
+  "enaf_ha_par_1000hab_2011_2025", "ENAF ha / 1 000 hab.",          "Risques et sols","ha",       2,
+  "enaf_variation_vs_ref_pct",     "ENAF vs référence (%)",         "Risques et sols","%",        1,
+  "bpe_panier_score",              "Panier de services (0-10)",     "Services",       "",         1,
+  "bpe_sante_pour1000",            "Équip. santé / 1 000 hab.",     "Services",       "",         2,
+  "arcep_pct_ftth",                "Fibre FttH (%)",                "Services",       "%",        1
 )
+stopifnot(nrow(INDICATOR_META) == 80, !anyDuplicated(INDICATOR_META$var),
+          all(INDICATOR_META$var %in% names(merged)))
+arrow::write_parquet(INDICATOR_META, file.path(out_dir, "indicator_meta.parquet"))
+
+# ---- Corrélations ----
+NUMERIC_VARS <- INDICATOR_META$var
 
 corr_long <- function(df, method, strate_label = "Toutes") {
   num_df <- df[, NUMERIC_VARS, drop = FALSE]
@@ -399,3 +595,38 @@ print(correlations |>
         dplyr::filter(method == "spearman", strate == "Toutes",
                       v1 == "elec_pct_rn" | v2 == "elec_pct_rn") |>
         dplyr::arrange(dplyr::desc(abs(rho))))
+
+# ---- Agrégats départementaux PONDÉRÉS par la population (C11) ----
+# pages/departements.qmd agrégeait chaque commune à poids égal (une commune de
+# 23 hab pesait autant que Marseille). Ici : médiane pondérée (prix, revenu, APL,
+# chômage, carbone, voiture), taux = Σcompte/Σpop (accidents), moyenne pondérée
+# (délinquance, restreinte aux communes où le total est publié ; la part de
+# population couverte est fournie), somme (bio).
+wmedian <- function(x, w) {
+  ok <- !is.na(x) & !is.na(w) & w > 0
+  if (!any(ok)) return(NA_real_)
+  x <- x[ok]; w <- w[ok]; o <- order(x); x <- x[o]; w <- w[o]
+  x[which(cumsum(w) >= sum(w) / 2)[1]]
+}
+dept_agg_w <- merged |>
+  dplyr::filter(!is.na(code_dept)) |>
+  dplyr::group_by(code_dept, libelle_dept) |>
+  dplyr::summarise(
+    n_communes = dplyr::n(),
+    pop_dept   = sum(ctx_pop_latest, na.rm = TRUE),
+    prix_app   = wmedian(dvf_prix_app,    ctx_pop_latest),
+    revenu     = wmedian(revenu_median,   ctx_pop_latest),
+    apl        = wmedian(apl_medecins,    ctx_pop_latest),
+    chomage    = wmedian(defm_taux_pop,   ctx_pop_latest),
+    delinq     = {ok <- !is.na(del_total_pour_mille) & !is.na(ctx_pop_latest)
+                  if (any(ok)) weighted.mean(del_total_pour_mille[ok], ctx_pop_latest[ok]) else NA_real_},
+    delinq_pop_couverte = sum(ctx_pop_latest[!is.na(del_total_pour_mille)], na.rm = TRUE) /
+                          sum(ctx_pop_latest, na.rm = TRUE),
+    accidents  = ifelse(pop_dept > 0, sum(n_accidents_2024, na.rm = TRUE) / pop_dept * 1000, NA_real_),
+    carbone    = wmedian(carb_hab_total,  ctx_pop_latest),
+    voiture    = wmedian(mob_pct_voiture, ctx_pop_latest),
+    bio        = sum(bio_surface_ha,      na.rm = TRUE),
+    .groups = "drop"
+  )
+arrow::write_parquet(dept_agg_w, file.path(out_dir, "departements_agg.parquet"))
+message(glue::glue("✔ departements_agg.parquet : {nrow(dept_agg_w)} départements (pondérés population)"))

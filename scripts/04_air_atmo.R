@@ -312,6 +312,18 @@ if (file.exists(elec_path)) {
   monthly <- full
 }
 
+# Fenêtre d'observation (data-side) : R/setup_dashboard.R lisait atmo$date_ech,
+# colonne inexistante dans le snapshot agrégé -> date jamais affichée.
+obs_dates <- sort(unique(raw$date_ech))
+fmt_fr <- function(x) format(as.Date(x), "%d/%m/%Y")
+monthly <- monthly |>
+  dplyr::mutate(
+    date_debut   = as.character(min(obs_dates)),
+    date_fin     = as.character(max(obs_dates)),
+    date_fenetre = paste0("moyenne du ", fmt_fr(min(obs_dates)), " au ",
+                          fmt_fr(max(obs_dates)))
+  )
+
 arrow::write_parquet(monthly, out_path)
 
 # ---- Rapport ----

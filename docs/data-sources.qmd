@@ -1,7 +1,13 @@
 ---
 title: "Sources de données"
-subtitle: "13 jeux publics agrégés. Pour chaque source : organisme, URL canonique, format, snapshot, couverture, script de prep."
+subtitle: "Jeux publics agrégés. Pour chaque source : organisme, URL canonique, format, snapshot, couverture, script de prep."
 ---
+
+```{r}
+#| include: false
+source(here::here("R", "site_numbers.R"))
+```
+
 
 ```{=html}
 <style>
@@ -139,18 +145,18 @@ Toutes les sources sont publiques, ouvertes (data.gouv.fr ou portails open data
 des opérateurs publics), et téléchargeables sans authentification. Aucune
 donnée individuelle.
 
-```{=html}
-<div class="kpi-strip">
-  <div class="kpi"><div class="v">13</div><div class="l">sources data.gouv</div></div>
-  <div class="kpi"><div class="v">~1,4 GB</div><div class="l">de raw downloaded</div></div>
-  <div class="kpi"><div class="v">15</div><div class="l">scripts R de prep</div></div>
-  <div class="kpi"><div class="v">35 798</div><div class="l">communes couvertes</div></div>
-  <div class="kpi"><div class="v">2018-2026</div><div class="l">amplitude snapshots</div></div>
-</div>
+```{r}
+#| results: asis
+cat('<div class="kpi-strip">',
+    sprintf('<div class="kpi"><div class="v">%s</div><div class="l">jeux de données ouverts</div></div>', site$sources),
+    sprintf('<div class="kpi"><div class="v">%s</div><div class="l">scripts R de prep</div></div>', site$scripts),
+    sprintf('<div class="kpi"><div class="v">%s</div><div class="l">communes croisées</div></div>', site$communes),
+    sprintf('<div class="kpi"><div class="v">%s</div><div class="l">indicateurs croisés</div></div>', site$indicateurs),
+    '<div class="kpi"><div class="v">2018-2026</div><div class="l">amplitude des millésimes</div></div></div>', sep = "\n")
 ```
 
 
-## Récapitulatif des 13 sources
+## Récapitulatif des sources
 
 ```{=html}
 <table class="src-summary">
@@ -167,18 +173,28 @@ donnée individuelle.
   <tbody>
     <tr><td class="ico">🗳️</td><td>Législatives 2024 (T2 + T1 fallback)</td><td>Min. Intérieur</td><td class="cov">~35 000 communes</td><td class="date">2024-07-10</td><td class="script">02_elections.R</td></tr>
     <tr><td class="ico">🏛️</td><td>Municipales 2026 (T1 + T2)</td><td>Min. Intérieur</td><td class="cov">~3 300 communes</td><td class="date">2026-03-23</td><td class="script">12_municipales_2026.R</td></tr>
-    <tr><td class="ico">🏠</td><td>DVF Demandes de Valeurs Foncières</td><td>DGFiP / Etalab</td><td class="cov">655 495 ventes</td><td class="date">2021-2024</td><td class="script">03_dvf_aggregate.R</td></tr>
+    <tr><td class="ico">🏠</td><td>DVF Demandes de Valeurs Foncières</td><td>DGFiP / Etalab</td><td class="cov">3,98 M ventes agrégées</td><td class="date">2021-2025 (2025 provisoire)</td><td class="script">03_dvf_aggregate.R</td></tr>
     <tr><td class="ico">🌬️</td><td>Indice ATMO qualité de l'air</td><td>Atmo France</td><td class="cov">~25 000 communes</td><td class="date">30 j glissants</td><td class="script">04_air_atmo.R</td></tr>
-    <tr><td class="ico">🚨</td><td>SSMSI Délinquance + BAAC Accidents</td><td>Min. Intérieur (SSMSI) + ONISR</td><td class="cov">~18 000 + 11 099 communes</td><td class="date">2025 / 2024</td><td class="script">07_ssmsi_dgfip.R, 11_baac.R</td></tr>
+    <tr><td class="ico">🚨</td><td>SSMSI Délinquance + BAAC Accidents</td><td>Min. Intérieur (SSMSI) + ONISR</td><td class="cov">685 à 31 000 (selon indicateur, secret stat) + 34 920 communes (0 = aucun accident)</td><td class="date">2025 / 2024</td><td class="script">07_ssmsi_dgfip.R, 11_baac.R</td></tr>
     <tr><td class="ico">💶</td><td>Comptes communaux DGFiP</td><td>DGFiP</td><td class="cov">~35 000 communes</td><td class="date">2024</td><td class="script">07_ssmsi_dgfip.R</td></tr>
     <tr><td class="ico">⚕️</td><td>APL 5 professions DREES</td><td>DREES</td><td class="cov">~35 000 communes</td><td class="date">2023</td><td class="script">08_drees_apl.R</td></tr>
-    <tr><td class="ico">⚕️</td><td>Espérance de vie INSEE</td><td>INSEE</td><td class="cov">~28 000 communes</td><td class="date">2024</td><td class="script">09_esperance_vie.R</td></tr>
-    <tr><td class="ico">📊</td><td>FiLoSoFi Revenus disponibles</td><td>INSEE</td><td class="cov">~30 000 communes</td><td class="date">2021</td><td class="script">10_filosofi_densite_defm.R</td></tr>
+    <tr><td class="ico">⚕️</td><td>Espérance de vie INSEE (niveau département)</td><td>INSEE</td><td class="cov">101 départements, recopiés sur 34 935 communes</td><td class="date">2025 (provisoire)</td><td class="script">09_esperance_vie.R</td></tr>
+    <tr><td class="ico">📊</td><td>FiLoSoFi Revenus disponibles (2021, composition)</td><td>INSEE</td><td class="cov">~31 300 communes</td><td class="date">2021</td><td class="script">10_filosofi_densite_defm.R</td></tr>
     <tr><td class="ico">👥</td><td>Populations + Grille densité INSEE</td><td>INSEE</td><td class="cov">~35 000 communes</td><td class="date">2017-2024</td><td class="script">06_insee_populations.R, 10_…</td></tr>
-    <tr><td class="ico">🏭</td><td>DEFM Chômage cat. A+B+C</td><td>DARES</td><td class="cov">~7 400 communes</td><td class="date">1 trimestre</td><td class="script">10_filosofi_densite_defm.R</td></tr>
+    <tr><td class="ico">🏭</td><td>DEFM Chômage cat. A+B+C</td><td>DARES</td><td class="cov">~34 900 communes</td><td class="date">2024-T4</td><td class="script">10_filosofi_densite_defm.R</td></tr>
     <tr><td class="ico">🔥</td><td>Empreinte carbone par habitant</td><td>RARE / CITEPA</td><td class="cov">~34 800 communes</td><td class="date">2018 (base)</td><td class="script">13_energie_carbone.R</td></tr>
-    <tr><td class="ico">🚗</td><td>MOBPRO mobilité domicile-travail</td><td>INSEE (RP 2019)</td><td class="cov">~34 800 communes</td><td class="date">2019 (publié 2023)</td><td class="script">14_mobilite.R, 16_mobilite_flows.R</td></tr>
+    <tr><td class="ico">🚗</td><td>MOBPRO mobilité domicile-travail</td><td>INSEE (RP 2022)</td><td class="cov">~34 800 communes</td><td class="date">2022</td><td class="script">14_mobilite.R, 16_mobilite_flows.R</td></tr>
     <tr><td class="ico">🌱</td><td>Agence Bio surfaces + opérateurs</td><td>Agence Bio</td><td class="cov">23 100 communes</td><td class="date">2024</td><td class="script">15_agriculture_bio.R</td></tr>
+    <tr><td class="ico">📊</td><td>FiLoSoFi 2023 (« Filosofi 2 »)</td><td>INSEE</td><td class="cov">~30 800 communes (pauvreté ~5 200)</td><td class="date">2026-08-06</td><td class="script">28_filosofi_2023.R</td></tr>
+    <tr><td class="ico">🗳️</td><td>Élections agrégées : participation 2002-2026</td><td>Min. Intérieur via data.gouv.fr</td><td class="cov">34 869 communes</td><td class="date">2026</td><td class="script">19_participation_elections.R</td></tr>
+    <tr><td class="ico">🏠</td><td>Recensement 2022 : logement et emploi</td><td>INSEE</td><td class="cov">34 903 communes (hors Mayotte)</td><td class="date">RP 2022</td><td class="script">20_rp2022_logement_emploi.R</td></tr>
+    <tr><td class="ico">🌊</td><td>CatNat et PPRN (GASPAR)</td><td>MTE / Géorisques</td><td class="cov">34 875 communes</td><td class="date">1982 à 2025</td><td class="script">21_catnat_gaspar.R</td></tr>
+    <tr><td class="ico">🏪</td><td>Base permanente des équipements</td><td>INSEE</td><td class="cov">34 875 communes</td><td class="date">01/01/2025</td><td class="script">22_bpe_equipements.R</td></tr>
+    <tr><td class="ico">🤝</td><td>CAF allocataires (RSA, aides au logement)</td><td>CNAF</td><td class="cov">34 836 communes (taux ≥ 1 000 hab.)</td><td class="date">2024-12</td><td class="script">23_caf_allocataires.R</td></tr>
+    <tr><td class="ico">📶</td><td>Déploiement de la fibre (FttH)</td><td>ARCEP</td><td class="cov">34 920 communes</td><td class="date">2026 T2</td><td class="script">24_arcep_fibre.R</td></tr>
+    <tr><td class="ico">🌾</td><td>Consommation d'espaces NAF (ENAF)</td><td>Cerema</td><td class="cov">34 856 communes (métropole + 971-974)</td><td class="date">2011-2025</td><td class="script">25_conso_enaf.R</td></tr>
+    <tr><td class="ico">🔋</td><td>DPE logements existants</td><td>ADEME</td><td class="cov">22 432 communes (≥ 30 DPE)</td><td class="date">depuis 07/2021</td><td class="script">26_dpe_ademe.R</td></tr>
+    <tr><td class="ico">⚡</td><td>Électricité et gaz par commune (ORE)</td><td>Agence ORE</td><td class="cov">34 851 communes (gaz : 9 324)</td><td class="date">2011-2024</td><td class="script">27_energie_ore.R</td></tr>
   </tbody>
 </table>
 ```
@@ -253,7 +269,7 @@ Immobilier (DVF), finances communales (DGFiP), revenus des ménages (FiLoSoFi IN
 ```{=html}
 <div class="src-card cat-eco">
   <h3>DVF — Demandes de Valeurs Foncières géolocalisées</h3>
-  <div class="org">DGFiP · Etalab · 4 années 2021-2024</div>
+  <div class="org">DGFiP · Etalab · 5 années 2021-2025 (2025 provisoire)</div>
   <div class="field"><span class="field-label">URL</span><span class="field-value"><code>files.data.gouv.fr/geo-dvf/latest/csv/{YYYY}/full.csv.gz</code> (50-120 MB par année compressé)</span></div>
   <div class="field"><span class="field-label">Filtres</span><span class="field-value">
     <ul>
@@ -332,17 +348,17 @@ Délinquance enregistrée et accidents corporels, deux sources Min. Intérieur.
 <div class="src-card cat-sec">
   <h3>SSMSI — Délinquance enregistrée par commune</h3>
   <div class="org">Service Statistique Ministériel de la Sécurité Intérieure · 2025</div>
-  <div class="field"><span class="field-label">Variables</span><span class="field-value">8 indicateurs ‰ habitants : cambriolages, vols personnes, vols véhicules, violences sexuelles, dégradations, trafic stupéfiants, usage stupéfiants, total.</span></div>
-  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~18 000 communes (après secret stat)</span></div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value">13 indicateurs ‰ habitants (violences, vols, cambriolages, dégradations, stupéfiants) + total (somme des 13, publiée seulement si les 13 le sont).</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">11 000 à 31 000 communes selon l'indicateur ; total : 685 communes</span></div>
   <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/07_ssmsi_dgfip.R</code></span></div>
-  <div class="caveat">Secret statistique : taux non publié si moins de 5 faits cumulés sur 3 ans. Les ~17 000 communes les plus petites sont en "non publié" (gris sur la carte).</div>
+  <div class="caveat">Secret statistique : un décompte n'est diffusé que s'il vaut 0 ou ≥ 5 ; 1 à 4 faits = non publié (NA, gris sur la carte). Dans les petites communes, seuls les zéros sont visibles (biais de sélection).</div>
 </div>
 
 <div class="src-card cat-sec">
   <h3>BAAC — Bulletin d'analyse des accidents corporels</h3>
   <div class="org">ONISR / Min. Intérieur · 2024</div>
   <div class="field"><span class="field-label">Variables</span><span class="field-value">Compte d'accidents corporels par commune, normalisé en ‰ habitants (joint avec <code>pop_latest</code>).</span></div>
-  <div class="field"><span class="field-label">Couverture</span><span class="field-value">11 099 communes ayant ≥ 1 accident en 2024</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">34 920 communes ; ~11 200 ont ≥ 1 accident en 2024, les autres valent 0</span></div>
   <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/11_baac.R</code></span></div>
 </div>
 ```
@@ -373,12 +389,12 @@ Accès aux soins (DREES) et espérance de vie (INSEE).
 </div>
 
 <div class="src-card cat-sante">
-  <h3>Espérance de vie INSEE par commune</h3>
-  <div class="org">INSEE · 2024</div>
-  <div class="field"><span class="field-label">Variable</span><span class="field-value">Espérance de vie à la naissance, années, par commune. Médiane nationale ~83 ans.</span></div>
-  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~28 000 communes (81,6% match)</span></div>
+  <h3>Espérance de vie INSEE par département</h3>
+  <div class="org">INSEE · « Espérance de vie en 2025 » (provisoire)</div>
+  <div class="field"><span class="field-label">Variable</span><span class="field-value">Espérance de vie à la naissance (moyenne simple hommes/femmes), 74,7 à 85,4 ans, niveau département.</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">101 départements ; la valeur est recopiée sur les 34 935 communes du département (<code>esperance_vie_niveau</code> = « departement »)</span></div>
   <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/09_esperance_vie.R</code></span></div>
-  <div class="caveat">INSEE ne publie pas le code commune INSEE dans ce fichier. Join par <em>nom commune + département normalisé</em> → 81,6% de taux de match. Les 18,4% non-match sont les communes au nom homonyme ou avec un nom INSEE différent du nom usuel.</div>
+  <div class="caveat">L'INSEE ne publie pas d'espérance de vie communale fiable : la carte est un aplat départemental. L'ancienne série communale (1 371 communes, valeurs de 11 à 105 ans) a été abandonnée le 2026-10-14.</div>
 </div>
 ```
 
@@ -406,13 +422,13 @@ Démographie INSEE (recensement + grille densité) et chômage DARES.
     <ol>
       <li>Rural non périurbain</li>
       <li>Rural périurbain</li>
+      <li>Ceintures urbaines</li>
       <li>Petites villes</li>
       <li>Centres urbains intermédiaires</li>
-      <li>Ceintures urbaines</li>
       <li>Grands centres urbains</li>
     </ol>
   </span></div>
-  <div class="field"><span class="field-label">Usage</span><span class="field-value">Palette catégorielle sur la page Démographie + variable continue <code>densite_rang</code> (1-6) dans Explorer et Bivariée.</span></div>
+  <div class="field"><span class="field-label">Usage</span><span class="field-value">Palette catégorielle sur la page Démographie + variable continue <code>densite_rang</code> (1 = rural non périurbain … 6 = grands centres urbains) dans Explorer et Bivariée.</span></div>
   <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/10_filosofi_densite_defm.R</code></span></div>
 </div>
 
@@ -420,13 +436,13 @@ Démographie INSEE (recensement + grille densité) et chômage DARES.
   <h3>DEFM — Chômage cat. A+B+C par commune</h3>
   <div class="org">DARES · Direction Animation Recherche Études Statistiques</div>
   <div class="field"><span class="field-label">Variable</span><span class="field-value">Demandeurs d'Emploi en Fin de Mois, catégories A (sans activité) + B (réduite courte) + C (réduite longue). Normalisé en taux ‰ habitants.</span></div>
-  <div class="field"><span class="field-label">Couverture</span><span class="field-value">~7 400 communes seulement (DARES ne publie pas pour les plus petites)</span></div>
+  <div class="field"><span class="field-label">Couverture</span><span class="field-value">34 910 communes, 2024-T4 (jeu « Inscrits à France Travail, données communales », data.gouv.fr). Effectifs arrondis à 5 : taux masqué sous 100 habitants.</span></div>
   <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/10_filosofi_densite_defm.R</code></span></div>
 </div>
 
 <div class="src-card cat-soc">
-  <h3>MOBPRO — Mobilité domicile-travail (RP 2019)</h3>
-  <div class="org">INSEE · Recensement de la population · 2019 (publié 2023)</div>
+  <h3>MOBPRO — Mobilité domicile-travail (RP 2022)</h3>
+  <div class="org">INSEE · Recensement de la population · 2022</div>
   <div class="field"><span class="field-label">Dataset ID</span><span class="field-value"><code>63db95ccf8de145951fa5fa3</code></span></div>
   <div class="field"><span class="field-label">Resource ZIP</span><span class="field-value"><code>f3f22487-22d0-45f4-b250-af36fc56ccd0</code> (82 MB ZIP → ~500 MB CSV)</span></div>
   <div class="field"><span class="field-label">Format source</span><span class="field-value">Fichier détail : ~5 M lignes, 1 ligne = 1 actif occupé pondéré (IPONDI).</span></div>
@@ -435,7 +451,7 @@ Démographie INSEE (recensement + grille densité) et chômage DARES.
       <li><code>COMMUNE</code> = commune de résidence</li>
       <li><code>DCLT</code> = commune lieu de travail</li>
       <li><code>IPONDI</code> = pondération individuelle</li>
-      <li><code>TRANS</code> = mode (RP 2019 : 1=pas, 2=marche, 3=vélo, 4=2RM, <strong>5=voiture</strong>, <strong>6=TC</strong>)</li>
+      <li><code>TRANS</code> = mode (RP 2019 et RP 2022 : 1=pas, 2=marche, 3=vélo, 4=2RM, <strong>5=voiture</strong>, <strong>6=TC</strong>)</li>
     </ul>
   </span></div>
   <div class="field"><span class="field-label">Agrégation</span><span class="field-value">Via duckdb : <code>mob_pct_emploi_local</code>, <code>mob_pct_voiture/tc/velo/pied</code>, <code>mob_top_dest_code/flux</code>. Pour le Sankey, consolidation PLM (script <code>16_mobilite_flows.R</code>).</span></div>
@@ -478,10 +494,70 @@ Agriculture biologique certifiée (Agence Bio).
 ```
 
 
+## 🆕 Vague 2 (2026-10-14) {.cat-section-title}
+
+::: {.cat-section-sub}
+Dix jeux ajoutés, tous en licence ouverte, téléchargeables sans authentification.
+:::
+
+```{=html}
+<div class="src-card cat-soc"><h3>FiLoSoFi 2023 (« Filosofi 2 »)</h3><div class="org">INSEE · Licence Ouverte</div>
+  <div class="field"><span class="field-label">URL</span><span class="field-value"><a href="https://www.insee.fr/fr/statistiques/8984752">insee.fr/fr/statistiques/8984752</a> (FILOSOFI_CC_csv.zip, publié le 2026-08-06)</span></div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">Niveau de vie médian et taux de pauvreté à 60 % pour ~30 800 communes (pauvreté ~5 200). Métropole et La Réunion ; valeurs secrètes vides.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/28_filosofi_2023.R</code></span></div>
+  <div class="caveat">Non comparable avec Filosofi 2021 (INSEE : comparaison « à proscrire »). Aucune évolution n'est calculée.</div></div>
+
+<div class="src-card cat-pol"><h3>Élections agrégées : participation 2002-2026</h3><div class="org">Ministère de l'Intérieur · data.gouv.fr · LO 2.0</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">Inscrits, votants, abstentions, blancs et nuls par bureau de vote, sommés par commune ; présidentielles, législatives, européennes, régionales, départementales, municipales.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/19_participation_elections.R</code></span></div>
+  <div class="caveat">Français de l'étranger exclus ; blancs et nuls non distingués avant 2016.</div></div>
+
+<div class="src-card cat-soc"><h3>Recensement 2022 : logement et emploi</h3><div class="org">INSEE · base communale</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">Résidences secondaires, logements vacants, propriétaires, ménages sans voiture, chômage au sens du recensement.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/20_rp2022_logement_emploi.R</code></span></div>
+  <div class="caveat">Mayotte absente ; non publié si le dénominateur est inférieur à 50.</div></div>
+
+<div class="src-card cat-env"><h3>CatNat et PPRN (GASPAR)</h3><div class="org">MTE / Géorisques · LO 2.0</div>
+  <div class="field"><span class="field-label">URL</span><span class="field-value"><a href="http://files.georisques.fr/GASPAR/gaspar.zip">files.georisques.fr/GASPAR/gaspar.zip</a></span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/21_catnat_gaspar.R</code></span></div>
+  <div class="caveat">Un arrêté est pris sur demande de la commune : exposition reconnue, pas intensité de l'aléa. 2025 sous-compté.</div></div>
+
+<div class="src-card cat-soc"><h3>Base permanente des équipements (BPE) 2025</h3><div class="org">INSEE · Licence Ouverte</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">Équipements par commune ; panier de la vie courante (10 familles, 0 à 10) ; équipements de santé pour 1 000 habitants.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/22_bpe_equipements.R</code></span></div>
+  <div class="caveat">Présence dans la commune n'est pas accès. Paris, Lyon, Marseille en commune entière.</div></div>
+
+<div class="src-card cat-soc"><h3>CAF : allocataires par commune</h3><div class="org">CNAF · data.caf.fr · LO 2.0</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">RSA, prime d'activité, allocations familiales, aides au logement (décembre 2024).</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/23_caf_allocataires.R</code></span></div>
+  <div class="caveat">Taux affichés à partir de 1 000 habitants ; régime général (MSA exclue) ; comptes arrondis à 5 ; Guyane : population sous-estimée.</div></div>
+
+<div class="src-card cat-eco"><h3>ARCEP : déploiement FttH par commune</h3><div class="org">ARCEP · LO</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">Part des locaux raccordables à la fibre jusqu'à l'abonné, 2026 T2 (France : 95,3 %).</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/24_arcep_fibre.R</code></span></div>
+  <div class="caveat">Raccordable n'est pas abonné.</div></div>
+
+<div class="src-card cat-env"><h3>Consommation d'espaces NAF (ENAF), 2011-2025</h3><div class="org">Cerema · data.gouv.fr · LO 2.0</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">Flux d'espaces naturels, agricoles et forestiers artificialisés (Fichiers fonciers) ; rythme 2021-2025 contre 2011-2021.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/25_conso_enaf.R</code></span></div>
+  <div class="caveat">Un flux, pas un stock ; non cadastré et domaine public manquants ; métropole et 971-974.</div></div>
+
+<div class="src-card cat-env"><h3>DPE logements existants</h3><div class="org">ADEME · data-fair · LO 2.0</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">Étiquettes A à G agrégées par commune côté serveur ; part F/G.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/26_dpe_ademe.R</code></span></div>
+  <div class="caveat">Échantillon non représentatif du parc (DPE à la vente ou à la location) ; publié à partir de 30 diagnostics ; changement de méthode le 01/07/2024.</div></div>
+
+<div class="src-card cat-env"><h3>Agence ORE : consommation annuelle d'électricité et de gaz par commune (LO 2.0)</h3><div class="org">Agence ORE · data.gouv.fr · mise à jour 2026-01</div>
+  <div class="field"><span class="field-label">Contenu</span><span class="field-value">2011-2024, par secteur ; résidentiel rapporté aux habitants (INSEE 2021) et aux points de livraison. Remplace le CSV de 800 MB écarté auparavant.</span></div>
+  <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/27_energie_ore.R</code></span></div>
+  <div class="caveat">Rupture de série en 2018 ; petites cellules sous secret ; gaz dans 9 324 communes seulement ; le total inclut des clients industriels RTE.</div></div>
+```
+
+
 ## 🔬 Données dérivées (Explorer + Bivariée) {.cat-section-title}
 
 ::: {.cat-section-sub}
-Artefacts construits à partir des 13 sources brutes pour les pages d'analyse.
+Artefacts construits à partir des sources brutes ci-dessus pour les pages d'analyse.
 :::
 
 ```{=html}
@@ -491,7 +567,7 @@ Artefacts construits à partir des 13 sources brutes pour les pages d'analyse.
   <div class="field"><span class="field-label">Source amont</span><span class="field-value">Toutes les sources ci-dessus, jointes sur <code>code_commune</code> (PLM répercuté via <code>plm_map</code>).</span></div>
   <div class="field"><span class="field-label">Artefacts</span><span class="field-value">
     <ul>
-      <li><code>commune_merged.parquet</code> — 1 ligne / commune × 49 variables</li>
+      <li><code>commune_merged.parquet</code> — 1 ligne / commune, toutes les variables croisées (voir <code>indicator_meta.parquet</code> : registre des 80 indicateurs numériques)</li>
       <li><code>correlations.parquet</code> — paires × méthode × strate (15 912 lignes : 49×49/2 × {Spearman, Pearson} × 6 niveaux)</li>
       <li><code>bivariate_bins.parquet</code> — terciles × terciles pour 16 paires (571 712 lignes)</li>
     </ul>

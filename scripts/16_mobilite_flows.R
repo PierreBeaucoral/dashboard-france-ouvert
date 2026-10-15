@@ -4,7 +4,7 @@
 # Bloc I — Agrégation des flux domicile-travail entre bassins d'emploi
 # pour le Sankey de la page Mobilité.
 #
-# Source : INSEE MOBPRO 2019 (déjà téléchargé par scripts/14_mobilite.R).
+# Source : INSEE MOBPRO RP 2022 (déjà téléchargé par scripts/14_mobilite.R).
 # Stratégie :
 #   1. Identifier les 50 plus grosses communes destination (DCLT)
 #   2. Pour chaque résidence COMMUNE, agréger Σ IPONDI vers ces 50
@@ -20,24 +20,32 @@ suppressPackageStartupMessages({
   library(duckdb)
   library(DBI)
 })
+source(here::here("scripts", "cog_helpers.R"))
 
-csv_path <- here::here("data", "raw", "mobilite", "FD_MOBPRO_2019.csv")
+pq_path  <- here::here("data", "raw", "mobilite", "RP2022_mobpro.parquet")
 out_dir  <- here::here("data", "processed", "mobilite")
 out_path <- file.path(out_dir, "flows_top.parquet")
 
-if (!file.exists(csv_path)) {
-  stop("MOBPRO CSV introuvable. Lancer scripts/14_mobilite.R d'abord.")
+if (!file.exists(pq_path)) {
+  stop("MOBPRO parquet introuvable. Lancer scripts/14_mobilite.R d'abord.")
 }
 
 con <- DBI::dbConnect(duckdb::duckdb())
 on.exit(DBI::dbDisconnect(con, shutdown = TRUE), add = TRUE)
 
+# Harmonisation COG 2024 (millésime du fichier) -> COG 2026 : on remappe les
+# codes AVANT d'agréger, donc les effectifs de communes fusionnées s'additionnent.
+cogmap <- cog_map("2024-01-01")
+DBI::dbWriteTable(con, "cogmap", cogmap)
 DBI::dbExecute(con, sprintf(
-  "CREATE TABLE mob AS SELECT * FROM read_csv('%s', delim=';', header=true, all_varchar=true)",
-  csv_path
-))
+  "CREATE TABLE mob AS SELECT COALESCE(a.code_2026, CAST(COMMUNE AS VARCHAR)) AS COMMUNE,
+          COALESCE(b.code_2026, CAST(DCLT AS VARCHAR)) AS DCLT, IPONDI
+   FROM read_parquet('%s') m
+   LEFT JOIN cogmap a ON CAST(m.COMMUNE AS VARCHAR) = a.code_avant
+   LEFT JOIN cogmap b ON CAST(m.DCLT AS VARCHAR) = b.code_avant", pq_path))
 
-# Vue agrégée : on consolide les arrondissements PLM vers leur ville mère.
+# RP 2022 : COMMUNE est déjà la commune mère (arrondissement dans ARM) ;
+# DCLT reste détaillé. Vue agrégée : on consolide les arrondissements PLM vers leur ville mère.
 # Paris 75101-75120 → 75056, Lyon 69381-69389 → 69123, Marseille 132xx → 13055.
 DBI::dbExecute(con, "
   CREATE OR REPLACE VIEW mob_consolidated AS
@@ -119,3 +127,12 @@ cat(sprintf("\n✔ %d flux → %s (%.1f KB)\n",
 cat("\nTop 10 flux:\n")
 print(head(flows_named |>
              dplyr::select(label_res, label_dest, flux), 10))
+
+# ---- Contrôles ----
+stopifnot(
+  nrow(flows_named) == 200,
+  all(flows_named$flux >= 100),
+  !anyNA(flows_named$nom_res), !anyNA(flows_named$nom_dest),
+  !anyDuplicated(flows_named[c("code_res", "code_dest")])
+)
+cat("\n✔ stopifnot() OK\n")
