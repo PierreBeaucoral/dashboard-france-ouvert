@@ -102,6 +102,7 @@ if (elec_ready) {
   apl_path  <- here::here("data", "processed", "drees", "apl_medecins.parquet")
   apl_ready <- file.exists(apl_path)
   if (apl_ready) apl_data <- arrow::read_parquet(apl_path)
+  apl_millesime <- if (apl_ready) max(apl_data$apl_millesime, na.rm = TRUE) else NA_integer_
 
   # FiLoSoFi (Bloc 1 — revenus INSEE)
   filo_path_d <- here::here("data", "processed", "filosofi",
@@ -853,7 +854,7 @@ if (apl_ready) {
       '  else if (d.apl < 3.5) { status = "Sous-doté"; statusClass = "cp-badge-t1"; }\n',
       '  else { status = "Bien doté"; statusClass = "cp-badge-t2"; }\n',
       '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \' · <span class="cp-badge \' + statusClass + \'">\' + status + \'</span></div></div>\' +\n',
-      '    \'<div class="cp-section"><h4>APL médecins généralistes 2023</h4>\' +\n',
+      '    \'<div class="cp-section"><h4>APL médecins généralistes ', apl_millesime, '</h4>\' +\n',
       '    \'<div class="cp-kvs">\' +\n',
       '    \'<div class="cp-kv"><span>Tous médecins</span><span class="cp-num">\' + fmt(d.apl) + \' c/an/hab</span></div>\' +\n',
       '    \'<div class="cp-kv"><span>Médecins ≤ 65 ans</span><span class="cp-num">\' + fmt(d.aplj) + \' c/an/hab</span></div>\' +\n',
@@ -1523,7 +1524,7 @@ if (filo_ready) {
 
 ## Row {height="82%"}
 
-::: {.card title="Désert médical · APL médecins généralistes 2023 (consultations/an/hab)" width="72%"}
+::: {.card title="Désert médical · APL médecins généralistes `r apl_millesime` (consultations/an/hab)" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
@@ -1604,7 +1605,7 @@ if (apl_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Source</strong> · DREES · APL 2023 · 5 professions.<br>
+    <strong>Source</strong> · DREES · APL `r apl_millesime` · 5 professions.<br>
     APL médecins en consultations/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab.
   </div>
 </div>

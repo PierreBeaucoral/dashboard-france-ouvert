@@ -52,6 +52,13 @@ build_geometry <- function() {
     return(invisible())
   }
   x <- sf::read_sf(geo_src, quiet = TRUE)
+  # Ordre de dessin = ordre des entités : les grandes communes d'abord, les petites par-dessus.
+  # Sinon une commune contenue dans le tracé généralisé d'une voisine (Chêne-Sec 39140 sous
+  # Beauvernois 71028) est recouverte, donc invisible et non cliquable (audit 2026-10-15, mineur 1).
+  # Aire planaire en degrés² (CRS retiré : s2/lwgeom inutiles), corrigée de cos(latitude).
+  xp  <- sf::st_set_crs(x, NA)
+  lat <- vapply(sf::st_geometry(xp), function(g) mean(sf::st_bbox(g)[c(2, 4)]), numeric(1))
+  x <- x[order(-as.numeric(sf::st_area(xp)) * cos(lat * pi / 180)), ]
   g <- sf::st_geometry(x)
   enc <- lapply(g, function(mp) {                       # mp : MULTIPOLYGON
     lapply(unclass(mp), function(poly) lapply(poly, encode_ring))
@@ -107,7 +114,10 @@ build_columns <- function() {
   for (f in num) {
     v <- m[[f]]
     v[!is.finite(v)] <- NA_real_
-    writeLines(jsonlite::toJSON(round(v, 3), na = "null", digits = NA),
+    # Exception : la population est stockée en log10 et ré-affichée en habitants par les pages
+    # Profil/Semblables (10^v arrondi) ; 3 décimales affichaient 2 133 045 pour Paris
+    # au lieu de la population réelle 2 133 111 (ctx_pop_latest). 8 décimales -> erreur < 0,05 hab. : l'arrondi rend l'effectif exact.
+    writeLines(jsonlite::toJSON(round(v, if (f == "ctx_log_pop") 8L else 3L), na = "null", digits = NA),
                file.path("assets", "data", "col", paste0(f, ".json")), useBytes = TRUE)
   }
   message("[assets] ", length(num), " colonnes + index : ", nrow(m), " communes")
@@ -219,7 +229,13 @@ build_constellation <- function() {
     ddx[j] <- pk$x; ddy[j] <- pk$y
   }
   full <- function(v) { o <- rep(NA_real_, length(dl)); o[has] <- v; round(o, 1) }
-  obj <- list(w = W, h = round(H, 1), hm = round(Hm, 1), k = round(kk, 5), rmin = rmin,
+  # Chiffres de la note « Lecture » (pages/constellation.qmd), calculés ici avec la MÊME échelle
+  # que les cercles : un cercle est au rayon minimal tant que kk * sqrt(pop) <= rmin.
+  pop_seuil <- (rmin / kk)^2
+  sous <- placed & pop <= pop_seuil
+  lecture <- list(pop_seuil = round(pop_seuil, 1), part_communes = sum(sous) / sum(placed),
+                  part_pop = sum(pop[sous]) / sum(pop[placed]), n_sans_pop = sum(placed & pop == 0))
+  obj <- list(w = W, h = round(H, 1), hm = round(Hm, 1), k = round(kk, 5), rmin = rmin, lecture = lecture,
               boxes = lapply(boxes, function(b) { b[c("x", "y", "w", "h")] <- lapply(b[c("x", "y", "w", "h")], round, 1); b }),
               gx = round(gx, 1), gy = round(gy, 1),
               dep = list(c = dl, gx = full(dgx), gy = full(dgy), dx = full(ddx), dy = full(ddy), r = full(dr)))

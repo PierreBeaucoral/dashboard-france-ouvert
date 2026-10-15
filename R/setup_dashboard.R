@@ -134,6 +134,8 @@ if (elec_ready) {
   apl_path  <- here::here("data", "processed", "drees", "apl_medecins.parquet")
   apl_ready <- file.exists(apl_path)
   if (apl_ready) apl_data <- arrow::read_parquet(apl_path)
+  # Millésime APL lu dans les données (script 08), jamais figé dans les libellés
+  apl_millesime <- if (apl_ready) max(apl_data$apl_millesime, na.rm = TRUE) else NA_integer_
 
   # Espérance de vie INSEE → joint à APL pour partager la page Santé
   ev_path <- here::here("data", "processed", "insee_extra", "esperance_vie.parquet")

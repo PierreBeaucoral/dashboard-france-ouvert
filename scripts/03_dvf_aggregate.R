@@ -147,6 +147,14 @@ out <- out |>
     estimation_insuffisante = n_transactions < 5
   )
 
+# Harmonisation COG 2026 (communes renumérotées) UNE FOIS, ici : tous les consommateurs
+# (Immobilier, Profil, Explorer) lisent des codes COG 2026 et les mêmes valeurs (audit 2026-10-15,
+# MAJOR-2). Nécessite data/processed/insee/ (script 06_). Les ventes sont conservées (stopifnot).
+source(here::here("scripts", "cog_helpers.R"))
+n_avant <- sum(out$n_transactions)
+out <- dvf_combine_renamed(out, cog_map_renamed())
+stopifnot(sum(out$n_transactions) == n_avant)
+
 arrow::write_parquet(out, out_path)
 
 # ---- Rapport ----

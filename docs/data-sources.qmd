@@ -177,7 +177,7 @@ cat('<div class="kpi-strip">',
     <tr><td class="ico">🌬️</td><td>Indice ATMO qualité de l'air</td><td>Atmo France</td><td class="cov">~25 000 communes</td><td class="date">30 j glissants</td><td class="script">04_air_atmo.R</td></tr>
     <tr><td class="ico">🚨</td><td>SSMSI Délinquance + BAAC Accidents</td><td>Min. Intérieur (SSMSI) + ONISR</td><td class="cov">685 à 31 000 (selon indicateur, secret stat) + 34 920 communes (0 = aucun accident)</td><td class="date">2025 / 2024</td><td class="script">07_ssmsi_dgfip.R, 11_baac.R</td></tr>
     <tr><td class="ico">💶</td><td>Comptes communaux DGFiP</td><td>DGFiP</td><td class="cov">~35 000 communes</td><td class="date">2024</td><td class="script">07_ssmsi_dgfip.R</td></tr>
-    <tr><td class="ico">⚕️</td><td>APL 5 professions DREES</td><td>DREES</td><td class="cov">~35 000 communes</td><td class="date">2023</td><td class="script">08_drees_apl.R</td></tr>
+    <tr><td class="ico">⚕️</td><td>APL 5 professions DREES</td><td>DREES</td><td class="cov">~35 000 communes</td><td class="date">2024</td><td class="script">08_drees_apl.R</td></tr>
     <tr><td class="ico">⚕️</td><td>Espérance de vie INSEE (niveau département)</td><td>INSEE</td><td class="cov">101 départements, recopiés sur 34 935 communes</td><td class="date">2025 (provisoire)</td><td class="script">09_esperance_vie.R</td></tr>
     <tr><td class="ico">📊</td><td>FiLoSoFi Revenus disponibles (2021, composition)</td><td>INSEE</td><td class="cov">~31 300 communes</td><td class="date">2021</td><td class="script">10_filosofi_densite_defm.R</td></tr>
     <tr><td class="ico">👥</td><td>Populations + Grille densité INSEE</td><td>INSEE</td><td class="cov">~35 000 communes</td><td class="date">2017-2024</td><td class="script">06_insee_populations.R, 10_…</td></tr>
@@ -378,11 +378,11 @@ Accès aux soins (DREES) et espérance de vie (INSEE).
 ```{=html}
 <div class="src-card cat-sante">
   <h3>APL — Accessibilité Potentielle Localisée (5 professions)</h3>
-  <div class="org">DREES · Direction Recherche, Études, Évaluation, Statistiques · 2023</div>
+  <div class="org">DREES · Direction Recherche, Études, Évaluation, Statistiques · APL 2024 (millésime lu dans les données ; classeurs de juillet 2026)</div>
   <div class="field"><span class="field-label">Professions</span><span class="field-value">
     <ul>
-      <li>Médecins généralistes (tous + ≤65 ans pour soutenabilité future)</li>
-      <li>Infirmières</li>
+      <li>Médecins généralistes (tous + de 65 ans et moins pour soutenabilité future)</li>
+      <li>Infirmiers</li>
       <li>Sages-femmes</li>
       <li>Dentistes</li>
       <li>Kinésithérapeutes</li>
@@ -476,12 +476,12 @@ Agriculture biologique certifiée (Agence Bio).
 ```{=html}
 <div class="src-card cat-agri">
   <h3>Agence Bio — Surfaces, opérateurs, cheptels</h3>
-  <div class="org">Agence Bio · données communales certifiées 2008-2024</div>
+  <div class="org">Agence Bio · données communales certifiées, millésime 2024 conservé (publication d'avant septembre 2026)</div>
   <div class="field"><span class="field-label">Dataset ID</span><span class="field-value"><code>61a6250d8660681353681fa8</code></span></div>
   <div class="field"><span class="field-label">Resources</span><span class="field-value">
     <ul>
-      <li>SAU bio (33 MB CSV séparateur virgule) : <code>b7ce51bf-5675-4843-b618-247ef209416d</code></li>
-      <li>Opérateurs (89 MB CSV séparateur point-virgule) : <code>130c2031-0b6a-45b2-aa42-23114f21a730</code></li>
+      <li>SAU bio (CSV séparateur virgule) : ressource actuelle <code>0b668cd6-3f43-4c5a-a411-d59035e77cb7</code> (2008-2025, surfaces masquées « NC » à ~62 %, non utilisée) ; le parquet commité vient de l'ancienne publication (<code>b7ce51bf-…</code>, 2024)</li>
+      <li>Opérateurs (CSV) : ressource actuelle <code>d8d704fb-61ec-4035-acb3-773b5a63c23d</code> (séparateur virgule depuis septembre 2026) ; ancienne <code>130c2031-…</code></li>
     </ul>
   </span></div>
   <div class="field"><span class="field-label">Variables</span><span class="field-value">

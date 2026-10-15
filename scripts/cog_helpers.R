@@ -53,3 +53,34 @@ retablies_codes <- function() {
   p <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet"))
   p$code_commune[p$pop_millesime %in% 2023L]
 }
+
+#' Table de passage des seules COMMUNES RENUMÉROTÉES (mouvements INSEE 41 et 50, depuis 2015),
+#' sans perte pour des niveaux (prix, taux). Les fusions (plusieurs codes -> un) en sont exclues.
+cog_map_renamed <- function() {
+  cog_map("2015-01-01",
+          fus = arrow::read_parquet(here::here("data", "processed", "insee", "commune_fusions.parquet")) |>
+            dplyr::filter(as.character(type_mvt) %in% c("41", "50")))
+}
+
+#' DVF : ramène les codes communes au COG 2026 puis fusionne par clé (code, annee, type_local).
+#' geo-dvf bascule de l'ancien au nouveau code EN COURS DE SÉRIE (Orée d'Anjou : 49069 en 2021-2025,
+#' 49126 en 2025 seulement) : sans fusion, les lignes de l'ancien code se perdent (116 ventes de maisons
+#' 2024 pour 49126). n_transactions est sommé ; prix médian/q25/q75 = moyenne pondérée par
+#' n_transactions (APPROXIMATION documentée, comme pour PLM : la médiane d'un territoire réuni est
+#' inconnue) ; estimation_insuffisante recalculé sur le n fusionné (règle de 03 : n < 5).
+#' Idempotente. Ne touche que les clés présentes sous plusieurs codes.
+dvf_combine_renamed <- function(df, map) {
+  df$code_commune <- to_cog2026(df$code_commune, map)
+  key <- c("code_commune", "annee", "type_local")
+  dup <- duplicated(df[key]) | duplicated(df[key], fromLast = TRUE)
+  if (!any(dup)) return(df)
+  comb <- df[dup, , drop = FALSE] |>
+    dplyr::group_by(dplyr::across(dplyr::all_of(key))) |>
+    dplyr::summarise(
+      dplyr::across(c(prix_m2_median, prix_m2_q25, prix_m2_q75),
+                    ~ stats::weighted.mean(.x, n_transactions)),
+      n_transactions = sum(n_transactions),
+      .groups = "drop") |>
+    dplyr::mutate(estimation_insuffisante = n_transactions < 5)
+  dplyr::bind_rows(df[!dup, , drop = FALSE], comb[names(df)])
+}

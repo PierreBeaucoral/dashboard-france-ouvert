@@ -32,7 +32,7 @@ axes <- tibble::tribble(
   ~field,             ~label,       ~label_long,                          ~unit,      ~d, ~src,                         ~tf,   ~log10,
   "ctx_log_pop",      "Population", "Population",                        "hab.",      0L, "INSEE, recensement 2021",     "lin", TRUE,
   "revenu_median",    "Revenu",     "Revenu médian",                      "€",         0L, "FiLoSoFi 2021",               "lin", FALSE,
-  "apl_medecins",     "Médecins",   "Accès aux médecins (APL)",           "c/an/hab",  2L, "DREES, APL 2023",             "lin", FALSE,
+  "apl_medecins",     "Médecins",   "Accès aux médecins (APL)",           "c/an/hab",  2L, paste("DREES, APL", apl_millesime), "lin", FALSE,
   "fin_recettes",     "Recettes",   "Recettes communales",                "€/hab",     0L, "DGFiP, comptes 2024",         "log", FALSE,
   "del_cambriolages", "Cambriol.",  "Cambriolages",                       "‰ log.",     1L, "SSMSI 2025 (si publié, pour 1 000 logements)",      "log", FALSE,
   "carb_hab_total",   "CO₂",        "Empreinte carbone",                  "tCO₂/hab",  1L, "RARE/CITEPA, 2018",           "lin", FALSE,

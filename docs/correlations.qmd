@@ -25,7 +25,7 @@ affiche ces paires sous trois angles :
 
 La page **Bivariée** affiche les paires pré-calculées dans une **palette
 choroplèthe 3 × 3 terciles** (Stevens 2015) — 9 classes par paire,
-1 176 combinaisons disponibles.
+`r site$paires` combinaisons disponibles.
 
 
 ## Granularité par source
@@ -158,7 +158,7 @@ cliquer une cellule met en évidence les communes correspondantes.
 **16 paires pré-calculées** côté R (`scripts/05_merge_and_explore.R`) — par ex.
 `elec_pct_rn × dvf_prix_app`, `carb_hab_total × revenu_median`,
 `mob_pct_voiture × densite_rang`, `bio_surface_ha × elec_pct_nfp`. Toutes les
-1 176 paires possibles sont calculables côté JS si l'utilisateur change les
+`r site$paires` paires possibles sont calculables côté JS si l'utilisateur change les
 selectors X/Y de la page Bivariée.
 
 

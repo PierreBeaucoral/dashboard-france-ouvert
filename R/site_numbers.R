@@ -48,7 +48,12 @@ site <- local({
               "sante", "revenus", "demographie", "energie", "mobilite", "agriculture",
               "logement", "risques", "services")
   n_scr <- length(list.files(here::here("scripts"), pattern = "^[0-9]{2}_.*\\.R$"))
+  # Millésime APL lu dans les données (08_), jamais figé dans les libellés
+  apl_path <- here::here("data", "processed", "drees", "apl_medecins.parquet")
+  apl_mil <- if (file.exists(apl_path))
+    max(arrow::read_parquet(apl_path, col_select = "apl_millesime")$apl_millesime, na.rm = TRUE) else NA_integer_
   list(
+    apl         = apl_mil,
     communes    = site_fmt(n_com),
     indicateurs = n_ind,
     paires      = site_fmt(if (is.na(n_ind)) NA else choose(n_ind, 2)),

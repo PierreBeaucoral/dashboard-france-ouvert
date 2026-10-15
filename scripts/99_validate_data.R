@@ -71,8 +71,10 @@ SPEC <- list(
   ),
   "drees/apl_medecins.parquet" = list(
     min_rows = 30000, max_rows = 36000,
-    cols = c("code_commune", "apl_medecins"),
-    ranges = list(apl_medecins = c(0, 60))
+    cols = c("code_commune", "apl_medecins", "apl_medecins_jeunes", "apl_infirmieres", "apl_sagefemmes",
+             "apl_dentistes", "apl_kines", "apl_millesime"),
+    ranges = list(apl_medecins = c(0, 60), apl_millesime = c(2022, 2035)),
+    unique_key = "code_commune"
   ),
   "filosofi/revenus_communes.parquet" = list(
     min_rows = 30000, max_rows = 36000,
@@ -496,6 +498,56 @@ tryCatch({
   ind <- meta$var
   for (cc in c("49126", "12218"))
     chk(sum(!is.na(unlist(mg[mg$code_commune == cc, ind]))) >= 40, paste0(cc, " : renumérotée mais < 40 indicateurs (jointures sur l'ancien code ?)"))
+
+  # Audit MAJOR-2 : le DVF est harmonisé en COG 2026 UNE fois, dans 03_ (cog_helpers.R). Les paires
+  # renumérotées sont dérivées de la table COG (mouvements 41/50), pas écrites à la main. Pour chacune :
+  # (i) plus aucune ligne sous l'ancien code dans dvf_aggregated, (ii) clé (code, année, type) unique,
+  # (iii) les ventes de maisons 2024 publiées dans commune_merged (Profil/Explorer) = celles de
+  # l'agrégat lu par l'Immobilier (sous réserve du seuil n >= 5 de 03).
+  dvf_raw <- arrow::read_parquet(here::here("data", "processed", "dvf", "dvf_aggregated.parquet"))
+  source(here::here("scripts", "cog_helpers.R"))
+  rmap <- cog_map_renamed()
+  chk(nrow(rmap) > 0, "DVF : table COG des communes renumérotées vide")
+  chk(!any(dvf_raw$code_commune %in% rmap$code_avant),
+      paste0("DVF : codes anciens encore présents dans dvf_aggregated : ",
+             paste(head(intersect(dvf_raw$code_commune, rmap$code_avant), 8), collapse = ",")))
+  chk(!anyDuplicated(dvf_raw[c("code_commune", "annee", "type_local")]), "DVF : clé (code, année, type) dupliquée")
+  for (cc in unique(rmap$code_2026)) {
+    nraw <- sum(dvf_raw$n_transactions[dvf_raw$code_commune == cc & dvf_raw$annee == 2024 & dvf_raw$type_local == "Maison"])
+    nmg  <- mg$dvf_n_mai[mg$code_commune == cc]
+    if (length(nmg) == 1L)
+      chk(if (nraw >= 5) isTRUE(nmg == nraw) else is.na(nmg),
+          paste0("DVF renumérotée ", cc, " : ventes de maisons 2024 publiées (", nmg, ") != agrégat Immobilier (", nraw, ")"))
+  }
+
+  # Audit mineur 9 : apl_medecins_jeunes = colonne « 65 ans ou moins » du classeur brut (pas la « 62 ans »,
+  # qui était lue à tort en 5e position). Contrôle contre le XLSX quand data/raw est présent.
+  rawa <- here::here("data", "raw", "drees", "apl_medecins.xlsx")
+  if (file.exists(rawa)) {
+    ap <- arrow::read_parquet(here::here("data", "processed", "drees", "apl_medecins.parquet"))
+    sh <- paste("APL", max(ap$apl_millesime, na.rm = TRUE))
+    rw <- suppressMessages(readxl::read_excel(rawa, sheet = sh, col_names = FALSE, col_types = "text"))
+    hd <- unlist(rw[9, ], use.names = FALSE)
+    cj <- grep("65 ans", hd)
+    chk(length(cj) == 1L, "APL brut : colonne « 65 ans » introuvable/ambiguë")
+    if (length(cj) == 1L) {
+      body <- rw[-(1:10), ]
+      rj <- suppressWarnings(as.numeric(body[[cj]])); names(rj) <- body[[1]]
+      v <- ap$apl_medecins_jeunes; names(v) <- ap$code_commune
+      k <- intersect(names(rj)[!is.na(rj)], names(v)[!is.na(v)])
+      chk(length(k) > 30000 && max(abs(rj[k] - v[k])) < 1e-9,
+          "apl_medecins_jeunes != colonne « 65 ans ou moins » du classeur DREES brut")
+    }
+  } else cat("  [ignoré] apl_medecins_jeunes vs brut DREES : data/raw absent (CI de déploiement)\n")
+
+  # Round 3 : tous les polygones communaux sont valides (planaire), 1 par commune du cadre, MULTIPOLYGON.
+  if (requireNamespace("sf", quietly = TRUE)) {
+    suppressMessages(sf::sf_use_s2(FALSE))
+    gsf <- sf::read_sf(here::here("data", "processed", "geo", "communes.geojson"), quiet = TRUE)
+    chk(all(sf::st_is_valid(gsf)), paste0("géométrie : ", sum(!sf::st_is_valid(gsf)), " polygones invalides"))
+    chk(!any(sf::st_is_empty(gsf)), "géométrie : polygones vides")
+    chk(nrow(gsf) == length(need) && !anyDuplicated(gsf$code), "géométrie : nombre de polygones != cadre COG 2026 - 3 villes PLM")
+  } else cat("  [ignoré] validité des polygones : package sf absent\n")
 
   # C1 : libellés de densité du JS = ordre des rangs des données
   js <- paste(readLines(here::here("assets", "cmap.js"), warn = FALSE), collapse = " ")

@@ -35,7 +35,7 @@ crit <- tibble::tribble(
   "rev",  "revenu_median",   "Revenu",     "2021", "INSEE, FiLoSoFi 2021",            "lin", FALSE,  TRUE,
   "pmai", "dvf_prix_mai",    "Maison",     "2024", "DVF 2024 (médiane)",              "log", FALSE,  TRUE,
   "papp", "dvf_prix_app",    "Appart.",    "2024", "DVF 2024 (médiane)",              "log", FALSE,  TRUE,
-  "apl",  "apl_medecins",    "APL",        "2023", "DREES, APL 2023",                 "lin", FALSE,  TRUE,
+  "apl",  "apl_medecins",    "APL",        as.character(apl_millesime), paste("DREES, APL", apl_millesime),              "lin", FALSE,  TRUE,
   "car",  "mob_pct_voiture", "Voiture",    "2022", "INSEE MOBPRO, RP 2022",           "lin", FALSE,  TRUE,
   "vac",  "pct_vacants",     "Vacants",    "2022", "INSEE, RP 2022",                  "lin", FALSE,  TRUE,
   "prop", "pct_proprietaires", "Propriét.", "2022", "INSEE, RP 2022",                 "lin", FALSE,  FALSE,

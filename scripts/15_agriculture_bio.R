@@ -3,13 +3,20 @@
 #
 # Bloc K — Surfaces et opérateurs en agriculture biologique par commune.
 #
-# Sources :
-#   - Agence Bio · data.gouv.fr ID 61a6250d8660681353681fa8
-#     * SAU bio (CSV 33 MB) : b7ce51bf-5675-4843-b618-247ef209416d
-#     * Opérateurs bio (CSV 89 MB) : 130c2031-0b6a-45b2-aa42-23114f21a730
+# Sources (Agence Bio, data.gouv.fr dataset 61a6250d8660681353681fa8, permaliens stables
+# « /datasets/r/<id> » qui suivent la dernière version de chaque ressource) :
+#   - SAU bio, surfaces 2008-2025 : 0b668cd6-3f43-4c5a-a411-d59035e77cb7 (CSV 45 MB)
+#   - Opérateurs bio 2008-2025   : d8d704fb-61ec-4035-acb3-773b5a63c23d (CSV 136 MB, virgule)
 #
-# Pour chaque commune on garde l'année la plus récente disponible (2024).
+# Pour chaque commune on garde l'année la plus récente disponible.
 # Sortie : data/processed/agriculture/bio_commune.parquet
+#
+# ATTENTION (décision 2026-10-15, voir docs/decisions.qmd) : la republication de septembre 2026
+# applique le secret statistique (« NC ») à ~60 % des lignes commune-année de surface ; sommer ces
+# NC comme zéro retirerait ~31 % des hectares nationaux 2024 (1,86 contre 2,71 Mha dans le
+# parquet commité, millésime 2024 de l'ancienne publication). Ce n'est pas le même indicateur :
+# le script s'ARRÊTE (sans écrire) tant que les surfaces sont masquées, et le parquet commité
+# (2024, ancienne publication) est conservé. Hors du refresh automatique pour cette raison.
 # ============================================================
 
 suppressPackageStartupMessages({
@@ -21,16 +28,12 @@ suppressPackageStartupMessages({
   library(stringr)
 })
 
-URL_SAU <- paste0(
-  "https://static.data.gouv.fr/resources/",
-  "historique-detaille-des-surfaces-cheptels-et-nombre-doperateurs-par-commune/",
-  "20250701-134135/donnees-communes-sau.csv"
-)
-URL_OPS <- paste0(
-  "https://static.data.gouv.fr/resources/",
-  "historique-detaille-des-surfaces-cheptels-et-nombre-doperateurs-par-commune/",
-  "20260305-140950/donnees-communes-operateur.csv"
-)
+URL_SAU <- "https://www.data.gouv.fr/fr/datasets/r/0b668cd6-3f43-4c5a-a411-d59035e77cb7"
+URL_OPS <- "https://www.data.gouv.fr/fr/datasets/r/d8d704fb-61ec-4035-acb3-773b5a63c23d"
+# Millésime des libellés (« Agence Bio, 2024 » dans R/indicator_sources.R) : à changer ensemble.
+ANNEE_ATTENDUE <- 2024L
+# Part maximale tolérée de lignes de surface masquées (« NC ») ; l'ancienne publication : 0 %.
+MAX_NC <- 0.05
 
 raw_dir  <- here::here("data", "raw", "agriculture")
 out_dir  <- here::here("data", "processed", "agriculture")
@@ -42,14 +45,14 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
 if (!file.exists(sau_path) || file.size(sau_path) < 1e7) {
   message("Téléchargement Agence Bio SAU (33 MB)…")
-  curl::curl_download(URL_SAU, sau_path, quiet = FALSE)
+  curl::curl_download(URL_SAU, sau_path, handle = curl::new_handle(useragent = "Mozilla/5.0", followlocation = TRUE), quiet = TRUE)
 }
 if (!file.exists(ops_path) || file.size(ops_path) < 1e7) {
   message("Téléchargement Agence Bio opérateurs (89 MB)…")
-  curl::curl_download(URL_OPS, ops_path, quiet = FALSE)
+  curl::curl_download(URL_OPS, ops_path, handle = curl::new_handle(useragent = "Mozilla/5.0", followlocation = TRUE), quiet = TRUE)
 }
 
-# ---- Parsing SAU (CSV séparateur virgule) ----
+# ---- Parsing SAU (CSV séparateur virgule, « NC » = secret statistique) ----
 # Colonnes exposées : annee, coderegion, region, codedepartement, departement,
 # codeepci, epci, codeinseecommune, codepostalcommune, commune, nb_exp,
 # surfab, surfc1, surfc2, surfc3, surfc123, surfbio.
@@ -59,6 +62,7 @@ sau <- readr::read_csv(sau_path,
                         col_types = readr::cols(.default = readr::col_character()),
                         show_col_types = FALSE)
 message("\nColonnes SAU : ", paste(names(sau), collapse = ", "))
+stopifnot("colonnes SAU attendues" = all(c("annee", "codeinseecommune", "nb_exp", "surfab", "surfbio") %in% names(sau)))
 
 sau_clean <- sau |>
   dplyr::transmute(
@@ -75,6 +79,17 @@ message(sprintf("→ Dernière année SAU bio : %d (%d communes)",
                 last_year_sau,
                 length(unique(sau_clean$code_commune[sau_clean$annee == last_year_sau]))))
 
+# Garde « secret statistique » : part de lignes de l'année retenue dont la surface est « NC ».
+nc_share <- mean(sau$surfbio[sau$annee == as.character(last_year_sau)] %in% "NC")
+message(sprintf("→ Lignes de surface masquées (NC) en %d : %.1f %%", last_year_sau, 100 * nc_share))
+if (nc_share > MAX_NC)
+  stop(sprintf(paste0("15_agriculture_bio.R : %.0f %% des surfaces %d sont masquées (NC, secret ",
+                      "statistique) : indicateur non comparable au parquet commité (2024, ancienne ",
+                      "publication). Parquet conservé, rien écrit. Voir docs/decisions.qmd."),
+               100 * nc_share, last_year_sau))
+stopifnot("millésime SAU != ANNEE_ATTENDUE : mettre à jour les libellés (R/indicator_sources.R) et la constante" =
+            last_year_sau == ANNEE_ATTENDUE)
+
 sau_latest <- sau_clean |>
   dplyr::filter(annee == last_year_sau) |>
   dplyr::group_by(code_commune) |>
@@ -85,8 +100,9 @@ sau_latest <- sau_clean |>
     .groups = "drop"
   )
 
-# ---- Parsing Opérateurs (séparateur ; agrégé par ligne production) ----
-ops <- readr::read_delim(ops_path, delim = ";",
+# ---- Parsing Opérateurs (séparateur détecté : « ; » avant 2026, « , » depuis la republication) ----
+ops_delim <- if (grepl(";", readLines(ops_path, n = 1L, warn = FALSE), fixed = TRUE)) ";" else ","
+ops <- readr::read_delim(ops_path, delim = ops_delim,
                           locale = readr::locale(decimal_mark = ".",
                                                  encoding = "UTF-8"),
                           col_types = readr::cols(.default = readr::col_character()),

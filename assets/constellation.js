@@ -805,6 +805,14 @@
     readHash();
     Promise.all([CMap.data.index(), getJSON("data/constellation.json"), col("ctx_pop_latest")]).then(function (r) {
       D.idx = r[0]; D.geo = r[1]; D.pop = r[2]; D.nd = D.idx.depts.length;
+      // Chiffres de la note « Lecture » : calculés par R/build_web_assets.R avec l'échelle des cercles
+      var LEC = D.geo.lecture, setTxt = function (id, v) { var e = $(id); if (e) e.textContent = v; };
+      if (LEC) {
+        setTxt("cs-lec-seuil", CMap.fmt(Math.round(LEC.pop_seuil / 10) * 10, 0));
+        setTxt("cs-lec-pc", CMap.fmt(Math.round(100 * LEC.part_communes), 0));
+        setTxt("cs-lec-pp", CMap.fmt(Math.round(100 * LEC.part_pop), 0));
+        setTxt("cs-lec-n", CMap.fmt(LEC.n_sans_pop, 0));
+      }
       D.deptRow = {}; D.idx.depts.forEach(function (d, i) { D.deptRow[d.code] = i; });
       var n = D.idx.c.length;
       CL = mkLayer(n); DL = mkLayer(D.nd);

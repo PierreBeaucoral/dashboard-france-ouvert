@@ -22,6 +22,7 @@ suppressPackageStartupMessages({
   library(arrow)
   library(here)
   library(glue)
+  library(purrr)
 })
 
 # ---- Chemins ----
@@ -80,9 +81,7 @@ bio   <- if (file.exists(bio_path))   arrow::read_parquet(bio_path)   else NULL
 # sont déjà sommés dans les scripts amont (cog_helpers.R, 06, 11, 19-26).
 # Si le code COG 2026 a déjà sa propre ligne dans la source, c'est elle qui est conservée.
 source(here::here("scripts", "cog_helpers.R"))
-ren_map <- cog_map("2015-01-01",
-                   fus = arrow::read_parquet(here::here("data", "processed", "insee", "commune_fusions.parquet")) |>
-                     dplyr::filter(as.character(type_mvt) %in% c("41", "50")))
+ren_map <- cog_map_renamed()
 cog_rename <- function(df) {
   if (is.null(df)) return(df)
   new <- to_cog2026(df$code_commune, ren_map)
@@ -92,7 +91,10 @@ cog_rename <- function(df) {
   df$code_commune <- new
   df[!clash, , drop = FALSE]
 }
-dvf <- cog_rename(dvf); air <- cog_rename(air); ssmsi <- cog_rename(ssmsi)
+# DVF : déjà harmonisé en COG 2026 en amont (03_dvf_aggregate.R, dvf_combine_renamed dans
+# cog_helpers.R) pour que l'Immobilier, le Profil et l'Explorer lisent les mêmes valeurs. L'appel
+# ci-dessous est un garde-fou idempotent (no-op si 03 a tourné avec les mêmes fusions).
+dvf <- dvf_combine_renamed(dvf, ren_map); air <- cog_rename(air); ssmsi <- cog_rename(ssmsi)
 dgfip <- cog_rename(dgfip); filo <- cog_rename(filo); dens <- cog_rename(dens)
 defm <- cog_rename(defm); apl <- cog_rename(apl); baac <- cog_rename(baac)
 carb <- cog_rename(carb); mob <- cog_rename(mob); bio <- cog_rename(bio)
@@ -415,7 +417,9 @@ merged <- join_new(merged, rd(filo23_path), c("rev_median_2023", "taux_pauvrete_
 merged <- merged |>
   dplyr::mutate(
     ctx_log_inscrits = log10(pmax(ctx_inscrits, 1)),
-    ctx_log_pop      = log10(pmax(ctx_pop_latest, 1)),
+    # population nulle (6 communes de la Meuse « mortes pour la France ») : log indéfini -> NA
+    # (affichait « 1 hab. » avec pmax(., 1)) ; les pages montrent alors « n.d. ».
+    ctx_log_pop      = ifelse(ctx_pop_latest > 0, log10(ctx_pop_latest), NA_real_),
     # Strate "taille commune" : INSEE pop si dispo, sinon proxy inscrits
     strate_taille = dplyr::case_when(
       !is.na(ctx_strate_pop)         ~ as.character(ctx_strate_pop),
@@ -572,7 +576,6 @@ corr_long <- function(df, method, strate_label = "Toutes") {
 }
 
 message("Calcul des matrices de corrélation (Spearman + Pearson, global + 4 strates)...")
-library(purrr)
 corr_list <- list(
   corr_long(merged, "spearman", "Toutes"),
   corr_long(merged, "pearson",  "Toutes")

@@ -18,7 +18,7 @@
 
 **4 pages analyse croisée** :
 
-🔀 Carte bivariée (palette Stevens 3×3, 1 176 combinaisons) · 📈 Explorer (heatmap des indicateurs + top 25 corrélations + scatter LOESS) · 🕸️ Profil commune (radar 8D rang centile) · 🗂️ Small multiples départements (96 tuiles, 9 indicateurs)
+🔀 Carte bivariée (palette Stevens 3×3, 3 160 combinaisons) · 📈 Explorer (heatmap des indicateurs + top 25 corrélations + scatter LOESS) · 🕸️ Profil commune (radar 8D rang centile) · 🗂️ Small multiples départements (96 tuiles, 9 indicateurs)
 
 ## 🚀 Quickstart
 
@@ -47,7 +47,7 @@ for i in $(seq -w 1 18); do
   Rscript scripts/${i}_*.R
 done
 
-# Rendu Quarto (25 pages, ~5 min)
+# Rendu Quarto (26 pages, ~5 min)
 quarto render
 ```
 
@@ -70,7 +70,7 @@ quarto preview  # serveur local sur http://localhost:4848
 | Atmo air | Atmo France | ~25 000 communes | 30 j glissants |
 | SSMSI délinquance + BAAC accidents | Min. Intérieur / ONISR | ~18 000 + 11 099 | 2025 / 2024 |
 | DGFiP finances | DGFiP | ~35 000 | 2024 |
-| APL santé (5 pros) + EV INSEE | DREES + INSEE | ~35 000 + 28 000 | 2023-2024 |
+| APL santé (5 pros) + EV INSEE | DREES + INSEE | ~35 000 + 28 000 | 2024 |
 | FiLoSoFi revenus (2021 composition ; 2023 niveau, série non comparable) | INSEE | ~31 300 ; ~30 800 | 2021 ; 2023 |
 | Populations + Grille densité INSEE | INSEE | ~35 000 | 2017-2024 |
 | DEFM chômage | DARES | ~34 900 | 2024-T4 |
@@ -127,11 +127,11 @@ Cf. [`docs/decisions.qmd`](docs/decisions.qmd) pour les choix méthodologiques d
 │   ├── socio_helpers.R        # choropleth_socio générique
 │   ├── dvf_helpers.R          # DVF breaks
 │   └── air_helpers.R          # ATMO
-├── scripts/                   # 18 scripts pipeline numérotés
+├── scripts/                   # 30 scripts pipeline numérotés (00 à 28, plus 99)
 │   ├── 01_geo_boundaries.R
 │   ├── 02_elections.R
 │   ├── ...
-│   └── 18_municipales_elus.R
+│   └── 28_filosofi_2023.R
 ├── data/
 │   ├── raw/                   # téléchargements .gitignore'd
 │   └── processed/             # parquets versionnés (~41 MB)
