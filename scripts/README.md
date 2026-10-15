@@ -112,3 +112,13 @@ Colonnes dont le sens change (MOBPRO RP 2022 vs RP 2019) :
 ### 05 — `05_merge_and_explore.R` (mise à jour 2026-10-14)
 - Ajoute 28 indicateurs à `commune_merged` (participation, RP 2022, CatNat, BPE, CAF, ARCEP, ENAF, DPE, ORE, Filosofi 2023), uniquement des taux et parts. Règles : CAF si pop ≥ 1 000, DPE si n ≥ 30, évolutions ORE sans cellule résidentielle masquée. Écrit `explorer/indicator_meta.parquet` (var, label, group, unit, dig) : registre unique des 80 indicateurs, lu par l'Explorer, la Carte bivariée et les Classements.
 
+
+
+## Mise à jour 2026-10-15 — corrections de l'audit Referee 2
+
+- **Ordre** : `06_insee_populations.R` AVANT `02_elections.R` (les élections sont harmonisées au COG 2026 avec `cog_helpers.R`) et avant 19-28 ; `05_merge_and_explore.R` en dernier, puis `99_validate_data.R`.
+- `06_` : populations légales RP 2017-2021 **sommées** vers le COG 2026 (codes absorbés), Mayotte = recensement 2017 (`pop_millesime`), source INSEE reprise du champ `insee_pop` de la base SSMSI brute (`data/raw/ssmsi/`).
+- `02_elections.R` : sortie au COG 2026 (communes COG seulement, 34 865) ; codes consulaires/COM écartés.
+- `05_` : table des communes = COG 2026 (34 875) ; villes PLM : ligne officielle conservée si la source la publie.
+- `07_` : cambriolages en ‰ logements (`ssmsi_log_ref`, `del_cambriolages_n`), `del_total_pour_mille` = Σ effectifs / population × 1 000, `del_n_total`.
+- `19_` : « abstention attendue 24,7 % » supprimée (non sourcée) ; l'abstention 2022 T1 de 24,7 % hors étranger est une valeur observée, pas un contrôle.

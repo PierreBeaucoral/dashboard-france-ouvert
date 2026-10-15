@@ -210,6 +210,57 @@ aggregate_commune <- function(df_long) {
     )
 }
 
+# ---- Harmonisation COG 2026 (audit M1/C2) ----
+# Le fichier du ministère est au COG 2024 et contient des codes qui ne sont pas des
+# communes (circonscriptions des Français de l'étranger ZZ…, COM 975/98x, ZX). On
+# somme les communes absorbées en 2024-2026 vers leur code 2026 (effectifs sommés,
+# pourcentages recalculés pondérés par les exprimés, abstention par les inscrits),
+# puis on ne garde que les communes COG 2026 (table 06_). Prérequis : 06_insee_populations.R.
+# Famille gagnante d'une commune fusionnée = famille aux voix cumulées les plus élevées
+# (voix = pct × exprimés / 100) ; la marge est l'écart entre les deux premières familles.
+# Les communes non fusionnées (≈99,8 %) ne sont pas touchées.
+FAMS <- c("NFP", "ENS", "LR", "RN", "Divers")
+harmonise_cog2026 <- function(agg, map, valid) {
+  agg <- dplyr::mutate(agg, code_orig = code_insee, code_insee = to_cog2026(code_insee, map))
+  agg <- dplyr::filter(agg, code_insee %in% valid)
+  dup <- agg$code_insee[duplicated(agg$code_insee)]
+  if (length(dup) == 0L) return(dplyr::select(agg, -code_orig))
+  one <- agg |> dplyr::filter(!code_insee %in% dup)
+  mrg <- agg |> dplyr::filter(code_insee %in% dup)
+  fam_cols <- paste0("pct_", FAMS)
+  res <- mrg |>
+    dplyr::group_by(code_insee) |>
+    dplyr::group_modify(function(d, key) {
+      d <- d[order(-d$inscrits), ]                       # composante la plus peuplée = libellés
+      w <- d$exprimes
+      voix <- vapply(fam_cols, function(cn) {
+        v <- d[[cn]]; if (all(is.na(v))) NA_real_ else sum(v * w, na.rm = TRUE) }, numeric(1))
+      pct <- voix / sum(w)                                  # en % des exprimés
+      names(pct) <- fam_cols
+      ord <- order(-dplyr::coalesce(voix, -1))
+      out <- d[1, ]
+      out[c("inscrits", "votants", "exprimes", "abstentions")] <-
+        lapply(d[c("inscrits", "votants", "exprimes", "abstentions")], sum)
+      out$pct_abstention <- round(100 * out$abstentions / out$inscrits, 2)
+      out[fam_cols] <- as.list(round(pct, 2))
+      out$famille_vainqueur <- FAMS[ord[1]]
+      out$pct_vainqueur <- round(pct[ord[1]], 2)
+      out$pct_second <- round(dplyr::coalesce(pct[ord[2]], 0), 2)
+      out$marge_vainqueur <- out$pct_vainqueur - out$pct_second
+      out$voix_vainqueur <- as.integer(round(voix[ord[1]] / 100))
+      out$voix_second <- as.integer(round(dplyr::coalesce(voix[ord[2]], 0) / 100))
+      out$nuance_vainqueur <- d$nuance_vainqueur[match(TRUE, d$famille_vainqueur == out$famille_vainqueur)]
+      out
+    }) |>
+    dplyr::ungroup()
+  message(glue::glue("  Communes fusionnées recombinées : {nrow(res)} (depuis {nrow(mrg)} codes 2024)"))
+  dplyr::bind_rows(one, res) |> dplyr::select(-code_orig)
+}
+source(here::here("scripts", "cog_helpers.R"))
+cog_valid <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet")) |>
+  dplyr::filter(type_com == "COM") |> dplyr::pull(code_commune)
+cog_m24 <- cog_map("2024-01-01")
+
 # ---- Chemins ----
 
 raw_dir   <- here::here("data", "raw", "elections")
@@ -234,8 +285,8 @@ if (!file.exists(t1_path) || file.size(t1_path) < 5e7) {
 
 # ---- Pipeline ----
 
-agg_t2 <- parse_tour(t2_path, "T2") |> aggregate_commune()
-agg_t1 <- parse_tour(t1_path, "T1") |> aggregate_commune()
+agg_t2 <- parse_tour(t2_path, "T2") |> aggregate_commune() |> harmonise_cog2026(cog_m24, cog_valid)
+agg_t1 <- parse_tour(t1_path, "T1") |> aggregate_commune() |> harmonise_cog2026(cog_m24, cog_valid)
 
 # Combine : T2 prioritaire, T1 comble les trous (circo décidée au T1).
 # La colonne `tour` permet de tracer quel tour est affiché par commune.
@@ -263,6 +314,15 @@ agg_t1_extra <- agg_t1 |>
 
 out <- out |>
   dplyr::left_join(agg_t1_extra, by = "code_insee")
+
+# Libellé officiel COG 2026 (le nom de la composante la plus peuplée serait faux pour
+# une commune nouvelle : « La Longeville » pour Pays-de-Montbenoît).
+cog_nm <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet")) |>
+  dplyr::filter(type_com == "COM") |> dplyr::select(code_insee = code_commune, nom_cog = nom_commune)
+out <- out |>
+  dplyr::left_join(cog_nm, by = "code_insee") |>
+  dplyr::mutate(nom_commune = dplyr::coalesce(nom_cog, nom_commune), nom_cog = NULL)
+stopifnot(!anyDuplicated(out$code_insee), all(out$code_insee %in% cog_valid))
 
 # ---- Écriture ----
 

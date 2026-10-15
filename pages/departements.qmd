@@ -89,7 +89,7 @@ des communes du département.</p>
       <label><input type="radio" name="dept-ind" value="prix_app"> Prix m² App</label>
       <label><input type="radio" name="dept-ind" value="revenu"> Revenu médian</label>
       <label><input type="radio" name="dept-ind" value="apl"> APL médecins</label>
-      <label><input type="radio" name="dept-ind" value="chomage"> Chômage ‰</label>
+      <label><input type="radio" name="dept-ind" value="chomage"> Demandeurs d’emploi (DEFM) ‰</label>
       <label><input type="radio" name="dept-ind" value="delinq"> Délinquance totale ‰ (couverture partielle)</label>
       <label><input type="radio" name="dept-ind" value="accidents"> Accidents ‰</label>
       <label><input type="radio" name="dept-ind" value="carbone"> CO₂ t/hab</label>

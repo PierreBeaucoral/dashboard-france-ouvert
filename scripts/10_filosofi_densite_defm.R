@@ -148,7 +148,7 @@ if (file.exists(dens_path_in)) {
 # 3. DEFM DARES (chômage)
 # ============================================================
 
-message("→ DEFM DARES (1.08M lignes en long format)...")
+message("→ DEFM DARES (≈2,09 M lignes en long format)...")
 defm_path_in  <- here::here("data", "raw", "dares", "defm_communales.csv")
 defm_path_out <- here::here("data", "processed", "dares", "defm_commune.parquet")
 dir.create(dirname(defm_path_out), recursive = TRUE, showWarnings = FALSE)
@@ -192,7 +192,10 @@ if (file.exists(defm_path_in)) {
   # Contrôle même périmètre : somme des communes vs ligne "Total France" du
   # même fichier (écart attendu < 0,5 %, arrondi des effectifs à 5).
   # 2024-T4 : 5 563 980 vs 5 565 440. Contrôle externe fait le 2026-10-15 contre
-  # les notes DREETS 2024-T4 (Marne, Moselle, Hauts-de-France, BFC : ±0,5 %).
+  # les notes DREETS 2024-T4 (Marne, Moselle, Hauts-de-France, BFC : ±0,5 %) :
+  #   https://grand-est.dreets.gouv.fr/sites/grand-est.dreets.gouv.fr/IMG/pdf/defm_moselle_2024t4.pdf
+  #   https://grand-est.dreets.gouv.fr/sites/grand-est.dreets.gouv.fr/IMG/pdf/defm_marne_2024t4.pdf
+  #   https://hauts-de-france.dreets.gouv.fr/sites/hauts-de-france.dreets.gouv.fr/IMG/pdf/la_demande_d_emploi_dans_la_region_hauts-de-france_au_4e_trimestre_2024.pdf
   stopifnot(!anyDuplicated(defm$code_commune), length(total_fr) == 1,
             abs(sum(defm$defm_abc) / total_fr - 1) < 0.005)
   # Effectifs -> COG 2026 (fusions depuis 2024 ; règle de scripts/cog_helpers.R)

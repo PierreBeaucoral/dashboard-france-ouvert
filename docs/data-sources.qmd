@@ -348,7 +348,7 @@ Délinquance enregistrée et accidents corporels, deux sources Min. Intérieur.
 <div class="src-card cat-sec">
   <h3>SSMSI — Délinquance enregistrée par commune</h3>
   <div class="org">Service Statistique Ministériel de la Sécurité Intérieure · 2025</div>
-  <div class="field"><span class="field-label">Variables</span><span class="field-value">13 indicateurs ‰ habitants (violences, vols, cambriolages, dégradations, stupéfiants) + total (somme des 13, publiée seulement si les 13 le sont).</span></div>
+  <div class="field"><span class="field-label">Variables</span><span class="field-value">13 indicateurs ‰ habitants (violences, vols, dégradations, stupéfiants), sauf cambriolages en ‰ <strong>logements</strong> ; total ‰ habitants = Σ effectifs des 13 postes ÷ population × 1 000 (publié seulement si les 13 le sont).</span></div>
   <div class="field"><span class="field-label">Couverture</span><span class="field-value">11 000 à 31 000 communes selon l'indicateur ; total : 685 communes</span></div>
   <div class="field"><span class="field-label">Script</span><span class="field-value"><code>scripts/07_ssmsi_dgfip.R</code></span></div>
   <div class="caveat">Secret statistique : un décompte n'est diffusé que s'il vaut 0 ou ≥ 5 ; 1 à 4 faits = non publié (NA, gris sur la carte). Dans les petites communes, seuls les zéros sont visibles (biais de sélection).</div>

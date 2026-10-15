@@ -153,6 +153,9 @@
     if (!ixP) ixP = Promise.all([CMap.data.index(), CMap.data.col("ctx_pop_latest"), CMap.data.col("densite_rang")])
       .then(function (r) {
         var ix = r[0], pos = {};
+        if (ix.dl && ix.dl.length === 6) {          // libellés issus des données : écrase le repli (en place)
+          ix.dl.forEach(function (l, k) { DENS_SHORT[k] = DENS_SHORT_BY_LABEL[l] || l; DENS_RANKED[k] = l; });
+        }
         var metro = [];
         for (var i = 0; i < ix.c.length; i++) { pos[ix.c[i]] = i; if (!/^9[78]/.test(ix.c[i])) metro.push(i); }
         // metro : positions des communes de métropole (univers des parts de la légende)
@@ -169,10 +172,26 @@
     for (i = 1; i <= 16; i++) PLM["132" + (i < 10 ? "0" : "") + i] = "13055";
   })();
   CMap.plmCity = function (code) { return PLM[code] || code; };
+  var PLM_ARR = {};
+  Object.keys(PLM).forEach(function (a) { (PLM_ARR[PLM[a]] = PLM_ARR[PLM[a]] || []).push(a); });
 
   /* ---------- Légende (dessinée en JS : toujours synchrone avec la carte) ---------- */
-  var DENS_SHORT = ["Rural isolé", "Rural périurbain", "Petites villes", "Centres interm.", "Ceintures urbaines", "Grands centres"];
+  // Libellés des 6 classes de densité INSEE, dans l'ordre du rang (1 rural … 6 grands centres).
+  // SOURCE UNIQUE = grille_densite.parquet (scripts/10_), émise dans l'index communes.json (`dl`)
+  // par R/build_web_assets.R. Les libellés courts sont indexés par le LIBELLÉ INSEE, jamais par
+  // la position : un ordre divergent est impossible. Le tableau ci-dessous n'est que le repli
+  // avant chargement de l'index (vérifié contre les données par tests/check_cmap_stats.js).
+  var DENS_SHORT_BY_LABEL = {
+    "Rural non périurbain": "Rural isolé", "Rural périurbain": "Rural périurbain",
+    "Ceintures urbaines": "Ceintures urbaines", "Petites villes": "Petites villes",
+    "Centres urbains intermédiaires": "Centres interm.", "Grands centres urbains": "Grands centres"
+  };
+  var DENS_RANKED = ["Rural non périurbain", "Rural périurbain", "Ceintures urbaines",
+                     "Petites villes", "Centres urbains intermédiaires", "Grands centres urbains"];
+  var DENS_SHORT = DENS_RANKED.map(function (l) { return DENS_SHORT_BY_LABEL[l]; });
   CMap.densLabels = DENS_SHORT;
+  CMap.densShortByLabel = DENS_SHORT_BY_LABEL;
+  CMap.densRanked = DENS_RANKED;
 
   function pct(x) {
     if (x == null) return "";
@@ -502,6 +521,7 @@
     main._recolored = true; CMap._rc++; CMap._brush = null;
     var naFill = css("--na-fill", "#E9EBED"), op = opts.opacity == null ? 0.9 : opts.opacity;
     var lg0 = opts.legend || {}, st, K = opts.palette.length;
+    var getS = CMapStats.withPlmFallback(opts.get, PLM_ARR);   // villes PLM comblées (parts de légende, gradient)
     function opOf(c, v) { return opts.opacityOf ? opts.opacityOf(c, v) : op; }
     if (opts.levels) {                       // catégoriel : classe = rang du niveau
       var clsOfLevel = function (v) {
@@ -520,9 +540,9 @@
       var slc = legendSlot(main);
       var s3 = { title: lg0.title, palette: opts.palette, cats: opts.levels, naLabel: lg0.naLabel, sub: lg0.sub, note: lg0.note };
       if (slc) { CMap.drawLegend(slc, s3); collapseOnMobile(slc); }
-      CMap.cur = { levels: opts.levels, legend: lg0, get: opts.get, palette: opts.palette };
+      CMap.cur = { levels: opts.levels, legend: lg0, get: getS, palette: opts.palette };
       var tick = main._cmapLegendTick = (main._cmapLegendTick || 0) + 1;
-      legendStats(function (c) { return clsOfLevel(opts.get(c)) + 1; }, null, K).then(function (stats) {
+      legendStats(function (c) { return clsOfLevel(getS(c)) + 1; }, null, K).then(function (stats) {
         s3.stats = stats; if (slc && main._cmapLegendTick === tick) { CMap.drawLegend(slc, s3); collapseOnMobile(slc); }
       });
       refreshGradient();
@@ -557,7 +577,7 @@
     if (slot) { CMap.drawLegend(slot, s2); collapseOnMobile(slot); }
     var vcache = {};
     function val(c) {
-      if (!(c in vcache)) { var v = opts.get(c); vcache[c] = (v == null || !isFinite(v)) ? null : v; }
+      if (!(c in vcache)) { var v = getS(c); vcache[c] = (v == null || !isFinite(v)) ? null : v; }
       return vcache[c];
     }
     CMap.cur = { get: val, legend: lg0, st: st, scale: opts.scale, palette: opts.palette };

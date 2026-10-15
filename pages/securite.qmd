@@ -1,6 +1,6 @@
 ---
 title: "Sécurité"
-subtitle: "Délinquance SSMSI 2025 et accidents BAAC 2024, taux pour 1 000 habitants"
+subtitle: "Délinquance SSMSI 2025 (cambriolages pour 1 000 logements, autres postes pour 1 000 habitants) et accidents BAAC 2024"
 format:
   dashboard:
     include-in-header:
@@ -27,7 +27,8 @@ if (ssmsi_ready) {
   # Lissage Bayes empirique (Poisson-gamma) des taux : les petites communes ont des
   # taux très instables (1 fait = plusieurs ‰). Prior estimé par la méthode des moments,
   # séparément dans chacune des 6 classes de densité INSEE (voir eb_poisson_gamma()).
-  # Événements = taux × population de référence SSMSI / 1000. Les cellules non publiées
+  # Événements = taux × exposition / 1000, où l'exposition est la population de référence
+  # SSMSI (tous les postes) ou le nombre de LOGEMENTS (cambriolages : taux pour 1 000 logements). Les cellules non publiées
   # (secret statistique) restent NA : on ne lisse que des valeurs publiées.
   dens_grp <- if (exists("densite_data")) densite_data$densite_rang[match(ssmsi_data$code_commune, densite_data$code_commune)] else NULL
   smooth_rate <- function(rate_pm, pop, group) {
@@ -36,10 +37,12 @@ if (ssmsi_ready) {
     e$eb * 1000
   }
   pop_ref <- ssmsi_data$ssmsi_pop_ref
+  log_ref <- ssmsi_data$ssmsi_log_ref
   sec_for_js <- ssmsi_data |>
     dplyr::transmute(
       code  = code_commune,
       pop   = pop_ref,
+      n_camb = del_cambriolages_n,   # effectif publié (pas un taux × population)
       camb  = round(del_cambriolages,     1),
       vehs  = round(del_vols_vehicules,   1),
       vols  = round(del_vols_pers,        1),
@@ -50,7 +53,7 @@ if (ssmsi_ready) {
       tot   = round(del_total_pour_mille, 1),
       acc   = if ("acc_pour_mille" %in% names(ssmsi_data)) round(acc_pour_mille, 2) else NA_real_,
       n_acc = if ("n_accidents_2024" %in% names(ssmsi_data)) n_accidents_2024 else NA_integer_,
-      cambs  = round(smooth_rate(del_cambriolages,   pop_ref, dens_grp), 1),
+      cambs  = round(smooth_rate(del_cambriolages,   log_ref, dens_grp), 1),
       vehss  = round(smooth_rate(del_vols_vehicules, pop_ref, dens_grp), 1),
       volss  = round(smooth_rate(del_vols_pers,      pop_ref, dens_grp), 1),
       violss = round(smooth_rate(del_violences_sex,  pop_ref, dens_grp), 1),
@@ -62,7 +65,7 @@ if (ssmsi_ready) {
   emit_table("secData", sec_for_js)
 
   fields <- list(
-    del_cambriolages  = list(key = "camb",  t = "Cambriolages"),
+    del_cambriolages  = list(key = "camb",  t = "Cambriolages", u = "‰ logements"),
     del_vols_vehicules = list(key = "vehs", t = "Vols de véhicules"),
     del_vols_pers     = list(key = "vols",  t = "Vols de personnes"),
     del_violences_sex = list(key = "viols", t = "Violences sexuelles"),
@@ -72,7 +75,7 @@ if (ssmsi_ready) {
     acc_pour_mille    = list(key = "acc",   t = "Accidents corporels BAAC"),
     del_total_pour_mille = list(key = "tot", t = "Total des 13 postes")
   )
-  fields <- lapply(fields, function(f) c(f, list(digits = if (f$key == "acc") 2L else 1L,
+  fields <- lapply(fields, function(f) c(f, list(u = if (is.null(f$u)) "‰ habitants" else f$u, digits = if (f$key == "acc") 2L else 1L,
                                                   smooth = f$key != "tot")))
 
   cat('<script>\n',
@@ -80,7 +83,7 @@ if (ssmsi_ready) {
       'window.secFields = ', as.character(jsonlite::toJSON(fields, auto_unbox = TRUE)), ';\n',
       'window.secRecolor = function(field) {\n',
       '  var f = window.secFields[field] || window.secFields.del_cambriolages, vr = document.querySelector("input[name=sec-val]:checked"), sm = !!(vr && vr.value === "eb" && f.smooth);\n',
-      '  var k = sm ? f.key + "s" : f.key, ttl = f.t + ", ‰ (échelle log" + (sm ? ", lissé" : "") + ")";\n',
+      '  var k = sm ? f.key + "s" : f.key, ttl = f.t + ", " + f.u + " (échelle log" + (sm ? ", lissé" : "") + ")";\n',
       '  CMap.recolor({ get: function (c) { var r = window.secData[c]; return r ? r[k] : null; },\n',
       '    scale: "log_quantile", palette: window.secPalette,\n',
       '    legend: { title: ttl, unit: "‰", digits: f.digits, naLabel: "Non publié (secret statistique)",\n',
@@ -100,14 +103,14 @@ if (ssmsi_ready) {
       '    return;\n',
       '  }\n',
       '  function fmt(x, n) { if (x == null) return "—"; return Number(x).toLocaleString("fr-FR", {minimumFractionDigits: n || 1, maximumFractionDigits: n || 1}); }\n',
-      '  function row(label, raw, sm, n) {\n',
-      '    return \'<div class="cp-kv"><span>\' + label + \'</span><span class="cp-num">\' + fmt(raw, n) + \' ‰\' + (raw != null && sm != null ? \' <span class="cp-sm" title="Taux lissé (Bayes empirique)">→ \' + fmt(sm, n) + \'</span>\' : "") + \'</span></div>\';\n',
+      '  function row(label, raw, sm, n, u) {\n',
+      '    return \'<div class="cp-kv"><span>\' + label + \'</span><span class="cp-num">\' + fmt(raw, n) + \' \' + (u || "‰ hab.") + (raw != null && sm != null ? \' <span class="cp-sm" title="Taux lissé (Bayes empirique)">→ \' + fmt(sm, n) + \'</span>\' : "") + \'</span></div>\';\n',
       '  }\n',
-      '  var ev = (d.camb != null && d.pop) ? Math.round(d.camb * d.pop / 1000) : null;\n',
+      '  var ev = d.n_camb != null ? d.n_camb : null;\n',
       '  el.innerHTML = \'<div class="cp-header"><h3>\' + nom + \'</h3><div class="cp-meta">\' + dept + \' · \' + code + \'</div></div>\' +\n',
       '    \'<div class="cp-section"><h4>Délinquance SSMSI 2025 · taux ‰ (brut → lissé)</h4>\' +\n',
       '    \'<div class="cp-kvs">\' +\n',
-      '    row("Cambriolages", d.camb, d.cambs) +\n',
+      '    row("Cambriolages (pour 1 000 logements)", d.camb, d.cambs, 1, "‰ log.") +\n',
       '    row("Vols de véhicules", d.vehs, d.vehss) +\n',
       '    row("Vols de personnes", d.vols, d.volss) +\n',
       '    row("Dégradations", d.degr, d.degrs) +\n',
@@ -115,7 +118,7 @@ if (ssmsi_ready) {
       '    row("Trafic de stupéfiants", d.stup, d.stups) +\n',
       '    row("Usage de stupéfiants", d.ucan, d.ucans) +\n',
       '    row("Total (13 postes)", d.tot, null) +\n',
-      '    \'</div><p class="cp-def">Population de référence : \' + (d.pop ? Number(d.pop).toLocaleString("fr-FR") : "—") + \' hab.\' + (ev != null ? " Cambriolages ≈ " + ev + " faits." : "") + \' Le taux lissé rapproche les petites communes de la moyenne de leur classe de densité ; il ne remplace pas le taux brut.</p></div>\' +\n',
+      '    \'</div><p class="cp-def">Population de référence : \' + (d.pop ? Number(d.pop).toLocaleString("fr-FR") : "—") + \' hab.\' + (ev != null ? " Cambriolages : " + Number(ev).toLocaleString("fr-FR") + " faits publiés." : "") + \' Le taux lissé rapproche les petites communes de la moyenne de leur classe de densité ; il ne remplace pas le taux brut.</p></div>\' +\n',
       '    (d.acc != null ? \'<div class="cp-section"><h4>Accidents corporels BAAC 2024</h4><div class="cp-kvs"><div class="cp-kv"><span>Nombre</span><span class="cp-num">\' + (d.n_acc != null ? d.n_acc : "—") + \'</span></div>\' + row("Taux", d.acc, d.accs, 2) + \'</div></div>\' : "");\n',
       '};\n',
       '</script>\n',
@@ -127,7 +130,7 @@ if (ssmsi_ready) {
 
 ## Row {height="77%"}
 
-::: {.card title="Délinquance par commune, taux pour 1 000 habitants" width="72%"}
+::: {.card title="Délinquance par commune (‰ habitants ; cambriolages ‰ logements)" width="72%"}
 ```{=html}
 <div class="dvf-controls">
   <div class="dvf-ctrl-group">
@@ -186,7 +189,7 @@ if (ssmsi_ready) {
   </div>
   <div class="cp-source">
     <strong>Source</strong> · SSMSI 2025 (délinquance) + BAAC 2024 (accidents) · Min. Intérieur.<br>
-    Taux ‰ habitants. Secret stat : valeur non publiée en dessous du seuil de diffusion (hachures). Le total n'est calculé que si les 13 postes sont publiés (685 communes) : les indicateurs individuels couvrent bien plus de communes. Échelle log sur la carte. Lissage : Poisson-gamma, prior par classe de densité INSEE.
+    Taux ‰ habitants, sauf cambriolages (‰ logements, dénominateur SSMSI). Secret stat : valeur non publiée en dessous du seuil de diffusion (hachures). Le total (somme des effectifs des 13 postes / population × 1 000, unités de compte mixtes : victimes, infractions, mis en cause) n'est calculé que si les 13 postes sont publiés (685 communes) : les indicateurs individuels couvrent bien plus de communes. Échelle log sur la carte. Lissage : Poisson-gamma, prior par classe de densité INSEE.
   </div>
 </div>
 ```

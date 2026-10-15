@@ -28,7 +28,7 @@ SPEC <- list(
   "geo/departements.geojson" = list(kind = "file", min_kb = 80, max_kb = 600),
 
   "elections/legislatives_2024_t2.parquet" = list(
-    min_rows = 30000, max_rows = 40000,
+    min_rows = 30000, max_rows = 36000,
     cols = c("code_insee", "nom_commune", "famille_vainqueur", "pct_abstention"),
     ranges = list(pct_abstention = c(0, 100))
   ),
@@ -144,7 +144,7 @@ SPEC <- list(
     cols = c("code_commune", "pct_res_secondaires", "pct_vacants", "pct_proprietaires",
              "pct_menages_sans_voiture", "taux_chomage_rp"),
     ranges = list(pct_res_secondaires = c(0, 100), pct_vacants = c(0, 100),
-                  pct_proprietaires = c(0, 100), pct_menages_sans_voiture = c(-0.01, 100),
+                  pct_proprietaires = c(0, 100), pct_menages_sans_voiture = c(0, 100),
                   taux_chomage_rp = c(0, 100))
   ),
   "risques/catnat_commune.parquet" = list(
@@ -265,7 +265,7 @@ tryCatch({
       "fin_recettes quasi colinéaire à la population (totaux ?)")
 
   # C3 : total délinquance NA dès qu'une composante est non diffusée
-  comp <- grep("^del_(?!total|n_)", names(ss), value = TRUE, perl = TRUE)
+  comp <- grep("^del_(?!total|n_)(?!.*_n$)", names(ss), value = TRUE, perl = TRUE)
   incomplet <- rowSums(is.na(ss[, comp])) > 0
   chk(all(is.na(ss$del_total_pour_mille[incomplet])), "del_total renseigné alors qu'une composante est NA")
   chk(all(ss$del_n_publies == rowSums(!is.na(ss[, comp]))), "del_n_publies incohérent")
@@ -308,6 +308,9 @@ tryCatch({
   meta <- rd("explorer/indicator_meta.parquet")
   chk(nrow(meta) == 80 && !anyDuplicated(meta$var), "indicator_meta : 80 variables uniques attendues")
   chk(all(meta$var %in% names(mg)), "indicator_meta : variable absente de commune_merged")
+  # Planchers de couverture = GARDE-FOUS DE RÉGRESSION (1,7 à 4,8 % sous les valeurs observées
+  # le 2026-10-15), pas des valeurs officielles : ils détectent une source qui s'effondre,
+  # ils ne prouvent pas que la couverture est « bonne ».
   cov_min <- c(abst_pres22_t1 = 34000, pct_res_secondaires = 32000, pct_proprietaires = 30000,
                n_catnat_since_2015 = 34000, bpe_panier_score = 34000, arcep_pct_ftth = 34000,
                enaf_ha_par_1000hab_2011_2025 = 33000, dpe_pct_fg = 22000,
@@ -341,6 +344,72 @@ tryCatch({
   # PLM : villes présentes dans les nouvelles sources
   pm2 <- mg[mg$code_commune %in% c("75056", "69123", "13055"), ]
   chk(!anyNA(pm2$pct_vacants) && !anyNA(pm2$arcep_pct_ftth) && !anyNA(pm2$abst_pres22_t1), "PLM : logement/ARCEP/participation manquants")
+
+  # ============================================================
+  # Audit 2026-10-15 (M5) : contrôles qui auraient détecté C1-C4 et M1.
+  # Règle : chaque comparateur est de MÊME PÉRIMÈTRE et SOURCÉ ; aucune tolérance
+  # ajustée pour faire passer un contrôle.
+  # ============================================================
+  cogc <- pop[pop$type_com == "COM", ]
+
+  # M1 : la table des communes = COG 2026 (INSEE v_commune_2026.csv, TYPECOM == "COM" :
+  # 34 875 communes ; https://www.insee.fr/fr/statistiques/8740222). Aucun code consulaire
+  # (ZZ…, ZX), COM du Pacifique / Saint-Pierre (975, 977, 978, 98x) ni commune absorbée.
+  chk(nrow(cogc) == 34875, paste0("COG 2026 : ", nrow(cogc), " communes != 34 875 (INSEE v_commune_2026)"))
+  chk(setequal(mg$code_commune, cogc$code_commune),
+      paste0("commune_merged != COG 2026 : ", length(setdiff(mg$code_commune, cogc$code_commune)), " en trop, ",
+             length(setdiff(cogc$code_commune, mg$code_commune)), " manquantes"))
+  chk(!any(grepl("^(Z|97[578]|98)", mg$code_commune)), "commune_merged : codes non communaux (ZZ, ZX, 975/977/978/98x)")
+  chk(all(el$code_insee %in% cogc$code_commune), "élections : codes hors COG 2026 (non harmonisés ?)")
+  chk(nrow(rd("explorer/departements_agg.parquet")) == 101, "departements_agg : 101 départements attendus (96 + 5 DROM)")
+
+  # C2 : populations au COG 2026. (a) conservation : le total RP 2021 hors Mayotte vaut le total
+  # officiel INSEE, Populations légales 2021 = 67 408 052 hab. (https://www.insee.fr/fr/statistiques/7728826).
+  chk(sum(cogc$pop_2021, na.rm = TRUE) == 67408052, paste0("population 2021 hors Mayotte = ",
+      sum(cogc$pop_2021, na.rm = TRUE), " != 67 408 052 (INSEE popleg 2021)"))
+  # (b) Mayotte : recensement 2017, 256 500 hab. arrondis (https://www.insee.fr/fr/statistiques/3286558)
+  my <- cogc[substr(cogc$code_commune, 1, 3) == "976", ]
+  chk(nrow(my) == 17 && abs(sum(my$pop_latest) - 256500) < 100, "Mayotte : 17 communes, ~256 500 hab. (RP 2017) attendues")
+  # (c) sommation des communes absorbées (sinon le total (a) ne change pas !) : lecture du brut RP
+  rawp <- here::here("data", "raw", "insee", "populations_2017_2021.parquet")
+  if (file.exists(rawp)) {
+    rp <- arrow::read_parquet(rawp); names(rp) <- tolower(names(rp)); rp <- rp[rp$annee_rp == "2021", ]
+    v <- function(c) sum(rp$pmun[rp$codgeo %in% c])
+    sd <- cogc$pop_2021[cogc$code_commune == "93066"]
+    chk(sd == v(c("93066", "93059")), "Saint-Denis 93066 : pop 2021 != Saint-Denis + Pierrefitte-sur-Seine (fusion 2025)")
+  }
+  # Seules les communes rétablies / sans habitants peuvent avoir pop_latest NA ou 0 (liste fermée)
+  chk(sum(is.na(cogc$pop_latest)) <= 10, paste0("populations : ", sum(is.na(cogc$pop_latest)), " communes sans population (<= 10 attendues : rétablies 2026)"))
+
+  # C3 : PLM : valeur ville = ligne OFFICIELLE de la source lorsqu'elle la publie (FiLoSoFi)
+  fl <- rd("filosofi/revenus_communes.parquet")
+  for (cc in plm) for (vv in c("revenu_median", "revenu_d9", "gini")) {
+    a <- fl[[vv]][fl$code_commune == cc]; b <- mg[[vv]][mg$code_commune == cc]
+    chk(length(a) == 1 && isTRUE(all.equal(a, b)), paste0("PLM ", cc, " ", vv, " : ", b, " != ligne officielle FiLoSoFi ", a))
+  }
+  # ... et la ville DEFM (absente de la source) = somme de ses arrondissements
+  df <- rd("dares/defm_commune.parquet")
+  chk(mg$defm_abc[mg$code_commune == "75056"] == sum(df$defm_abc[df$code_commune %in% sprintf("751%02d", 1:20)]),
+      "PLM : DEFM Paris != somme des arrondissements")
+
+  # C4 : unités SSMSI. Cambriolages = taux pour 1 000 LOGEMENTS (insee_log) ; total = Σ effectifs / population.
+  cb <- ss[!is.na(ss$del_cambriolages) & ss$del_cambriolages_n > 0 & ss$ssmsi_log_ref > 0, ]
+  # Tolérance relative 0,5 % = arrondi de publication du taux SSMSI (observé : <= 0,11 %), à comparer
+  # à l'écart d'unité qu'on veut détecter (taux par habitant vs par logement : x2 en médiane).
+  chk(max(abs(cb$del_cambriolages / (cb$del_cambriolages_n / cb$ssmsi_log_ref * 1000) - 1)) < 0.005,
+      "SSMSI cambriolages : taux != effectif / logements x 1000")
+  chk(abs(median(cb$del_cambriolages / (cb$del_cambriolages_n / cb$ssmsi_pop_ref * 1000)) - 1) > 0.2,
+      "SSMSI cambriolages : taux identique à effectif / habitants (dénominateur logements perdu ?)")
+  tt <- ss[!is.na(ss$del_total_pour_mille), ]
+  chk(max(abs(tt$del_total_pour_mille - tt$del_n_total / tt$ssmsi_pop_ref * 1000)) < 1e-6, "SSMSI total != Σ effectifs / population x 1000")
+  chk(ss$del_cambriolages_n[ss$code_commune == "75056"] == 7072, "Paris : 7 072 cambriolages attendus (SSMSI 2025)")
+
+  # C1 : libellés de densité du JS = ordre des rangs des données
+  js <- paste(readLines(here::here("assets", "cmap.js"), warn = FALSE), collapse = " ")
+  jl <- strsplit(gsub('.*var DENS_RANKED = \\[([^]]*)\\].*', "\\1", js), ",\\s*")[[1]]
+  jl <- gsub('^\\s*"|"\\s*$', "", jl)
+  dl <- unique(den[order(den$densite_rang), c("densite_rang", "densite_insee")])$densite_insee
+  chk(identical(jl, dl), paste0("cmap.js DENS_RANKED != rangs des données : ", paste(jl, collapse = "|")))
 }, error = function(e) fail("SEMANTIQUE : erreur d'exécution : ", conditionMessage(e)))
 
 # ---- Rapport ----

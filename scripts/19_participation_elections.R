@@ -62,10 +62,15 @@ raw <- DBI::dbGetQuery(con, glue("
   GROUP BY 1, 2
 ")) |> tibble::as_tibble()
 message("Lignes commune x élection brutes : ", nrow(raw))
+n_src_2022 <- DBI::dbGetQuery(con, glue("
+  SELECT SUM(inscrits) AS n FROM read_parquet('{pq_path}')
+  WHERE id_election = '2022_pres_t1' AND code_commune IS NOT NULL"))$n
 
 valid <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet")) |>
   filter(type_com == "COM") |> pull(code_commune)
 dropped <- raw |> filter(!code_commune %in% valid)
+message("Part des inscrits prés. 2022 T1 hors périmètre COG 2026 (étranger, COM) : ",
+        round(100 * sum(dropped$inscrits[dropped$id_election == "2022_pres_t1"]) / n_src_2022, 2), " %")
 message("Hors COG 2026 (étranger, COM Pacifique, etc.) : ",
         n_distinct(dropped$code_commune), " codes, ", nrow(dropped), " lignes écartées")
 
@@ -120,10 +125,8 @@ stopifnot(
   abs(n22 / 34900 - 1) < 0.05,
   all(c("75056", "69123", "13055") %in% wide$code_commune),
   all(wide$abst_pres22_t1 >= 0 & wide$abst_pres22_t1 <= 100, na.rm = TRUE),
-  # abstention prés. 2022 T1 : 26,3 % officiel (avec étranger, ~1,9 M inscrits hors périmètre) ;
-  # hors étranger/COM on attend ~24,7 %
-  abs(100 * sum(long$abstentions[long$id_election == "2022_pres_t1"]) /
-        sum(long$inscrits[long$id_election == "2022_pres_t1"]) - 24.7) < 0.5,
-  sum(long$inscrits[long$id_election == "2022_pres_t1"]) > 0.95 * 48.75e6 - 1.9e6
+  # Conservation (même périmètre, même fichier) : le remappage COG 2026 ne perd ni ne crée
+  # d'inscrits (somme avant mapping = somme après, tous codes confondus).
+  abs(n_src_2022 - sum(raw$inscrits[raw$id_election == "2022_pres_t1"])) < 0.5
 )
 cat("\n✔ stopifnot() OK\n")

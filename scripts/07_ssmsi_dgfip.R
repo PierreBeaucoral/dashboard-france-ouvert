@@ -75,7 +75,7 @@ ssmsi_filt <- ssmsi |>
     var = unname(indicators_short[as.character(indicateur)]),
     code_commune = stringr::str_pad(.data[[codgeo_col]], 5, "left", "0")
   ) |>
-  dplyr::select(code_commune, var, taux_pour_mille, nombre, insee_pop)
+  dplyr::select(code_commune, var, taux_pour_mille, nombre, insee_pop, insee_log)
 
 ssmsi_wide <- ssmsi_filt |>
   dplyr::select(code_commune, var, taux_pour_mille) |>
@@ -84,6 +84,12 @@ ssmsi_wide <- ssmsi_filt |>
     values_from  = taux_pour_mille,
     values_fn    = mean
   )
+
+# Effectifs bruts (nombre) : base du total et des comptes affichés.
+counts_wide <- ssmsi_filt |>
+  dplyr::select(code_commune, var, nombre) |>
+  tidyr::pivot_wider(names_from = var, values_from = nombre,
+                     names_prefix = "n_", values_fn = mean)
 
 # Garde : si une nuance n'a pas de libellé court dans `indicators_short`,
 # pivot_wider crée une colonne au nom NA (artefact). On la supprime — elle
@@ -100,23 +106,37 @@ if (any(na_named)) {
 # 0 apparaissent -> biais de sélection (voir docs/decisions.qmd).
 # Total = somme des 13 composantes SEULEMENT si toutes sont diffusées, sinon NA
 # (l'ancien rowSums(na.rm = TRUE) sommait des sous-ensembles différents).
+# UNITÉ (audit C4) : `taux_pour_mille` est rapporté aux HABITANTS (insee_pop) pour
+# tous les postes SAUF « Cambriolages de logement », rapporté aux LOGEMENTS
+# (insee_log). Les additionner mélangeait deux dénominateurs. Le total est donc
+# reconstruit à partir des EFFECTIFS sur un dénominateur unique (population),
+# et le taux de cambriolages reste « pour 1 000 logements » (colonne
+# del_cambriolages, jamais additionnée). Les postes ont aussi des unités de
+# compte différentes (victimes, infractions, mis en cause) : le total est un
+# indice agrégé de volumes enregistrés, pas un nombre de faits.
 comp_cols <- unique(unname(indicators_short))
 comp_cols <- intersect(comp_cols, names(ssmsi_wide))
+n_cols <- paste0("n_", comp_cols)
 ssmsi_wide <- ssmsi_wide |>
-  dplyr::mutate(
-    del_n_publies = rowSums(!is.na(dplyr::across(dplyr::all_of(comp_cols)))),
-    del_total_pour_mille = ifelse(
-      del_n_publies == length(comp_cols),
-      rowSums(dplyr::across(dplyr::all_of(comp_cols))), NA_real_)
-  )
+  dplyr::left_join(counts_wide, by = "code_commune")
 
-# Pop référence
+# Pop et logements référence
 pops <- ssmsi_filt |>
-  dplyr::distinct(code_commune, insee_pop)
+  dplyr::distinct(code_commune, insee_pop, insee_log)
 ssmsi_out <- ssmsi_wide |>
   dplyr::left_join(pops, by = "code_commune") |>
-  dplyr::rename(ssmsi_pop_ref = insee_pop) |>
-  dplyr::mutate(annee_ssmsi = latest_year)
+  dplyr::rename(ssmsi_pop_ref = insee_pop, ssmsi_log_ref = insee_log) |>
+  dplyr::mutate(
+    del_n_publies = rowSums(!is.na(dplyr::across(dplyr::all_of(comp_cols)))),
+    del_n_total = ifelse(del_n_publies == length(comp_cols),
+                         rowSums(dplyr::across(dplyr::all_of(n_cols))), NA_real_),
+    del_total_pour_mille = ifelse(!is.na(del_n_total) & ssmsi_pop_ref > 0,
+                                  del_n_total / ssmsi_pop_ref * 1000, NA_real_),
+    annee_ssmsi = latest_year
+  ) |>
+  dplyr::rename(del_cambriolages_n = n_del_cambriolages) |>
+  dplyr::select(-dplyr::starts_with("n_del_"))
+stopifnot(all(c("del_cambriolages_n", "ssmsi_log_ref", "del_n_total") %in% names(ssmsi_out)))
 
 arrow::write_parquet(ssmsi_out, file.path(out_dir, "ssmsi", "delinquance_commune.parquet"))
 message(glue::glue("  ✔ SSMSI : {nrow(ssmsi_out)} communes → ssmsi/delinquance_commune.parquet"))

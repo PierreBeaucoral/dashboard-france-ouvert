@@ -62,6 +62,15 @@ build_geometry <- function() {
   message("[assets] ", geo_out, " : ", format(file.size(geo_out), big.mark = " "), " o")
 }
 
+#' Libellés INSEE des classes de densité, ordonnés par densite_rang (1..6).
+dens_labels <- function() {
+  g <- arrow::read_parquet(file.path("data", "processed", "insee_densite", "grille_densite.parquet"),
+                           col_select = c("densite_insee", "densite_rang"))
+  g <- unique(g[!is.na(g$densite_rang), ])
+  stopifnot(nrow(g) == 6L, identical(sort(g$densite_rang), 1:6))
+  as.list(g$densite_insee[order(g$densite_rang)])
+}
+
 build_columns <- function() {
   mp <- file.path("data", "processed", "explorer", "commune_merged.parquet")
   if (!file.exists(mp)) {
@@ -84,7 +93,10 @@ build_columns <- function() {
     s  = match(as.character(m$strate_taille), strates) - 1L,
     depts = lapply(seq_len(nrow(depts)), function(i)
       list(code = depts$code_dept[i], nom = depts$libelle_dept[i])),
-    strates = as.list(strates)
+    strates = as.list(strates),
+    # Libellés des 6 classes de densité INSEE par rang (source unique : scripts/10_ ->
+    # grille_densite.parquet), lus par assets/cmap.js (CMap.densLabels).
+    dl = dens_labels()
   )
   writeLines(jsonlite::toJSON(idx, auto_unbox = TRUE, na = "null"),
              file.path("assets", "data", "communes.json"), useBytes = TRUE)
@@ -218,7 +230,64 @@ build_constellation <- function() {
           format(file.size(o2), big.mark = " "), " o")
 }
 
+#' Fiches communales de la page Législatives (pages/elections.qmd) : fichier colonnes
+#' assets/data/elections_lookup.json, téléchargé au premier clic. GÉNÉRÉ ICI (pré-rendu) et
+#' non dans la page : Quarto fige la liste des `resources:` avant de rendre les pages, donc un
+#' fichier écrit pendant le rendu n'arrivait jamais dans _site (404 sur Pages, audit C5).
+#' Une ligne par code de la géométrie métropolitaine (arrondissements PLM compris, qui
+#' reprennent la ligne de leur ville), communes avec famille gagnante seulement.
+build_elections_lookup <- function() {
+  ep <- file.path("data", "processed", "elections", "legislatives_2024_t2.parquet")
+  pp <- file.path("data", "processed", "elections", "participation_long.parquet")
+  pc <- file.path("data", "processed", "elections", "participation_commune.parquet")
+  pop_p <- file.path("data", "processed", "insee", "populations.parquet")
+  if (!all(file.exists(c(ep, pp, pc, pop_p, geo_src)))) {
+    message("[assets] elections_lookup : sources absentes, non généré"); return(invisible())
+  }
+  out <- file.path("assets", "data", "elections_lookup.json")
+  dir.create(dirname(out), recursive = TRUE, showWarnings = FALSE)
+  elec <- arrow::read_parquet(ep)
+  pop  <- arrow::read_parquet(pop_p, col_select = c("code_commune", "pop_latest", "strate_pop"))
+  elec <- merge(elec, data.frame(code_insee = pop$code_commune, pop_latest = pop$pop_latest,
+                                 strate_pop = as.character(pop$strate_pop)), by = "code_insee", all.x = TRUE)
+  # Participation : séries d'abstention 2002-2026 + vues carte
+  SER <- c("2002_pres_t1", "2007_pres_t1", "2012_pres_t1", "2017_pres_t1", "2022_pres_t1",
+           "2002_legi_t1", "2007_legi_t1", "2012_legi_t1", "2017_legi_t1", "2022_legi_t1", "2024_legi_t1",
+           "2004_euro_t1", "2009_euro_t1", "2014_euro_t1", "2019_euro_t1", "2024_euro_t1",
+           "2014_muni_t1", "2020_muni_t1", "2026_muni_t1")
+  pl <- arrow::read_parquet(pp)
+  pl <- pl[pl$id_election %in% SER, c("code_commune", "id_election", "part_abstention")]
+  pl$part_abstention <- round(pl$part_abstention, 1)
+  ser <- tidyr::pivot_wider(pl, names_from = id_election, values_from = part_abstention, names_prefix = "s_")
+  part <- dplyr::left_join(
+    arrow::read_parquet(pc, col_select = c("code_commune", "abst_pres22_t1", "abst_euro24",
+                                           "abst_muni26_t1", "abst_delta_pres02_pres22")) |>
+      dplyr::mutate(dplyr::across(-code_commune, ~ round(.x, 1))), ser, by = "code_commune")
+  # Géométrie : codes métropole (hors DROM), PLM -> ville
+  g <- sf::st_drop_geometry(sf::read_sf(geo_src, quiet = TRUE))
+  g <- g[!substr(g$code, 1, 3) %in% c("971", "972", "973", "974", "976"), c("code", "nom")]
+  plm_city <- c(setNames(rep("75056", 20), sprintf("751%02d", 1:20)),
+                setNames(rep("69123", 9), sprintf("693%02d", 81:89)),
+                setNames(rep("13055", 16), sprintf("132%02d", 1:16)))
+  g$join_code <- ifelse(g$code %in% names(plm_city), plm_city[g$code], g$code)
+  d <- merge(g, elec, by.x = "join_code", by.y = "code_insee", all.x = TRUE, sort = FALSE)
+  d <- d[!is.na(d$famille_vainqueur), ]
+  d <- merge(d, part, by.x = "join_code", by.y = "code_commune", all.x = TRUE, sort = FALSE)
+  d <- d[order(d$code), ]
+  r2 <- c("pct_vainqueur", "marge_vainqueur", "pct_abstention", paste0("pct_", c("NFP", "ENS", "RN", "LR", "Divers")),
+          paste0("pct_", c("NFP", "ENS", "RN", "LR", "Divers"), "_t1"), "pct_abstention_t1")
+  d[r2] <- lapply(d[r2], round, 2)
+  d$nom_commune <- ifelse(is.na(d$nom_commune), d$nom, d$nom_commune)
+  keep <- c("nom_commune", "libelle_dept", "code_dept", "tour", "famille_vainqueur", "nuance_vainqueur", r2,
+            "voix_vainqueur", "voix_second", "inscrits", "exprimes", "abstentions", "pop_latest", "strate_pop",
+            setdiff(names(part), "code_commune"))
+  lk <- c(list(c = d$code), as.list(d[keep]))
+  writeLines(jsonlite::toJSON(lk, na = "null", digits = NA), out, useBytes = TRUE)
+  message("[assets] elections_lookup.json : ", nrow(d), " codes, ", format(file.size(out), big.mark = " "), " o")
+}
+
 build_geometry()
 build_columns()
 build_flows()
 build_constellation()
+build_elections_lookup()

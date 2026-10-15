@@ -6,6 +6,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Un push fait avec GITHUB_TOKEN (refresh-data.yml) ne déclenche pas `push` : on enchaîne
+  # explicitement quand le refresh mensuel se termine avec succès.
+  workflow_run:
+    workflows: ["Refresh data sources"]
+    types: [completed]
+    branches: [main]
 
 # Permissions for Pages deployment
 permissions:
@@ -26,6 +32,7 @@ env:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

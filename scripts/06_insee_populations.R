@@ -116,7 +116,21 @@ message(glue::glue("Populations : {nrow(pop)} lignes (long format), cols : ",
 # Clé = codgeo SEUL. Avec libgeo dans la clé, une commune renommée entre deux
 # millésimes était éclatée en deux lignes (492 codes dupliqués). On garde le
 # libellé de l'année la plus récente.
-pop_ok <- pop |> dplyr::filter(!is.na(pmun))
+# HARMONISATION COG 2026 (audit C2) : les populations légales RP 2017-2021 sont à la
+# géographie d'avant les fusions de 2022-2026. Les effectifs des autres sources étant
+# sommés vers le code 2026 (cog_helpers.R), le dénominateur doit l'être aussi, sinon
+# une commune fusionnée a un numérateur de N communes pour une population d'une seule.
+# Effectif sommé, jamais moyenné. Un code encore vivant en 2026 n'est pas remappé.
+source(here::here("scripts", "cog_helpers.R"))
+pop_map <- cog_map("2016-01-01", fus = fusions, valid = cog_main$code_commune)
+pop_ok <- pop |>
+  dplyr::filter(!is.na(pmun)) |>
+  dplyr::mutate(codgeo_orig = codgeo, codgeo = to_cog2026(codgeo, pop_map))
+n_absorbed <- dplyr::n_distinct(pop_ok$codgeo_orig[pop_ok$codgeo_orig != pop_ok$codgeo])
+message(glue::glue("  Codes absorbés sommés vers leur commune 2026 : {n_absorbed}"))
+pop_ok <- pop_ok |>
+  dplyr::group_by(codgeo, annee_rp) |>
+  dplyr::summarise(pmun = sum(pmun), libgeo = libgeo[1], .groups = "drop")
 pop_lib <- pop_ok |>
   dplyr::arrange(codgeo, dplyr::desc(annee_rp)) |>
   dplyr::distinct(codgeo, .keep_all = TRUE) |>
@@ -127,8 +141,7 @@ populations_wide <- pop_ok |>
     id_cols      = codgeo,
     names_from   = annee_rp,
     values_from  = pmun,
-    names_prefix = "pop_",
-    values_fn    = ~ .x[1]
+    names_prefix = "pop_"
   ) |>
   dplyr::left_join(pop_lib, by = "codgeo")
 
@@ -178,6 +191,28 @@ out <- cog_main |>
   ) |>
   dplyr::select(-nom_pop)
 
+# Mayotte : absente des populations légales RP 2017-2021 ci-dessus. Source officielle
+# utilisée : population légale du recensement de Mayotte 2017 (INSEE), telle que reprise
+# dans le champ `insee_pop` (millésime 2017) de la base communale SSMSI ; le total des
+# 17 communes (256 518) est le chiffre INSEE (https://www.insee.fr/fr/statistiques/3286558).
+# Millésime tracé dans `pop_millesime` ; si le fichier SSMSI manque, Mayotte reste NA.
+out$pop_millesime <- ifelse(is.na(out$pop_latest), NA_integer_, as.integer(latest_year))
+ssmsi_raw <- here::here("data", "raw", "ssmsi", "base_communale.parquet")
+if (file.exists(ssmsi_raw)) {
+  sm <- arrow::read_parquet(ssmsi_raw, col_select = c(dplyr::starts_with("CODGEO"), "annee",
+                                                       "insee_pop", "insee_pop_millesime"))
+  codcol <- grep("^CODGEO", names(sm), value = TRUE)[1]
+  sm <- sm |>
+    dplyr::filter(annee == max(annee), grepl("^976", .data[[codcol]]), insee_pop_millesime == 2017L) |>
+    dplyr::distinct(code_commune = .data[[codcol]], insee_pop)
+  r <- match(sm$code_commune, out$code_commune)
+  stopifnot(!anyNA(r), all(is.na(out$pop_latest[r])))  # Mayotte n'avait aucune pop
+  out$pop_2017[r] <- sm$insee_pop
+  out$pop_latest[r] <- sm$insee_pop
+  out$pop_millesime[r] <- 2017L
+  message(glue::glue("  Mayotte : {nrow(sm)} communes, pop 2017 = {sum(sm$insee_pop)}"))
+} else message("  ⚠ SSMSI brut absent : Mayotte sans population (NA)")
+
 # PLM : les populations légales sont publiées par arrondissement ; la commune
 # 75056/69123/13055 (clé des élections, DGFiP, SSMSI...) y avait pop = NA.
 # On la reconstitue comme la somme de ses arrondissements.
@@ -211,7 +246,7 @@ arrow::write_parquet(fusions, file.path(out_dir, "commune_fusions.parquet"))
 
 cat(glue::glue("
 
-  ✔ {nrow(out)} communes (COG 2026 + pop 2017-2021)
+  ✔ {nrow(out)} communes (COG 2026 + pop 2017-2021 sommée sur le COG 2026)
     → {file.path(out_dir, 'populations.parquet')}
   ✔ {nrow(fusions)} mouvements de communes
     → {file.path(out_dir, 'commune_fusions.parquet')}

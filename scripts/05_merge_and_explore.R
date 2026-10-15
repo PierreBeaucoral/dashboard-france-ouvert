@@ -74,31 +74,36 @@ bio   <- if (file.exists(bio_path))   arrow::read_parquet(bio_path)   else NULL
 
 # ---- PLM : sources publiées à l'ARRONDISSEMENT (751xx/693xx/132xx) ----
 # commune_merged est indexée sur le code VILLE (75056/69123/13055, clé des
-# élections). DVF, APL, FiLoSoFi et DEFM n'ont que les arrondissements -> Paris,
-# Lyon, Marseille restaient NA. On ajoute une ligne ville = agrégat des
-# arrondissements : somme (DEFM), moyenne pondérée par la population légale
-# (APL, FiLoSoFi) ou par le nb de transactions (DVF). APPROXIMATION documentée
-# (une médiane de médianes n'est pas la médiane de la ville).
+# élections). RÈGLE (audit C3) : si la source publie la ligne ville OFFICIELLE
+# (FiLoSoFi, par ex.), on la GARDE telle quelle ; on ne reconstruit la ville depuis les
+# arrondissements que lorsque la ligne ville manque (DVF, APL, DEFM) : somme (effectifs),
+# moyenne pondérée par la population légale (APL) ou par le nb de transactions (DVF).
+# APPROXIMATION documentée dans ce second cas (une médiane de médianes n'est pas la
+# médiane de la ville ; un Gini moyen ignore l'inégalité entre arrondissements).
 plm_city_of <- function(code) {
   unname(c(`751` = "75056", `693` = "69123", `132` = "13055")[substr(code, 1, 3)])
 }
 plm_arr_codes <- c(sprintf("751%02d", 1:20), sprintf("693%02d", 81:89),
                    sprintf("132%02d", 1:16))
-plm_consolidate <- function(df, w, how = c("wmean", "sum")) {
+#' @param sum_cols colonnes numériques à SOMMER même si how = "wmean" (effectifs)
+plm_consolidate <- function(df, w, how = c("wmean", "sum"), sum_cols = character()) {
   how <- match.arg(how)
   arr <- df[df$code_commune %in% plm_arr_codes, , drop = FALSE]
-  if (nrow(arr) == 0) return(df)
   arr$.city <- plm_city_of(arr$code_commune)
+  # villes dont la source publie déjà une ligne : on n'y touche pas
+  arr <- arr[!arr$.city %in% df$code_commune, , drop = FALSE]
+  if (nrow(arr) == 0) return(df)
   arr$.w <- w[match(arr$code_commune, names(w))]
   num <- setdiff(names(arr)[vapply(arr, is.numeric, logical(1))], ".w")
   city <- arr |>
     dplyr::group_by(code_commune = .city) |>
     dplyr::summarise(
-      dplyr::across(dplyr::all_of(num), ~ if (how == "sum") sum(.x, na.rm = TRUE)
+      dplyr::across(dplyr::all_of(num), ~ if (how == "sum" || dplyr::cur_column() %in% sum_cols)
+                      sum(.x, na.rm = TRUE)
                     else stats::weighted.mean(.x, .w, na.rm = TRUE)),
       .groups = "drop")
   city[num] <- lapply(city[num], function(v) ifelse(is.nan(v), NA_real_, v))
-  dplyr::bind_rows(df[!df$code_commune %in% city$code_commune, ], city)
+  dplyr::bind_rows(df, city)
 }
 pop_w <- if (!is.null(pop)) stats::setNames(pop$pop_latest, pop$code_commune) else NULL
 
@@ -120,7 +125,7 @@ dvf_2024 <- dvf |>
 
 dvf_w <- stats::setNames(dplyr::coalesce(dvf_2024$dvf_n_app, 0) + dplyr::coalesce(dvf_2024$dvf_n_mai, 0) + 1,
                          dvf_2024$code_commune)
-dvf_2024 <- plm_consolidate(dvf_2024, dvf_w)
+dvf_2024 <- plm_consolidate(dvf_2024, dvf_w, sum_cols = c("dvf_n_app", "dvf_n_mai"))
 
 # ---- Préparer Air ----
 air_clean <- air |>
@@ -169,18 +174,26 @@ if (!is.null(pop)) {
 }
 
 # ---- Merge ----
-merged <- elec_clean |>
+# TABLE DES COMMUNES = COG 2026 (audit M1) : une ligne par commune du COG 2026
+# (populations.parquet, type_com == "COM" : y compris Paris/Lyon/Marseille sous le code
+# ville, sans arrondissements, sans circonscriptions consulaires ni COM). Les résultats
+# électoraux (déjà au COG 2026, scripts/02_) y sont rattachés.
+stopifnot(!is.null(pop))
+dept_lbl <- elec_clean |> dplyr::distinct(code_dept, libelle_dept) |>
+  dplyr::filter(!is.na(code_dept), !is.na(libelle_dept)) |> dplyr::distinct(code_dept, .keep_all = TRUE)
+frame <- pop |>
+  dplyr::filter(type_com == "COM") |>
+  dplyr::transmute(code_commune, nom_cog = nom_commune, dept_cog = code_dept)
+merged <- frame |>
+  dplyr::left_join(dplyr::select(elec_clean, -code_dept, -libelle_dept), by = "code_commune") |>
+  dplyr::mutate(nom_commune = dplyr::coalesce(nom_cog, nom_commune), code_dept = dept_cog,
+                nom_cog = NULL, dept_cog = NULL) |>
+  dplyr::left_join(dept_lbl, by = "code_dept") |>
+  dplyr::relocate(code_dept, libelle_dept, .after = nom_commune) |>
   dplyr::left_join(dvf_2024,  by = "code_commune") |>
-  dplyr::left_join(air_clean, by = "code_commune")
-
-if (!is.null(pop)) {
-  merged <- merged |> dplyr::left_join(pop_clean, by = "code_commune")
-} else {
-  merged <- merged |> dplyr::mutate(
-    ctx_pop_latest = NA_integer_,
-    ctx_strate_pop = NA_character_
-  )
-}
+  dplyr::left_join(air_clean, by = "code_commune") |>
+  dplyr::left_join(pop_clean, by = "code_commune")
+stopifnot(!anyDuplicated(merged$code_commune), nrow(merged) == nrow(frame))
 
 # Bloc 4 — Délinquance SSMSI
 if (!is.null(ssmsi)) {
@@ -424,8 +437,8 @@ INDICATOR_META <- tibble::tribble(
   "ctx_log_inscrits",              "log(inscrits)",                 "Démographie",    "",         2,
   "ctx_log_pop",                   "log(population)",               "Démographie",    "",         2,
   "densite_rang",                  "Densité INSEE (1 rural à 6 centre)", "Démographie", "",       0,
-  "del_total_pour_mille",          "Délinquance totale ‰",          "Sécurité",       "‰",        1,
-  "del_cambriolages",              "Cambriolages ‰",                "Sécurité",       "‰",        2,
+  "del_total_pour_mille",          "Délinquance totale (13 postes) ‰ hab.", "Sécurité", "‰ hab.",   1,
+  "del_cambriolages",              "Cambriolages ‰ logements",     "Sécurité",       "‰ log.",   2,
   "del_violences_sex",             "Violences sexuelles ‰",         "Sécurité",       "‰",        2,
   "del_trafic_stup",               "Trafic de stupéfiants ‰",       "Sécurité",       "‰",        2,
   "del_degradations",              "Dégradations ‰",                "Sécurité",       "‰",        2,
@@ -453,7 +466,7 @@ INDICATOR_META <- tibble::tribble(
   "apl_sagefemmes",                "APL sages-femmes",              "Santé",          "c/an/hab", 2,
   "apl_dentistes",                 "APL dentistes",                 "Santé",          "c/an/hab", 2,
   "apl_kines",                     "APL kinésithérapeutes",         "Santé",          "c/an/hab", 2,
-  "defm_taux_pop",                 "Chômage DEFM ‰",                "Chômage",        "‰",        1,
+  "defm_taux_pop",                 "Demandeurs d'emploi (DEFM) ‰ hab.", "Chômage",        "‰",        1,
   "taux_chomage_rp",               "Chômage RP 2022 (%)",           "Chômage",        "%",        1,
   "carb_hab_total",                "Empreinte CO₂ (t/hab)",         "Énergie",        "tCO₂/hab", 2,
   "ore_elec_res_mwh_hab",          "Électricité rés. MWh/hab.",     "Énergie",        "MWh/hab.", 2,

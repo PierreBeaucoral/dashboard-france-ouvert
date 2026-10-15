@@ -34,4 +34,25 @@ const wq = S.weightedQuantiles([1, 2, 3, 4], [1, 1, 1, 97], [0.5]);
 assert.strictEqual(wq[0], 4);                   // 97 % de la masse est sur la valeur 4
 near(S.percentile([1, 2, 2, 3], 2), 50);        // ex æquo : rang moyen
 near(S.percentile([1, 2, 3, 4], 0), 0);
+
+// 4. Villes PLM comblées (audit M2) : la ville sans valeur propre prend la moyenne de ses arrondissements
+const g = S.withPlmFallback(c => ({ "75101": 10, "75102": 20, "75103": null, "X": 5 })[c], { "75056": ["75101", "75102", "75103"] });
+near(g("75056"), 15);                           // arrondissement sans valeur ignoré
+assert.strictEqual(g("X"), 5);
+assert.ok(g("99999") == null);                  // commune sans arrondissement : inchangée
+const gc = S.withPlmFallback(c => ({ "75101": "Grands centres urbains" })[c], { "75056": ["75101"] });
+assert.strictEqual(gc("75056"), "Grands centres urbains");
+
+// 5. Libellés de densité (audit C1) : le repli de cmap.js suit EXACTEMENT l'ordre des rangs
+// de scripts/10_ (1 rural non périurbain ... 6 grands centres) et, si l'index généré existe,
+// l'ordre des données (assets/data/communes.json::dl, lui-même issu de grille_densite.parquet).
+const fs = require("fs");
+const src = fs.readFileSync("assets/cmap.js", "utf8");
+const ranked = JSON.parse(src.match(/var DENS_RANKED = (\[[^\]]*\])/)[1].replace(/\s+/g, " "));
+assert.deepStrictEqual(ranked, ["Rural non périurbain", "Rural périurbain", "Ceintures urbaines",
+  "Petites villes", "Centres urbains intermédiaires", "Grands centres urbains"]);
+if (fs.existsSync("assets/data/communes.json")) {
+  const dl = JSON.parse(fs.readFileSync("assets/data/communes.json")).dl;
+  assert.deepStrictEqual(dl, ranked, "ordre des libellés de densité : données != cmap.js");
+}
 console.log("check_cmap_stats.js : OK");

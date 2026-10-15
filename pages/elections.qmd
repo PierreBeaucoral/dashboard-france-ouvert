@@ -27,26 +27,7 @@ source(here::here("R", "page_helpers.R"))
 if (elec_ready) {
   # Les ~35 000 fiches communales ne sont plus dans le HTML : fichier colonnes
   # téléchargé au premier clic (assets/data/elections_lookup.json), puis en cache.
-  dir.create(here::here("assets", "data"), recursive = TRUE, showWarnings = FALSE)
-  # Participation : séries d'abstention 2002-2026 (participation_long) + vues carte (participation_commune)
-  pl <- arrow::read_parquet(here::here("data", "processed", "elections", "participation_long.parquet"))
-  SER <- c("2002_pres_t1", "2007_pres_t1", "2012_pres_t1", "2017_pres_t1", "2022_pres_t1",
-           "2002_legi_t1", "2007_legi_t1", "2012_legi_t1", "2017_legi_t1", "2022_legi_t1", "2024_legi_t1",
-           "2004_euro_t1", "2009_euro_t1", "2014_euro_t1", "2019_euro_t1", "2024_euro_t1",
-           "2014_muni_t1", "2020_muni_t1", "2026_muni_t1")
-  ser <- pl |> dplyr::filter(id_election %in% SER) |>
-    dplyr::mutate(part_abstention = round(part_abstention, 1)) |>
-    dplyr::select(code_commune, id_election, part_abstention) |>
-    tidyr::pivot_wider(names_from = id_election, values_from = part_abstention, names_prefix = "s_")
-  pc <- arrow::read_parquet(here::here("data", "processed", "elections", "participation_commune.parquet")) |>
-    dplyr::select(code_commune, abst_pres22_t1, abst_euro24, abst_muni26_t1, abst_delta_pres02_pres22) |>
-    dplyr::mutate(dplyr::across(-code_commune, ~ round(.x, 1)))
-  part <- dplyr::left_join(pc, ser, by = "code_commune") |> th_plm()
-  lkdf <- commune_lookup_df |> dplyr::left_join(part, by = c("code" = "code_commune"))
-  lk <- c(list(c = lkdf$code),
-          as.list(lkdf[setdiff(names(lkdf), "code")]))
-  writeLines(jsonlite::toJSON(lk, na = "null", digits = NA),
-             here::here("assets", "data", "elections_lookup.json"), useBytes = TRUE)
+  # (assets/data/elections_lookup.json est produit au pré-rendu par R/build_web_assets.R)
 
   # Synthèse communes vs inscrits (France entière, famille gagnante au tour décisif)
   nat <- elec |> dplyr::filter(!is.na(famille_vainqueur)) |>

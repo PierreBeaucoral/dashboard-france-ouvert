@@ -13,14 +13,18 @@
 #' @param since date (chr "YYYY-MM-DD") : on n'applique que les mouvements
 #'   effectifs à partir de cette date (= début du millésime géographique de la
 #'   source). Évite de réécrire des codes réutilisés avant le millésime.
+#' @param fus,valid  mouvements et codes vivants en 2026 ; par défaut lus dans
+#'   data/processed/insee/ (écrits par 06_). 06_ les fournit lui-même, car il
+#'   produit populations.parquet (évite la dépendance circulaire).
 #' @return tibble(code_avant, code_2026) ; ne contient que les codes à changer.
-cog_map <- function(since) {
-  fus <- arrow::read_parquet(here::here("data", "processed", "insee", "commune_fusions.parquet")) |>
+cog_map <- function(since, fus = NULL, valid = NULL) {
+  if (is.null(fus)) fus <- arrow::read_parquet(here::here("data", "processed", "insee", "commune_fusions.parquet"))
+  fus <- fus |>
     dplyr::filter(date_effet >= as.Date(since), code_avant != code_apres) |>
     dplyr::arrange(dplyr::desc(date_effet)) |>
     dplyr::distinct(code_avant, .keep_all = TRUE) |>
     dplyr::select(code_avant, code_final = code_apres)
-  valid <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet"))$code_commune
+  if (is.null(valid)) valid <- arrow::read_parquet(here::here("data", "processed", "insee", "populations.parquet"))$code_commune
   # un code encore vivant en 2026 n'est jamais remappé (défusions / codes réutilisés)
   fus <- dplyr::filter(fus, !code_avant %in% valid)
   # chaînage jusqu'au point fixe (a -> b -> c), 10 passes max

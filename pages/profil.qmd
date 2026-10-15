@@ -34,7 +34,7 @@ axes <- tibble::tribble(
   "revenu_median",    "Revenu",     "Revenu médian",                      "€",         0L, "FiLoSoFi 2021",               "lin", FALSE,
   "apl_medecins",     "Médecins",   "Accès aux médecins (APL)",           "c/an/hab",  2L, "DREES, APL 2023",             "lin", FALSE,
   "fin_recettes",     "Recettes",   "Recettes communales",                "€/hab",     0L, "DGFiP, comptes 2024",         "log", FALSE,
-  "del_cambriolages", "Cambriol.",  "Cambriolages",                       "‰",         1L, "SSMSI 2025 (si publié)",      "log", FALSE,
+  "del_cambriolages", "Cambriol.",  "Cambriolages",                       "‰ log.",     1L, "SSMSI 2025 (si publié, pour 1 000 logements)",      "log", FALSE,
   "carb_hab_total",   "CO₂",        "Empreinte carbone",                  "tCO₂/hab",  1L, "RARE/CITEPA, 2018",           "lin", FALSE,
   "mob_pct_voiture",  "Voiture",    "Part de la voiture (domicile-travail)", "%",      1L, "INSEE MOBPRO, RP 2022",          "lin", FALSE,
   "densite_rang",     "Densité",    "Densité INSEE",                      "",          0L, "INSEE, catégories d'espace 2024", "cat", FALSE

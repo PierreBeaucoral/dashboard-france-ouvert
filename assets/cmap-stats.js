@@ -112,7 +112,29 @@
     return 100 * (less + 0.5 * (lo - less)) / n;
   }
 
-  var api = { quantile7: quantile7, makeBreaks: makeBreaks, classOf: classOf, classShares: classShares,
+  /** Lecteur de valeurs qui comble les villes PLM (audit M2). Les cartes sont dessinées à
+   *  l'arrondissement : la ville (75056...) n'a alors pas de valeur propre et comptait « non
+   *  publié » dans les parts de légende et le gradient. Repli : moyenne simple des
+   *  arrondissements publiés (numérique) ou valeur du premier arrondissement (catégoriel).
+   *  Approximation limitée aux 3 villes, qui ne sert qu'à classer la ville (pas affichée).
+   *  arrOf : {codeVille: [codes arrondissements]}. */
+  function withPlmFallback(get, arrOf) {
+    return function (c) {
+      var v = get(c);
+      if (v != null && (typeof v !== "number" || isFinite(v))) return v;
+      var a = arrOf[c]; if (!a) return v;
+      var s = 0, n = 0, first = null, i, x;
+      for (i = 0; i < a.length; i++) {
+        x = get(a[i]);
+        if (x == null || (typeof x === "number" && !isFinite(x))) continue;
+        if (typeof x !== "number") { if (first == null) first = x; continue; }
+        s += x; n++;
+      }
+      return n ? s / n : (first != null ? first : v);
+    };
+  }
+
+  var api = { withPlmFallback: withPlmFallback, quantile7: quantile7, makeBreaks: makeBreaks, classOf: classOf, classShares: classShares,
               histogram: histogram, weightedQuantiles: weightedQuantiles, percentile: percentile };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.CMapStats = api;
