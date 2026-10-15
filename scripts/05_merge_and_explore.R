@@ -184,8 +184,8 @@ elec_clean <- elec |>
     elec_abstention = pct_abstention_t1,
     elec_marge      = marge_vainqueur,  # T2 : marge du vainqueur (qui a gagné)
     famille_vainqueur,
-    # Part des inscrits de la commune portée par le résultat « tour décisif » (< 1 : circonscriptions
-    # élues au 1er tour exclues du fichier T2, audit r3 A). Voir scripts/02_elections.R.
+    # Inscrits du résultat « tour décisif par bureau » / inscrits au 1er tour : ~1 partout (l'écart est
+    # l'écart d'inscrits publiés entre les deux tours). Voir scripts/02_elections.R.
     elec_couverture_inscrits = couverture_inscrits,
     ctx_inscrits    = inscrits
   )
@@ -464,7 +464,7 @@ INDICATOR_META <- tibble::tribble(
   "elec_pct_lr",                   "% LR (législ. 2024, T1)",       "Élections",      "%",        1,
   "elec_pct_divers",               "% Divers (législ. 2024, T1)",   "Élections",      "%",        1,
   "elec_abstention",               "Abstention (législ. 2024, T1)", "Élections",      "%",        1,
-  "elec_marge",                    "Marge du vainqueur (2nd tour, partiel)",       "Élections",      "pts",      1,
+  "elec_marge",                    "Marge du vainqueur (tour décisif par circonscription)",       "Élections",      "pts",      1,
   "abst_pres22_t1",                "Abstention prés. 2022 T1",      "Élections",      "%",        1,
   "abst_euro24",                   "Abstention européennes 2024",   "Élections",      "%",        1,
   "abst_muni26_t1",                "Abstention municipales 2026 T1","Élections",      "%",        1,
