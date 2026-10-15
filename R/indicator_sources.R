@@ -22,6 +22,7 @@
 .v_dgfip <- .vint("dgfip/comptes_communes.parquet", "annee_dgfip")
 .v_caf   <- .vint("insee_extra/caf_allocataires.parquet", "caf_annee")
 .v_arcep <- .vint("insee_extra/arcep_fibre.parquet", "arcep_trimestre")
+.v_apl   <- .vint("drees/apl_medecins.parquet", "apl_millesime")
 
 IND_SOURCE_RULES <- c(
   "^elec_marge$"                 = "Législatives 2024 (T2)",
@@ -41,7 +42,7 @@ IND_SOURCE_RULES <- c(
   "^(rev_median_2023|taux_pauvrete_2023)$" = "FiLoSoFi 2023",
   "^(revenu_|gini$|pct_imposes$|part_prestations$)" = "FiLoSoFi 2021",
   "^caf_"                        = paste("CAF, fin", .v_caf, "(Mayotte : population 2017)"),
-  "^apl_"                        = "DREES, APL 2023",
+  "^apl_"                        = paste("DREES, APL", .v_apl),
   "^defm_"                       = paste("DARES, DEFM", .v_defm, "(Mayotte : population 2017)"),
   "^taux_chomage_rp$"            = "INSEE, RP 2022",
   "^carb_"                       = "RARE/CITEPA, 2018",

@@ -1,6 +1,6 @@
 ---
 title: "Santé"
-subtitle: "Accès aux soins (APL, DREES 2023) et espérance de vie par département (INSEE 2025)"
+subtitle: "Accès aux soins (APL, DREES) et espérance de vie par département (INSEE 2025)"
 format:
   dashboard:
     include-in-header:
@@ -151,7 +151,7 @@ if (apl_ready) {
     </div>
   </div>
   <div class="cp-source">
-    <strong>Sources</strong> · DREES · APL 2023 (5 pros). INSEE · Espérance de vie 2025, niveau département.<br>
+    <strong>Sources</strong> · DREES · APL `r apl_millesime` (5 pros). INSEE · Espérance de vie 2025, niveau département.<br>
     APL médecins en c/an/hab ; seuil désert médical &lt; 2,5. Autres pros en ETP/100k hab. Espérance de vie en années, valeur du département (pas de mesure communale).
   </div>
 </div>

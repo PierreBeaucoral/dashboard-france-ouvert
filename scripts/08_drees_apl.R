@@ -2,20 +2,27 @@
 # scripts/08_drees_apl.R
 #
 # Bloc 5 (Santé) — Accessibilité Potentielle Localisée (APL) à 5
-# professions de santé : médecins généralistes, infirmières,
-# sages-femmes, chirurgiens-dentistes, kinésithérapeutes.
+# professions de santé : médecins généralistes, infirmiers, sages-femmes,
+# chirurgiens-dentistes, kinésithérapeutes.
 #
-# Source : DREES via data.gouv.fr
-#   Dataset : l-accessibilite-potentielle-localisee-apl
-#   Année retenue : APL 2023 (la plus récente)
+# Source : DREES (data.drees.solidarites-sante.gouv.fr, jeu 530), reprise sur data.gouv.fr :
+#   https://www.data.gouv.fr/datasets/accessibilite-potentielle-localisee-apl-aux-professionnels-de-sante
+#   Éditions de juillet 2026 : un classeur XLSX par profession, un onglet « APL <année> » par
+#   millésime (2022, 2023, 2024). Les URL d'attachement DREES ci-dessous sont stables (le fichier
+#   est remplacé sur place à chaque édition).
 #
-# Format XLSX commun aux 5 fichiers : 8 lignes d'en-tête, puis
-# col 1 = Code commune INSEE, col 2 = Nom commune, col 3 = APL principal,
-# col 4 = APL variante, col 5 = APL médecins ≤65 ans (uniquement médecins),
-# col 7 = Population.
+# Millésime : le plus récent onglet « APL <année> » commun aux 5 classeurs (lu dans les
+# fichiers, jamais figé). Il est écrit dans la colonne `apl_millesime` du parquet, que les
+# pages lisent pour leurs libellés.
 #
-# Sortie : data/processed/drees/apl_medecins.parquet
-#   1 ligne / commune × 5 colonnes apl_xxx
+# Mise en page (éd. 2026) : lignes 1-8 métadonnées (ligne 3 = « Millésime : AAAA »), ligne 9 =
+# intitulés de colonnes, ligne 10 = unités, données dès la ligne 11. col 1 = code commune INSEE,
+# col 2 = commune, col 3 = APL principal. Médecins : col 4/5/6 = APL des médecins de 65 / 62 /
+# 60 ans et moins. Les colonnes sont repérées par leur intitulé, avec stopifnot sur la mise en page.
+#
+# Sortie : data/processed/drees/apl_medecins.parquet (schéma inchangé + `apl_millesime`)
+#   code_commune, nom_commune, apl_medecins, apl_medecins_jeunes (<= 65 ans), apl_infirmieres,
+#   apl_sagefemmes, apl_dentistes, apl_kines, apl_millesime
 # ============================================================
 
 suppressPackageStartupMessages({
@@ -26,80 +33,104 @@ suppressPackageStartupMessages({
   library(glue)
   library(stringr)
   library(purrr)
+  library(tibble)
+  library(curl)
 })
 
 raw_dir <- here::here("data", "raw", "drees")
 out_dir <- here::here("data", "processed", "drees")
 out_path <- file.path(out_dir, "apl_medecins.parquet")
+dir.create(raw_dir, recursive = TRUE, showWarnings = FALSE)
 dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-# Mapping : fichier → nom variable + colonne principale à extraire
+BASE <- paste0("https://data.drees.solidarites-sante.gouv.fr/api/v2/catalog/datasets/",
+               "530_l-accessibilite-potentielle-localisee-apl/attachments/")
+
+# Un classeur par profession. `pat_main` : intitulé attendu de la colonne principale ;
+# `pat_jeunes` : intitulé de la variante « 65 ans et moins » (médecins seulement).
 pros <- list(
-  list(file = "apl_medecins.xlsx",     sheet = "APL 2023", var = "apl_medecins",     col_main = 3, col_jeunes = 5),
-  list(file = "apl_infirmieres.xlsx",  sheet = "APL 2023", var = "apl_infirmieres",  col_main = 3, col_jeunes = NA),
-  list(file = "apl_sagefemmes.xlsx",   sheet = "APL 2023", var = "apl_sagefemmes",   col_main = 3, col_jeunes = NA),
-  list(file = "apl_dentistes.xlsx",    sheet = "APL 2023", var = "apl_dentistes",    col_main = 3, col_jeunes = NA),
-  list(file = "apl_kines.xlsx",        sheet = "APL 2023", var = "apl_kines",        col_main = 3, col_jeunes = NA)
+  list(file = "apl_medecins.xlsx",    att = "indicateur_d_apl_aux_medecins_generalistes_xlsx",
+       var = "apl_medecins",    pat_main = "^APL aux médecins généralistes$",
+       pat_jeunes = "^APL aux médecins généralistes de 65 ans (et|ou) moins$"),
+  list(file = "apl_infirmieres.xlsx", att = "indicateur_d_apl_aux_infirmiers_xlsx",
+       var = "apl_infirmieres", pat_main = "^APL aux infirmi", pat_jeunes = NA),
+  list(file = "apl_sagefemmes.xlsx",  att = "indicateur_d_apl_aux_sages_femmes_xlsx",
+       var = "apl_sagefemmes",  pat_main = "^APL aux sages-femmes$", pat_jeunes = NA),
+  list(file = "apl_dentistes.xlsx",   att = "indicateur_d_apl_aux_chirurgiens_dentistes_xlsx",
+       var = "apl_dentistes",   pat_main = "^APL aux chirurgiens-dentistes$", pat_jeunes = NA),
+  list(file = "apl_kines.xlsx",       att = "indicateur_d_apl_aux_kinesitherapeutes_xlsx",
+       var = "apl_kines",       pat_main = "^APL aux kin", pat_jeunes = NA)
 )
 
-# Helper : parse un XLSX, garde code + APL principal
-parse_apl <- function(spec) {
-  path <- file.path(raw_dir, spec$file)
-  if (!file.exists(path)) {
-    message(glue::glue("  ⚠ {spec$file} manquant"))
-    return(NULL)
+# ---- Téléchargement (cache idempotent ; un XLSX valide est un zip : octets « PK ») ----
+is_xlsx <- function(p) file.exists(p) && file.size(p) > 1e5 &&
+  identical(readBin(p, "raw", 2L), as.raw(c(0x50, 0x4b)))
+for (s in pros) {
+  p <- file.path(raw_dir, s$file)
+  if (!is_xlsx(p)) {
+    message(glue::glue("Téléchargement {s$file}…"))
+    h <- curl::new_handle(useragent = "Mozilla/5.0", followlocation = TRUE)
+    curl::curl_download(paste0(BASE, s$att), p, handle = h, quiet = TRUE)
   }
-  message(glue::glue("  → {spec$file}"))
-  # Skip = 8 ne marche pas universellement ; on essaie 8 puis 7
-  d <- tryCatch(
-    suppressMessages(readxl::read_excel(path, sheet = spec$sheet, skip = 8,
-                                        col_names = FALSE)),
-    error = function(e) NULL
-  )
-  if (is.null(d) || ncol(d) < spec$col_main) {
-    d <- tryCatch(
-      suppressMessages(readxl::read_excel(path, sheet = spec$sheet, skip = 7,
-                                          col_names = FALSE)),
-      error = function(e) NULL
-    )
-  }
-  if (is.null(d)) return(NULL)
-
-  out <- d |>
-    dplyr::filter(!is.na(.data[[paste0("...", 1)]]),
-                  nchar(.data[[paste0("...", 1)]]) == 5) |>
-    dplyr::transmute(
-      code_commune = stringr::str_pad(.data[[paste0("...", 1)]], 5, "left", "0"),
-      nom_commune  = .data[[paste0("...", 2)]],
-      !!spec$var   := suppressWarnings(as.numeric(.data[[paste0("...", spec$col_main)]]))
-    )
-  if (!is.na(spec$col_jeunes) && spec$col_jeunes <= ncol(d)) {
-    out[[paste0(spec$var, "_jeunes")]] <- suppressWarnings(
-      as.numeric(d[[paste0("...", spec$col_jeunes)]][
-        seq_len(nrow(d))[!is.na(d[[paste0("...", 1)]]) &
-                          nchar(d[[paste0("...", 1)]]) == 5]
-      ])
-    )
-  }
-  return(out)
+  if (!is_xlsx(p)) stop("08_drees_apl.R : ", s$file, " n'est pas un XLSX valide (URL changée ?)")
 }
 
-message("→ Lecture des 5 fichiers APL 2023...")
+# ---- Millésime commun le plus récent ----
+sheet_years <- function(p) {
+  sh <- grep("^APL [0-9]{4}$", readxl::excel_sheets(p), value = TRUE)
+  as.integer(sub("^APL ", "", sh))
+}
+common <- Reduce(intersect, purrr::map(pros, ~ sheet_years(file.path(raw_dir, .x$file))))
+stopifnot("aucun onglet « APL <année> » commun aux 5 classeurs" = length(common) > 0)
+MILLESIME <- max(common)
+message("→ Millésime APL retenu (plus récent commun aux 5 classeurs) : ", MILLESIME)
+
+# Helper : lit l'onglet du millésime, vérifie la mise en page, renvoie code + APL
+parse_apl <- function(spec) {
+  path  <- file.path(raw_dir, spec$file)
+  d <- suppressMessages(readxl::read_excel(path, sheet = paste("APL", MILLESIME),
+                                           col_names = FALSE, col_types = "text"))
+  # Garde-fou de mise en page (éd. juillet 2026)
+  stopifnot(
+    # (DREES : l'onglet « APL 2023 » du classeur infirmiers porte « Millésime : 2024 » ; on lit donc
+    # l'onglet du millésime retenu ET on exige que son en-tête annonce le même millésime)
+    "ligne 3 = « Millésime : <millésime de l'onglet> »" = identical(d[[1]][3], paste("Millésime :", MILLESIME)),
+    "ligne 9 col 1 = « Code commune INSEE »" = identical(d[[1]][9], "Code commune INSEE"),
+    "ligne 9 col 2 = « Commune »" = identical(d[[2]][9], "Commune")
+  )
+  hdr <- unlist(d[9, ], use.names = FALSE)
+  col_main <- grep(spec$pat_main, hdr)
+  stopifnot("colonne APL principale introuvable/ambiguë" = length(col_main) == 1L,
+            "colonne principale attendue en col 3" = col_main == 3L)
+  body <- d[-(1:10), ]
+  keep <- !is.na(body[[1]]) & nchar(body[[1]]) == 5L
+  out <- tibble::tibble(
+    code_commune = body[[1]][keep],
+    nom_commune  = body[[2]][keep],
+    !!spec$var  := suppressWarnings(as.numeric(body[[col_main]][keep]))
+  )
+  if (!is.na(spec$pat_jeunes)) {
+    col_j <- grep(spec$pat_jeunes, hdr)
+    stopifnot("colonne « 65 ans et moins » introuvable/ambiguë" = length(col_j) == 1L)
+    out[[paste0(spec$var, "_jeunes")]] <- suppressWarnings(as.numeric(body[[col_j]][keep]))
+  }
+  stopifnot("codes commune dupliqués" = !anyDuplicated(out$code_commune),
+            "moins de 34 000 communes" = nrow(out) > 34000L,
+            "APL négatif" = all(out[[spec$var]] >= 0, na.rm = TRUE),
+            "trop de NA" = mean(is.na(out[[spec$var]])) < 0.02)
+  out
+}
+
+message("→ Lecture des 5 classeurs, onglet APL ", MILLESIME, "...")
 parsed_list <- purrr::map(pros, parse_apl)
 
-# Garde (audit N1) : ces 5 XLSX (feuille « APL 2023 ») ne sont PAS téléchargés par ce script ; les
-# anciennes ressources data.gouv n'existent plus et la nouvelle édition (juillet 2026) a une autre
-# mise en page. Sans fichier, on s'arrête AVANT d'écrire, plutôt que d'écraser apl_medecins.parquet.
-# Script hors du refresh automatique : à relancer à la main quand les fichiers sont déposés dans data/raw/drees/.
-if (length(purrr::compact(parsed_list)) == 0L)
-  stop("08_drees_apl.R : aucun fichier APL dans ", raw_dir, " (source non téléchargeable automatiquement)")
-
-# Réduit par left_join sur code_commune
+# Réduit par left_join sur code_commune (les médecins fixent le périmètre de communes)
 combined <- purrr::reduce(
-  purrr::compact(parsed_list),
+  parsed_list,
   function(a, b) dplyr::left_join(a, b |> dplyr::select(-dplyr::any_of("nom_commune")),
                                   by = "code_commune")
 )
+combined$apl_millesime <- as.integer(MILLESIME)
 
 arrow::write_parquet(combined, out_path)
 
