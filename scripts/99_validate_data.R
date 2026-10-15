@@ -490,16 +490,46 @@ tryCatch({
   for (cc in c("49126", "12218"))
     chk(sum(!is.na(unlist(mg[mg$code_commune == cc, ind]))) >= 40, paste0(cc, " : renumérotée mais < 40 indicateurs (jointures sur l'ancien code ?)"))
 
-  # Round 3 m-R1 : conservation des ventes DVF à travers cog_rename. Pour chaque commune renumérotée,
-  # les ventes de maisons 2024 publiées (commune_merged) = ventes brutes de l'ancien code + du nouveau
-  # (dvf_aggregated.parquet), sous réserve du seuil n >= 5 (règle de 03). Mêmes communes, même année, même type.
+  # Audit MAJOR-2 : le DVF est harmonisé en COG 2026 UNE fois, dans 03_ (cog_helpers.R). Les paires
+  # renumérotées sont dérivées de la table COG (mouvements 41/50), pas écrites à la main. Pour chacune :
+  # (i) plus aucune ligne sous l'ancien code dans dvf_aggregated, (ii) clé (code, année, type) unique,
+  # (iii) les ventes de maisons 2024 publiées dans commune_merged (Profil/Explorer) = celles de
+  # l'agrégat lu par l'Immobilier (sous réserve du seuil n >= 5 de 03).
   dvf_raw <- arrow::read_parquet(here::here("data", "processed", "dvf", "dvf_aggregated.parquet"))
-  for (pr in list(c("49069", "49126"), c("12076", "12218"), c("14011", "14581"), c("69159", "69114"))) {
-    nraw <- sum(dvf_raw$n_transactions[dvf_raw$code_commune %in% pr & dvf_raw$annee == 2024 & dvf_raw$type_local == "Maison"])
-    nmg  <- mg$dvf_n_mai[mg$code_commune == pr[2]]
-    chk(if (nraw >= 5) isTRUE(nmg == nraw) else is.na(nmg),
-        paste0("DVF renumérotée ", pr[2], " : ventes de maisons 2024 publiées (", nmg, ") != brutes ancien + nouveau code (", nraw, ")"))
+  source(here::here("scripts", "cog_helpers.R"))
+  rmap <- cog_map_renamed()
+  chk(nrow(rmap) > 0, "DVF : table COG des communes renumérotées vide")
+  chk(!any(dvf_raw$code_commune %in% rmap$code_avant),
+      paste0("DVF : codes anciens encore présents dans dvf_aggregated : ",
+             paste(head(intersect(dvf_raw$code_commune, rmap$code_avant), 8), collapse = ",")))
+  chk(!anyDuplicated(dvf_raw[c("code_commune", "annee", "type_local")]), "DVF : clé (code, année, type) dupliquée")
+  for (cc in unique(rmap$code_2026)) {
+    nraw <- sum(dvf_raw$n_transactions[dvf_raw$code_commune == cc & dvf_raw$annee == 2024 & dvf_raw$type_local == "Maison"])
+    nmg  <- mg$dvf_n_mai[mg$code_commune == cc]
+    if (length(nmg) == 1L)
+      chk(if (nraw >= 5) isTRUE(nmg == nraw) else is.na(nmg),
+          paste0("DVF renumérotée ", cc, " : ventes de maisons 2024 publiées (", nmg, ") != agrégat Immobilier (", nraw, ")"))
   }
+
+  # Audit mineur 9 : apl_medecins_jeunes = colonne « 65 ans ou moins » du classeur brut (pas la « 62 ans »,
+  # qui était lue à tort en 5e position). Contrôle contre le XLSX quand data/raw est présent.
+  rawa <- here::here("data", "raw", "drees", "apl_medecins.xlsx")
+  if (file.exists(rawa)) {
+    ap <- arrow::read_parquet(here::here("data", "processed", "drees", "apl_medecins.parquet"))
+    sh <- paste("APL", max(ap$apl_millesime, na.rm = TRUE))
+    rw <- suppressMessages(readxl::read_excel(rawa, sheet = sh, col_names = FALSE, col_types = "text"))
+    hd <- unlist(rw[9, ], use.names = FALSE)
+    cj <- grep("65 ans", hd)
+    chk(length(cj) == 1L, "APL brut : colonne « 65 ans » introuvable/ambiguë")
+    if (length(cj) == 1L) {
+      body <- rw[-(1:10), ]
+      rj <- suppressWarnings(as.numeric(body[[cj]])); names(rj) <- body[[1]]
+      v <- ap$apl_medecins_jeunes; names(v) <- ap$code_commune
+      k <- intersect(names(rj)[!is.na(rj)], names(v)[!is.na(v)])
+      chk(length(k) > 30000 && max(abs(rj[k] - v[k])) < 1e-9,
+          "apl_medecins_jeunes != colonne « 65 ans ou moins » du classeur DREES brut")
+    }
+  } else cat("  [ignoré] apl_medecins_jeunes vs brut DREES : data/raw absent (CI de déploiement)\n")
 
   # Round 3 : tous les polygones communaux sont valides (planaire), 1 par commune du cadre, MULTIPOLYGON.
   if (requireNamespace("sf", quietly = TRUE)) {

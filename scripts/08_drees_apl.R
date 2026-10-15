@@ -65,12 +65,23 @@ pros <- list(
 # ---- Téléchargement (cache idempotent ; un XLSX valide est un zip : octets « PK ») ----
 is_xlsx <- function(p) file.exists(p) && file.size(p) > 1e5 &&
   identical(readBin(p, "raw", 2L), as.raw(c(0x50, 0x4b)))
+# Le cache est invalidé si la taille distante (HEAD, Content-Length) diffère de celle du fichier local :
+# une nouvelle édition DREES est ainsi reprise. HEAD en échec ou sans taille -> on garde le cache.
+remote_size <- function(u) tryCatch({
+  h <- curl::new_handle(useragent = "Mozilla/5.0", followlocation = TRUE, nobody = TRUE, timeout = 30)
+  r <- curl::curl_fetch_memory(u, handle = h)
+  as.numeric(curl::parse_headers_list(r$headers)[["content-length"]])
+}, error = function(e) NA_real_)
 for (s in pros) {
   p <- file.path(raw_dir, s$file)
-  if (!is_xlsx(p)) {
+  u <- paste0(BASE, s$att)
+  rs <- remote_size(u)
+  stale <- is_xlsx(p) && length(rs) == 1L && !is.na(rs) && rs > 0 && rs != file.size(p)
+  if (stale) message(glue::glue("{s$file} : taille distante {rs} != locale {file.size(p)}, nouvelle édition ?"))
+  if (!is_xlsx(p) || stale) {
     message(glue::glue("Téléchargement {s$file}…"))
     h <- curl::new_handle(useragent = "Mozilla/5.0", followlocation = TRUE)
-    curl::curl_download(paste0(BASE, s$att), p, handle = h, quiet = TRUE)
+    curl::curl_download(u, p, handle = h, quiet = TRUE)
   }
   if (!is_xlsx(p)) stop("08_drees_apl.R : ", s$file, " n'est pas un XLSX valide (URL changée ?)")
 }
