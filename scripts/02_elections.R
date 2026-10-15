@@ -8,7 +8,7 @@
 #     T1 : elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-
 #          definitifs-du-1er-tour
 #     T2 : elections-legislatives-des-30-juin-et-7-juillet-2024-resultats-
-#          provisoires-du-2nd-tour (slug historique ; titre interne : "définitifs")
+#          definitifs-du-2nd-tour
 #   Ressources utilisées (URL stables, cf. URL_* ci-dessous) :
 #     - resultats-definitifs-par-bureau-de-vote.csv (T1 ~37 Mo, T2 ~17 Mo)
 #     - resultats-definitifs-par-circonscription(s)[-legislatives].csv (T1, T2) : drapeau « élu »
@@ -75,13 +75,11 @@ MIN_SIZE <- c("bv-2024-t1.csv" = 3e7, "bv-2024-t2.csv" = 1.5e7, "circo-2024-t1.c
               "circo-2024-t2.csv" = 1e5, "france-2024-t1.xlsx" = 5e3, "france-2024-t2.csv" = 1e3)
 
 # ---- Mapping nuance MI → famille politique ----
-# Familles = NFP / ENS / LR / RN / Divers. Ajouts du 2026-10-15 (audit r3 A) : REC et RDG
-# tombaient silencieusement dans « Divers » (coalesce par défaut). Choix documentés :
-#   REC (Reconquête) -> RN : extrême droite, même famille que EXD (« RN + alliés + extrême-droite
-#        hors RN »). 238 934 voix au T1 (0,75 % des exprimés).
-#   RDG (Parti radical de gauche) -> NFP : signataire de l'accord de gauche, et les nuances
-#        partisanes SOC/COM/VEC/FI sont déjà dans NFP. 12 434 voix au T1.
-# Une nuance absente de la table fait désormais ÉCHOUER le script (plus de repli silencieux).
+# Familles = NFP / ENS / LR / RN / Divers. Choix du propriétaire (2026-10-15) : REC (Reconquête) et
+# RDG (Parti radical de gauche) restent dans « Divers » : ni nuances du bloc RN (REC a présenté des
+# candidats contre le RN dans 323 de ses 328 circonscriptions), ni du NFP (en 78-10, 82-02 et
+# ZZ06, le candidat RDG s'est présenté contre le candidat officiel UG). Ils sont toutefois LISTÉS
+# explicitement : une nuance absente de la table fait ÉCHOUER le script (plus de repli silencieux).
 nuance_to_famille <- c(
   # NFP / gauche unie
   "UG"  = "NFP",
@@ -89,7 +87,6 @@ nuance_to_famille <- c(
   "SOC" = "NFP",
   "COM" = "NFP",
   "VEC" = "NFP",
-  "RDG" = "NFP",
   # Ensemble (majorité présidentielle + Horizons)
   "ENS" = "ENS",
   "HOR" = "ENS",
@@ -101,7 +98,6 @@ nuance_to_famille <- c(
   "RN"  = "RN",
   "UXD" = "RN",
   "EXD" = "RN",
-  "REC" = "RN",
   # Divers locaux / régionaux / dissidents
   "DVG" = "Divers",
   "DVD" = "Divers",
@@ -110,7 +106,9 @@ nuance_to_famille <- c(
   "REG" = "Divers",
   "ECO" = "Divers",
   "EXG" = "Divers",
-  "DIV" = "Divers"
+  "DIV" = "Divers",
+  "REC" = "Divers",   # Reconquête : voir l'en-tête de la table
+  "RDG" = "Divers"    # Parti radical de gauche : idem
 )
 FAMS <- c("NFP", "ENS", "LR", "RN", "Divers")
 
@@ -414,6 +412,12 @@ arr_dec <- dplyr::filter(arr_dec, code_insee %in% plm_arr_valid)
 stopifnot(setequal(unique(arr_dec$code_insee), plm_arr_valid))
 inscrits_hors <- sum(dplyr::distinct(arr_hors, code_bv, inscrits)$inscrits)
 agg_arr <- commune_table(arr_dec)
+# T1 par arrondissement (mêmes bureaux, 1er tour, même décodage) : parts T1 et couverture
+arr_t1 <- bv_t1 |>
+  dplyr::filter(code_insee %in% plm_cities) |>
+  dplyr::mutate(code_insee = plm_arr_code(code_insee, code_bv)) |>
+  dplyr::filter(code_insee %in% plm_arr_valid)
+agg_arr_t1 <- commune_table(arr_t1)
 
 # ---- Pipeline commune ----
 
@@ -439,35 +443,42 @@ if (length(sans_exprime)) {
 out <- agg_dec
 
 # T1 universel : toutes les communes votent au 1er tour ; parts par famille du T1 conservées
-# (panneau Élections : T1 ET résultat décisif côte à côte).
-agg_t1_extra <- agg_t1 |>
-  dplyr::transmute(
-    code_insee,
-    pct_NFP_t1        = pct_NFP,
-    pct_ENS_t1        = pct_ENS,
-    pct_RN_t1         = pct_RN,
-    pct_LR_t1         = pct_LR,
-    pct_Divers_t1     = pct_Divers,
-    pct_abstention_t1 = pct_abstention,
-    nuance_vainqueur_t1  = nuance_vainqueur,
-    famille_vainqueur_t1 = famille_vainqueur,
-    pct_vainqueur_t1     = pct_vainqueur)
-out <- dplyr::left_join(out, agg_t1_extra, by = "code_insee")
-
-# Couverture : inscrits du résultat affiché / inscrits au 1er tour (toutes circonscriptions).
-# Avec la règle « tour décisif par bureau » tous les bureaux sont couverts ; l'écart résiduel
-# vient des listes électorales qui bougent entre les deux dimanches. Plafonnée à 1 ; au-delà de
-# 25 % d'écart (2 % pour 500 inscrits et plus) ce n'est plus du bruit -> arrêt.
-out <- out |>
-  dplyr::left_join(dplyr::transmute(agg_t1, code_insee, inscrits_t1 = inscrits), by = "code_insee") |>
-  dplyr::mutate(ratio = inscrits / inscrits_t1, inscrits_t1 = NULL,
-                couverture_inscrits = round(pmin(1, ratio), 4))
-stopifnot(!anyNA(out$ratio), all(out$ratio < 1.25), all(out$ratio[out$inscrits >= 500] < 1.02),
-          all(out$ratio > 0.5))
-message(glue::glue("Couverture (inscrits décisifs / T1) : min {round(min(out$ratio), 4)}, ",
+# (panneau Élections : T1 ET résultat décisif côte à côte). Couverture : inscrits du résultat
+# affiché / inscrits au 1er tour (toutes circonscriptions). Avec la règle « tour décisif par
+# bureau » tous les bureaux sont couverts ; l'écart résiduel est la différence observée d'inscrits
+# publiés entre les deux tours (communes d'un seul bureau, p. ex. Louppy-le-Château 149 -> 128).
+# Plafonnée à 1. Garde-fous : ratio > 0,8 partout, > 0,95 dès 500 inscrits, < 1,25 (< 1,02 dès 500).
+add_t1_cov <- function(dec, t1) {
+  extra <- t1 |>
+    dplyr::transmute(
+      code_insee,
+      pct_NFP_t1        = pct_NFP,
+      pct_ENS_t1        = pct_ENS,
+      pct_RN_t1         = pct_RN,
+      pct_LR_t1         = pct_LR,
+      pct_Divers_t1     = pct_Divers,
+      pct_abstention_t1 = pct_abstention,
+      nuance_vainqueur_t1  = nuance_vainqueur,
+      famille_vainqueur_t1 = famille_vainqueur,
+      pct_vainqueur_t1     = pct_vainqueur,
+      inscrits_t1 = inscrits)
+  x <- dplyr::left_join(dec, extra, by = "code_insee") |>
+    dplyr::mutate(ratio = inscrits / inscrits_t1, inscrits_t1 = NULL,
+                  couverture_inscrits = round(pmin(1, ratio), 4))
+  stopifnot(!anyNA(x$ratio), all(x$ratio < 1.25), all(x$ratio[x$inscrits >= 500] < 1.02),
+            all(x$ratio > 0.8), all(x$ratio[x$inscrits >= 500] > 0.95))
+  x$ratio <- NULL
+  stopifnot(all(x$couverture_inscrits > 0 & x$couverture_inscrits <= 1), !anyNA(x$couverture_inscrits))
+  x
+}
+out <- add_t1_cov(out, agg_t1)
+agg_arr <- add_t1_cov(agg_arr, agg_arr_t1)
+# Repli T1 (source sans suffrage exprimé au T2 : Geay) : drapeau pour un libellé véridique
+# (le député y a été élu au 2nd tour mais la source ne publie aucune voix de ce tour).
+out$repli_t1     <- out$code_insee %in% sans_exprime
+agg_arr$repli_t1 <- FALSE
+message(glue::glue("Couverture (inscrits décisifs / T1) : min {min(out$couverture_inscrits)}, ",
                    "{sum(out$couverture_inscrits < 0.99)} communes < 0,99"))
-out$ratio <- NULL
-stopifnot(all(out$couverture_inscrits > 0 & out$couverture_inscrits <= 1), !anyNA(out$couverture_inscrits))
 
 # Libellé officiel COG 2026 (le nom de la composante la plus peuplée serait faux pour
 # une commune nouvelle : « La Longeville » pour Pays-de-Montbenoît).
@@ -491,7 +502,7 @@ arrow::write_parquet(agg_arr, arr_path)
 
 # ---- Rapport ----
 
-message(glue::glue("Couverture < 100 % : {sum(out$couverture_inscrits < 1)} communes ; < 50 % : {sum(out$couverture_inscrits < 0.5)}"))
+message(glue::glue("Couverture < 100 % : {sum(out$couverture_inscrits < 1)} communes ; < 80 % : {sum(out$couverture_inscrits < 0.8)}"))
 n_communes <- nrow(out)
 by_tour    <- out |> dplyr::count(tour, name = "n_communes")
 by_tour_famille <- out |> dplyr::count(tour, famille_vainqueur) |>

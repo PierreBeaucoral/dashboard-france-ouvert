@@ -185,7 +185,7 @@ elec_clean <- elec |>
     elec_marge      = marge_vainqueur,  # T2 : marge du vainqueur (qui a gagné)
     famille_vainqueur,
     # Inscrits du résultat « tour décisif par bureau » / inscrits au 1er tour : ~1 partout (l'écart est
-    # la révision des listes entre les deux tours). Voir scripts/02_elections.R.
+    # l'écart d'inscrits publiés entre les deux tours). Voir scripts/02_elections.R.
     elec_couverture_inscrits = couverture_inscrits,
     ctx_inscrits    = inscrits
   )

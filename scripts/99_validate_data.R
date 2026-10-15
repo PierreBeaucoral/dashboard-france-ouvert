@@ -446,7 +446,7 @@ tryCatch({
 
   # Audit r3 A (reconstruit au bureau de vote) : couverture = inscrits du résultat affiché / inscrits au 1er
   # tour. Désormais ~1 partout ; l'écart résiduel (min observé 0,859 ; 173 communes < 0,99, toutes décidées
-  # au T2) est la révision des listes entre les deux dimanches (communes à 1 bureau de 30-400 inscrits).
+  # au T2) est l'écart d'inscrits publiés entre les deux tours (communes à 1 bureau de 30-400 inscrits).
   # Plancher 0,8 = garde-fou de régression : en dessous, ce serait un vrai trou (circonscription absente).
   chk(!anyNA(el$couverture_inscrits) && all(el$couverture_inscrits > 0 & el$couverture_inscrits <= 1), "élections : couverture_inscrits hors de (0, 1]")
   chk(all(el$couverture_inscrits >= 0.8), paste0("élections : ", sum(el$couverture_inscrits < 0.8), " communes avec couverture < 0,8 (circonscription manquante ?)"))
@@ -459,6 +459,9 @@ tryCatch({
   # Lyon à un bureau près (code BV 0001, 386 inscrits, sans arrondissement identifiable ; cf. scripts/02_elections.R).
   ea <- rd("elections/legislatives_2024_arrondissements.parquet")
   chk(nrow(ea) == 45L && !anyDuplicated(ea$code_insee), "élections : arrondissements != 45 lignes uniques")
+  chk(identical(names(ea), names(el)), "élections : colonnes des arrondissements != colonnes du fichier commune")
+  chk(all(ea$tour %in% c("T1", "T2", "mixte")) && all(ea$couverture_inscrits >= 0.8 & ea$couverture_inscrits <= 1),
+      "élections : tour / couverture des arrondissements hors bornes")
   for (cty in c("75056", "69123", "13055")) {
     a_ <- ea[substr(ea$code_insee, 1, 3) == c(`75056` = "751", `69123` = "693", `13055` = "132")[[cty]], ]
     chk(el$inscrits[el$code_insee == cty] - sum(a_$inscrits) == (if (cty == "69123") 386L else 0L),

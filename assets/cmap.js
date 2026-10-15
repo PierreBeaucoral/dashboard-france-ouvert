@@ -121,7 +121,7 @@
     }
     return naPattern;
   }
-  /* Hachure « résultat partiel » (couverture des inscrits < 99 %) : traits sombres à 45°, posés SUR la
+  /* Hachure « résultat partiel » (couverture des inscrits < 80 %) : traits sombres à 45°, posés SUR la
      * couleur de la famille. Distincte de la hachure grise « non publié » (fond neutre, traits clairs 135°). */
   var partPattern = null;
   function hatchPart(ctx) {
