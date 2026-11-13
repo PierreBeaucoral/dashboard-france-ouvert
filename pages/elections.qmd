@@ -215,8 +215,8 @@ if (elec_ready) {
   </div>
   <div id="elec-natl" class="cp-content"></div>
   <div class="cp-source">
-    <strong>Sources</strong> : Min. Intérieur, Législatives 2024 ; participation 2002-2026 : élections agrégées par bureau de vote (data.gouv.fr), Français de l'étranger exclus.<br>
-    NFP / ENS / LR / RN = familles regroupant les nuances officielles. T1/T2 = 1ᵉʳ / 2nd tour. Résultats reconstruits bureau de vote par bureau de vote : chaque bureau compte avec le tour qui a élu le député de sa circonscription (1ᵉʳ tour si élu dès le 1ᵉʳ tour, sinon 2nd tour), voix cumulées par famille sur la commune. « mixte » = commune coupée entre des circonscriptions élues à des tours différents : ses parts mélangent les deux tours (Paris, Marseille, Lyon, Toulouse, Nice…). Le nombre d'inscrits publié diffère légèrement entre les deux tours dans certaines communes (jusqu'à 14 %, communes d'un seul bureau). Paris, Lyon, Marseille : résultat propre à chaque arrondissement (le bureau lyonnais « 0001 », 386 inscrits sans arrondissement, n'est compté que dans la ville). Reconquête et le PRG (RDG) sont classés dans Divers. Abstention en % des inscrits ; avant 2016, blancs et nuls non distingués.
+    <strong>Sources</strong> · Min. Intérieur, Législatives 2024 par bureau de vote ; participation 2002-2026 : data.gouv.fr, hors Français de l'étranger.<br>
+    Familles NFP / ENS / LR / RN ; Reconquête et PRG dans Divers. Chaque bureau compte au tour qui a élu son député ; « mixte » = commune à cheval sur des circonscriptions élues à des tours différents (Paris, Marseille, Lyon…). Paris, Lyon, Marseille : un résultat par arrondissement. Inscrits publiés parfois différents d'un tour à l'autre (jusqu'à 14 %, petites communes). Abstention en % des inscrits ; blancs et nuls distingués depuis 2016 seulement.
   </div>
 </div>
 ```
